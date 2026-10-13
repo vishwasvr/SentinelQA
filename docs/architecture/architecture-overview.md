@@ -126,15 +126,21 @@ A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as 
 **D-14 note:** the gate is *more* relevant without AI, not less. Free text (event descriptions, review notes, scope, PO findings) is now persisted for 7 years, and BR-04/05 already apply to the CAPA/NCMR create form. It applies to all free-text write endpoints.
 
 ## 13. Open items
+- O-10, O-11, O-12: **Deferred** by Vishwas (2026-10-13) to the [pre-go-live checklist](#14-pre-go-live-checklist-prod).
 - ~~O-08~~ **Resolved:** 7-year retention in prod only; dev/stage synthetic only.
 - ~~O-09~~ **Resolved:** AWS managed keys, no CMKs anywhere.
 - ~~O-01~~ **Resolved:** monthly job running daily-window incremental DynamoDB exports to S3 Glacier, 7-year lifecycle (`25-backup`).
-- **O-10 (new)** Restore runbook: DynamoDB *import from S3* reads full exports. Replaying incremental exports onto a restored baseline needs a custom job. Decide whether to also take a periodic (e.g. annual) **full** export to shorten the restore chain (≈ $0.10/GB per full export).
-- **O-11 (new)** S3 lifecycle does not transition objects smaller than 128 KB by default (behaviour **unverified** in this review). Small export files may stay in S3 Standard. The cost impact is cents, but confirm.
-- **O-12 (new)** Export bucket deletion protection: versioning only (no Object Lock per D-05). Decide whether to add a bucket-policy deny on `s3:DeleteObject*` for all principals except a break-glass role.
 - **O-02** CloudWatch Logs retention (90 days proposed).
 - **O-03** Single-account blast radius. Revisit before production customer data.
 - **O-04** Values for D-07 (weights, bands, due-soon windows) and the controlled-data marker list (D-14).
 - **O-05** Without WAF (D-11), public endpoints rely on API Gateway throttling. Set the throttle values.
 - **O-06** Whether hidden AI modules show a "coming later" state or are removed from navigation (UX).
 - **O-07** BRD OQs unresolved by design: OQ-03, 06, 07, 08, 10, 13 (we log attestation), 14, 15, 17, 18, 21, 22, 23.
+
+## 14. Pre-go-live checklist (prod)
+Complete before the prod go-live. Items deferred by Vishwas on 2026-10-13.
+
+- [ ] **O-10** — *Deferred to pre-go-live (2026-10-13)* Restore runbook: DynamoDB *import from S3* reads full exports. Replaying incremental exports onto a restored baseline needs a custom job. Decide whether to also take a periodic (e.g. annual) **full** export to shorten the restore chain (≈ $0.10/GB per full export).
+- [ ] **O-11** — *Deferred to pre-go-live (2026-10-13)* S3 lifecycle does not transition objects smaller than 128 KB by default (behaviour **unverified** in this review). Small export files may stay in S3 Standard. The cost impact is cents, but confirm.
+- [ ] **O-12** — *Deferred to pre-go-live (2026-10-13)* Export bucket deletion protection: versioning only (no Object Lock per D-05). Decide whether to add a bucket-policy deny on `s3:DeleteObject*` for all principals except a break-glass role.
+- [ ] **Go-live step: one-time FULL export** of the prod `Domain` and `AuditLog` tables (`ExportType=FULL_EXPORT`, PITR on) to the `25-backup` export bucket. This is the baseline for the monthly incremental exports, ≈ $0.10/GB of table size, ≈ $0 at go-live. Record the export time as the initial watermark (`/sentinelqa/prod/backup/last-export-to`).

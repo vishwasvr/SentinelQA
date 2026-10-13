@@ -29,7 +29,7 @@ Decisions applied (2026-10-13): **O-08** (7-year retention in prod only), **O-09
 \* At 100 users in year 7, combined DynamoDB storage (≈ 28 GB) exceeds the account-wide 25 GB always-free by ≈ 3 GB (+$0.78, included).
 
 - **Change vs v0.3 (20 users, year 1):** combined $4.95 → **$4.12** without free tier, $1.39 → **$0.46** with always-free. The $1 CMK fee is gone. Backup adds ≈ $0.06, KMS requests ≈ $0.06 (free within 20k).
-- **One-time setup:** ≈ $0 AWS, plus the one-time **baseline full export** of the prod tables ($0.10/GB, ≈ $0 at go-live size).
+- **One-time setup:** ≈ $0 AWS, plus the one-time **baseline full export** of the prod tables ($0.10/GB, ≈ $0 at go-live size), a go-live step in the overview pre-go-live checklist (§14).
 - **Optional WAF (not in totals):** ≈ $8.06/month.
 - **The non-prod "no free tier" figure is ≈ 80% GitHub Actions minutes** ($1.68). These are normally included in the GitHub plan.
 
@@ -139,7 +139,7 @@ Prod DynamoDB data, 20 users: ≈ 0.67 GB/year → **≈ 4.7 GB at year 7**. Non
 - Each incremental export is billed on the change data processed, with a **10 MB minimum**. At 20–50 users the minimum dominates (≈ 0.6 GB billed/month ≈ $0.06). At 100 users, audit changes (≈ 12 MB/day) exceed it, ≈ $0.09/month.
 - Exported files land in S3 Standard and transition to Glacier Flexible Retrieval ($0.0036/GB-mo) after 1 day. At year 7 that's ≈ 4.7 GB stored ≈ $0.02/month. They expire after 2,557 days.
 - One-time baseline full export at $0.10/GB of table size. ≈ $0 at go-live.
-- **Restore** = import the baseline full export ($0.15/GB) + replay the incrementals (custom job, O-10). Glacier retrieval adds $0.02/GB standard (Deep Archive price shown, Flexible Retrieval retrieval price **unverified**).
+- **Restore** = import the baseline full export ($0.15/GB) + replay the incrementals (custom job, O-10, deferred to the pre-go-live checklist). Glacier retrieval adds $0.02/GB standard (Deep Archive price shown, Flexible Retrieval retrieval price **unverified**).
 
 For comparison, the options not chosen: monthly AWS Backup warm ≈ $19.70/month at year 7, cold ≈ $6, annual AWS Backup ≈ $1.65.
 
@@ -168,7 +168,7 @@ Savings are per month, 20 users, versus the v0.2 design (3 CMKs, PITR everywhere
 | S-3 | **Lambda Function URL** (behind CloudFront OAC) instead of HTTP API | $0.07 ($0.33 at 100 users) | Loses stage throttling (only reserved concurrency: RPS = 10 × concurrency, 429 beyond). Loses the **JWT authorizer seam** (ADR-0008): auth would move into code or the edge. Two functions mean two origins/URLs. The WAF slot stays on CloudFront (ADR-0011 unaffected) | **Not recommended**. The saving is negligible | Would change ADR-0008 (seam) and O-05 (throttling) |
 | S-4 | **Composite alarms** to reduce alarm count | **Negative** ($0.50 each vs $0.10 standard) | Fewer emails, but costs more | Not recommended. Keep ≤ 10 standard alarms (free) | No |
 | S-5 | **Fewer prod alarms** (5 → 3) | $0.20 without free tier, $0 with free tier | Less coverage (drop the audit-errors and gate-blocks alarms) | Not recommended | D-10 unaffected |
-| S-6 | O-01: **S3 incremental export** vs AWS Backup monthly | vs A: **≈ $19.70 at year 7**. vs B (annual): ≈ $1.60 | Restore = import into a new table (slower, $0.15/GB). Glacier minimums and retrieval fees. Not WORM | **Adopted (O-01)**: monthly job, daily-window incremental exports | Consistent with D-05. Restore runbook open (O-10) |
+| S-6 | O-01: **S3 incremental export** vs AWS Backup monthly | vs A: **≈ $19.70 at year 7**. vs B (annual): ≈ $1.60 | Restore = import into a new table (slower, $0.15/GB). Glacier minimums and retrieval fees. Not WORM | **Adopted (O-01)**: monthly job, daily-window incremental exports | Consistent with D-05. Restore runbook deferred to pre-go-live (O-10) |
 | S-7 | **DynamoDB Standard-IA** for prod AuditLog | No free tier: ≈ $0.66 at year 7 (4.4 GB × $0.15) minus ≈ $0.03 extra requests. **With the 25 GB always-free: negative** (the free storage applies to Standard) | IA request prices are ~25% higher. IA PITR price unverified | **Not now**. Revisit if table storage exceeds 25 GB (≈ 90+ users at year 7) | No |
 | S-8 | Prod log retention 90 → 30 days | < $0.01 | Shorter forensic window | Not worth it | O-02 |
 | S-9 | arm64 GitHub runners / skip CI on docs-only changes | ≈ $0.40 / up to $1+ (only if beyond included minutes) | Minor | Adopt opportunistically | D-12 unaffected |
@@ -191,4 +191,4 @@ See §0 (20 / 50 / 100 users, year 1 and year 7). Variable cost ≈ $0.04–0.05
 ## 10. Caveats
 - Usage is assumed, not measured. Validate with Cost Explorer after month 1.
 - List prices retrieved 2026-10-13. No tax, Support plan, discounts, or credits included. New accounts (on/after 2025-07-15) get up to $200 credits, which would cover several years at this run rate if the credits didn't expire after 12 months.
-- Unverified: Glacier Flexible lifecycle-transition and retrieval prices, S3 lifecycle 128 KB minimum-size behaviour (O-11), legacy 12-month free tier, Function URL "no extra charge", IA PITR price, X-Ray, Route 53 queries, domain registration, ACM, Budgets, Deep Archive.
+- Unverified: Glacier Flexible lifecycle-transition and retrieval prices, S3 lifecycle 128 KB minimum-size behaviour (O-11, deferred to the pre-go-live checklist), legacy 12-month free tier, Function URL "no extra charge", IA PITR price, X-Ray, Route 53 queries, domain registration, ACM, Budgets, Deep Archive.
