@@ -58,8 +58,9 @@ Normal exports are write-once (each window has a unique prefix), so a noncurrent
 
 ### 3.1 Technical guards
 
-1. **Seed-only loader:** dev and stage get data only through `scripts/seed` from fixtures in the repo. Every fixture record must carry `isSample: true`. The loader refuses any record without it and refuses to run when `EnvName` = `prod`.
-2. **Write-path check (non-prod):** in `dev` and `stage`, the API rejects creates without `isSample=true` with a 422 `non_sample_data_forbidden`. The env profile turns this on (ADR-0013). Prod ignores it.
+1. **Seed-only loader:** dev and stage get data only through `scripts/seed` from fixtures in the repo. Every fixture record must carry `isSample: true`. The loader refuses any record without it. Per BR-49 (decided by Vishwas, 2026-10-13), the seed command is also the only way sample data reaches prod; in prod it needs the same approval as any other prod write.
+2. **Write-path check (non-prod):** in `dev` and `stage`, the API rejects creates without `isSample=true` with a 422 `non_sample_data_forbidden`. The env profile turns this on (ADR-0013).
+   **Prod (BR-49, decided):** the API rejects any create with `isSample=true` with a 422 `sample_flag_forbidden_in_prod`; nothing is saved and no audit event is written. The UI offers no sample option (openapi.yaml `30a1d00`).
 3. **CI fixture lint (ci.yml stage 7):** fails if a fixture has no `isSample: true`, or if it contains values that look real (email domains other than `example.com`/`example.org`, phone numbers outside the 555-01xx range, or CFR/ITAR markers outside the DP-03 test fixtures).
 4. **No prod-to-nonprod copy path:** the deploy role and cfn-exec have no permission to restore or import prod exports into dev or stage tables. A restore drill uses a short-lived env (`first-deploy.md` §6 step 10) with its own approval.
 
