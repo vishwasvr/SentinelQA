@@ -52,7 +52,7 @@ aws cloudformation deploy --profile sentinelqa-admin --stack-name SentinelQA-sta
   --template-file $T/00-bootstrap.yaml \
   --parameter-overrides EnvName=stage GitHubRepo=vishwasvr/SentinelQA \
     OidcProviderArn=arn:aws:iam::723940054516:oidc-provider/token.actions.githubusercontent.com \
-  --capabilities CAPABILITY_NAMED_IAM --tags app=SentinelQA env=stage --no-execute-changeset
+  --capabilities CAPABILITY_NAMED_IAM --tags Project=SentinelQA Environment=stage ManagedBy=CloudFormation Repo=vishwasvr/SentinelQA --no-execute-changeset
 # expect 5 x Add (AppRoleBoundary, ArtifactBucket, ArtifactBucketPolicy, CfnExecRole, DeployRole)
 # after execute + wait (decided: termination protection ON for stage Bootstrap):
 aws cloudformation update-termination-protection --enable-termination-protection --stack-name SentinelQA-stage-Bootstrap --profile sentinelqa-admin
@@ -91,7 +91,7 @@ Creates SNS topic `SentinelQA-stage-alarms` (+ email subscription). Export `Sent
 ```bash
 aws cloudformation deploy --profile sentinelqa-admin --stack-name SentinelQA-stage-Security --template-file $T/10-security.yaml \
   --parameter-overrides EnvName=stage AlarmEmail="$(gh variable get ALARM_EMAIL --env stage --repo vishwasvr/SentinelQA)" \
-  --role-arn "$EXEC" --tags app=SentinelQA env=stage --no-execute-changeset
+  --role-arn "$EXEC" --tags Project=SentinelQA Environment=stage ManagedBy=CloudFormation Repo=vishwasvr/SentinelQA --no-execute-changeset
 ```
 Verify: `aws sns list-subscriptions-by-topic --profile sentinelqa-admin --topic-arn $(aws cloudformation list-exports --profile sentinelqa-admin --query "Exports[?Name=='SentinelQA-stage-AlarmTopicArn'].Value" --output text)`; confirm the email (first-deploy §4).
 Rollback: `aws cloudformation delete-stack --profile sentinelqa-admin --stack-name SentinelQA-stage-Security`
@@ -103,7 +103,7 @@ Creates DynamoDB `SentinelQA-stage-Domain`, `SentinelQA-stage-AuditLog`, SSM con
 ```bash
 aws cloudformation deploy --profile sentinelqa-admin --stack-name SentinelQA-stage-Data --template-file $T/20-data.yaml \
   --parameter-overrides EnvName=stage EnvProfile=lean \
-  --capabilities CAPABILITY_NAMED_IAM --role-arn "$EXEC" --tags app=SentinelQA env=stage --no-execute-changeset
+  --capabilities CAPABILITY_NAMED_IAM --role-arn "$EXEC" --tags Project=SentinelQA Environment=stage ManagedBy=CloudFormation Repo=vishwasvr/SentinelQA --no-execute-changeset
 ```
 Verify: `aws dynamodb describe-table --profile sentinelqa-admin --table-name SentinelQA-stage-Domain --query Table.TableStatus` (and AuditLog) → `ACTIVE`.
 Rollback: `aws cloudformation delete-stack --profile sentinelqa-admin --stack-name SentinelQA-stage-Data` (sample data only; see nonprod-table-reset.md).
@@ -118,7 +118,7 @@ SHA=<commit-sha>
 aws cloudformation deploy --profile sentinelqa-admin --stack-name SentinelQA-stage-Api --template-file $T/30-api.yaml \
   --parameter-overrides EnvName=stage EnvProfile=lean \
     RecordsApiKey=$SHA/records-api.zip ReportsApiKey=$SHA/reports-api.zip ThrottleRate=10 ThrottleBurst=20 \
-  --capabilities CAPABILITY_NAMED_IAM --role-arn "$EXEC" --tags app=SentinelQA env=stage --no-execute-changeset
+  --capabilities CAPABILITY_NAMED_IAM --role-arn "$EXEC" --tags Project=SentinelQA Environment=stage ManagedBy=CloudFormation Repo=vishwasvr/SentinelQA --no-execute-changeset
 ```
 Verify: `aws cloudformation describe-stacks --profile sentinelqa-admin --stack-name SentinelQA-stage-Api --query "Stacks[0].Outputs" --output table`
 Rollback: `aws cloudformation delete-stack --profile sentinelqa-admin --stack-name SentinelQA-stage-Api`
@@ -131,7 +131,7 @@ Creates web S3 bucket, CloudFront OAC + distribution (API origin with origin-ver
 OV=$(aws ssm get-parameter --profile sentinelqa-admin --name /sentinelqa/stage/edge/origin-verify --with-decryption --query Parameter.Value --output text)
 aws cloudformation deploy --profile sentinelqa-admin --stack-name SentinelQA-stage-Web --template-file $T/40-web.yaml \
   --parameter-overrides EnvName=stage OriginVerifySecret="$OV" WebACLArn="" \
-  --role-arn "$EXEC" --tags app=SentinelQA env=stage --no-execute-changeset
+  --role-arn "$EXEC" --tags Project=SentinelQA Environment=stage ManagedBy=CloudFormation Repo=vishwasvr/SentinelQA --no-execute-changeset
 unset OV
 ```
 Verify: `aws cloudformation list-exports --profile sentinelqa-admin --query "Exports[?Name=='SentinelQA-stage-DistributionDomain'].Value" --output text` then `curl -s -o /dev/null -w '%{http_code}' https://<domain>/health` → 200.
@@ -144,7 +144,7 @@ Creates CloudWatch alarms (records-api errors, API 5xx, Domain/Audit system erro
 ```bash
 aws cloudformation deploy --profile sentinelqa-admin --stack-name SentinelQA-stage-Observability --template-file $T/50-observability.yaml \
   --parameter-overrides EnvName=stage EnvProfile=lean \
-  --role-arn "$EXEC" --tags app=SentinelQA env=stage --no-execute-changeset
+  --role-arn "$EXEC" --tags Project=SentinelQA Environment=stage ManagedBy=CloudFormation Repo=vishwasvr/SentinelQA --no-execute-changeset
 ```
 Verify: `aws cloudwatch describe-alarms --profile sentinelqa-admin --alarm-name-prefix SentinelQA-stage- --query "MetricAlarms[].[AlarmName,StateValue]" --output table`
 Rollback: `aws cloudformation delete-stack --profile sentinelqa-admin --stack-name SentinelQA-stage-Observability`
