@@ -106,6 +106,10 @@ DynamoDB items can be at most 400 KB, and so can each item in a `TransactWriteIt
 5. **What this means in practice.** With the BR field limits (§5), a normal record is a few KB, and a worst case of several full 32 KB free-text fields still fits once compressed. In practice a 413 can only come from extreme non-ASCII free text. It logs `errorCode=item_too_large` with the entity type and byte count only, never the content (§4.1).
 6. **Test hooks.** A unit test runs the size calculation against known item sizes. A boundary test checks that 349 KB passes and 351 KB gets a 413. An integration test confirms that after a 413, neither the Domain item nor any AuditLog item was written.
 
+### 4.4 How the seed command writes (BR-31, BR-49)
+
+`scripts/seed` does **not** call the API. It writes straight to DynamoDB with the operator's temporary `aws login` session, never with the records-api role. Each fixture record goes in through the same audit write module as the API (Developer spec `audit-write-path.md`), in one `TransactWriteItems` call with its `AuditLog` entry, with actor `{name:"seed", userId:null}` and `isSample=true`. That way BR-08 holds for seeded data too. The API's isSample 422s (`non_sample_data_forbidden`, `sample_flag_forbidden_in_prod`, `sample_flag_immutable`) apply only to API callers, so they don't conflict with the seed command. In prod, running the seed needs Vishwas's approval, like any other prod write (`ci-and-data-guards.md` §3).
+
 ## 5. Data model (BRD §6)
 Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (tenancy seam). **No TTL**. Prod retained ≥ 7 years (D-03, amended: prod only, O-08). Prod may also hold labelled sample records (BR-31). Dev/stage hold synthetic or labelled sample data only, never real customer records (BR-45).
 
