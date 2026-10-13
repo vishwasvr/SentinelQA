@@ -53,3 +53,23 @@ After 10-security, AWS emails `vishwas.learn@yahoo.com`. Vishwas must click **Co
 - `prod`: require manual approval with **required reviewer Vishwas**, deployment branches limited to `main`, and no self-review bypass.
 - `stage`: deploy from `main` only. `dev`: unrestricted.
 - Store `AWS_ROLE_ARN` (the deploy role ARN from 00) as an environment variable for each environment. No AWS secrets.
+
+## 6. Post-deploy backup/export verification (prod, 25-backup) — QA-29
+
+Run after 25-backup is first deployed in prod, and again after any change to 25-backup. Use the approved temporary login. Anything marked **[WRITE]** needs Vishwas's explicit approval before it runs. Everything else is read-only.
+
+1. PITR is on for both tables (it must report `ENABLED`):
+   `aws dynamodb describe-continuous-backups --table-name <DomainTable>` and the same for `<AuditLogTable>`.
+2. Both schedules exist and are `ENABLED`:
+   `aws scheduler get-schedule --name SentinelQA-prod-ddb-export-monthly` and `... --name SentinelQA-prod-ddb-export-verify-daily`.
+3. The export bucket has public access blocked and default encryption on:
+   `aws s3api get-public-access-block --bucket <ExportBucketName>` and `aws s3api get-bucket-encryption --bucket <ExportBucketName>`.
+4. **[WRITE]** Take the one-time FULL_EXPORT baseline (go-live), using `aws dynamodb export-table-to-point-in-time` for each table to `s3://<ExportBucketName>/exports/baseline/` with `--s3-sse-algorithm AES256`. Record both export ARNs in the run log.
+5. Poll with `aws dynamodb describe-export --export-arn <arn>` until the status is `COMPLETED`. `FAILED` means stop, investigate, and don't sign off.
+6. Confirm that objects exist under `exports/baseline/` (`aws s3 ls --recursive`) and that `manifest-summary.json` shows an `itemCount` greater than 0.
+7. **[WRITE]** Invoke the function once with `{"mode":"verify"}` (`aws lambda invoke --function-name SentinelQA-prod-ddb-export ...`). Within 15 minutes, check that `SentinelQA/Backup ExportHealthy{Env=prod}` has a datapoint equal to 1 (`aws cloudwatch get-metric-statistics`).
+8. Confirm that alarms `SentinelQA-prod-ddb-export-errors` and `SentinelQA-prod-ddb-export-unhealthy` exist and notify the alarm SNS topic (`aws cloudwatch describe-alarms`). `unhealthy` stays `INSUFFICIENT_DATA` or `ALARM` until three daily healthy datapoints exist.
+9. After the first monthly run on day 2 of the month, repeat steps 5–7 for the INCREMENTAL exports. Check that `/sentinelqa/prod/backup/last-export-to` has moved forward to the start of the current month (`aws ssm get-parameter`).
+10. Restore drill: no restore is done in prod. Doing one needs a short-lived env with prod settings (QA-29 alternative), which needs its own approval.
+
+Record the date, the export ARNs, the step results, and who approved each **[WRITE]** step in the run log in `docs/runbooks/bootstrap-admin-run.md`.
