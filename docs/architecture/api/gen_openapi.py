@@ -61,8 +61,8 @@ schemas={
  'PoFinding':s('object',properties={'rowId':ro(STR),'requirement':FT(),'clause':enum('AS9100D §8.4.3','AS9102'),'status':enum('Missing','Weak','Present','Not captured'),'suggestedWording':FT(),'whyCitation':FT('"Why this citation" note.')}),
  'PoCheck':s('object',allOf=[R('Meta'),R('WriteCommon')],description='Manual entry, observed fields only (BRD §13.2). Field classes per DP-04.',properties={
    'poNumber':STR,'supplier':STR,
-   'supplierId':s('string',description='OQ-14 DECIDED 2026-10-13 (link design is a GUESS, not observed): optional link to a Supplier. Free-text supplier stays as observed.'),
-   'supplierApprovalWarning':ro(s('boolean',description='OQ-14: WARNING ONLY, never blocks a save. GUESS: true when supplierId is set and that Supplier has no SupplierQualification at Active on ASL. Computed on read.')),'part':STR,'quantity':STR,'revision':FT('Observed as free text.'),
+   'supplierId':s('string',description='OQ-14 DECIDED 2026-10-13 (Vishwas approved the rule): optional link to a Supplier. Free-text supplier stays as observed.'),
+   'supplierApprovalWarning':ro(s('boolean',description='OQ-14 DECIDED 2026-10-13: WARNING ONLY, never blocks a save. True when supplierId is set and that Supplier has no SupplierQualification at Active on ASL. Computed on read.')),'part':STR,'quantity':STR,'revision':FT('Observed as free text.'),
    'findings':s('array',items=R('PoFinding')),
    'summaryCounts':ro(s('object',description='Derived count per status',additionalProperties=s('integer')))}),
  'Fai':s('object',allOf=[R('Meta'),R('WriteCommon')],required=['partNumber','partName'],properties={

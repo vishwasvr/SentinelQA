@@ -2482,10 +2482,10 @@ components:
         supplier: *id001
         supplierId:
           type: string
-          description: 'OQ-14 DECIDED 2026-10-13 (link design is a GUESS, not observed): optional link to a Supplier. Free-text supplier stays as observed.'
+          description: 'OQ-14 DECIDED 2026-10-13 (Vishwas approved the rule): optional link to a Supplier. Free-text supplier stays as observed.'
         supplierApprovalWarning:
           type: boolean
-          description: 'OQ-14: WARNING ONLY, never blocks a save. GUESS: true when supplierId is set and that Supplier has no SupplierQualification at Active on ASL. Computed on read.'
+          description: 'OQ-14 DECIDED 2026-10-13: WARNING ONLY, never blocks a save. True when supplierId is set and that Supplier has no SupplierQualification at Active on ASL. Computed on read.'
           readOnly: true
         part: *id001
         quantity: *id001
