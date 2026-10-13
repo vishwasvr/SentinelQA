@@ -50,3 +50,15 @@
 - Logs contain the parameter name but never its value, and the `ConfigErrors` metric is emitted.
 
 **Marker test cases carried forward:** `I.T.A.R`, `C-U-I` and `15 C.F.R. 734` get added to `test_marker_patterns.py` when the build starts.
+
+## 4. Additions (2026-10-13, after Vishwas's BR-49 decision and QA-36/40)
+- **isSample tests (BR-49/US-43, `30a1d00`, `28e42a1`):**
+  - In prod, a create with `isSample=true` returns 422 `sample_flag_forbidden_in_prod`.
+  - In dev and stage, a create without `isSample=true` returns 422 `non_sample_data_forbidden`.
+  - A PATCH that changes `isSample` returns 422 `sample_flag_immutable`, and a PATCH with the same value does nothing.
+  - In every 422 case, neither the Domain item nor the audit item is written.
+- **QA-36:** the #26 smoke test checks the transaction-only Deny (`first-deploy.md` §5b):
+  - a write inside a transaction must succeed,
+  - a bare PutItem must be denied.
+  
+  If the transactional write gets denied, remove only that Deny. The conditional put, the lint rule and the other Denies still apply.
