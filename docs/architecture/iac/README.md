@@ -38,6 +38,7 @@ Import graph: 25←{00,10,20}, 30←{00,20}, 40←30, 50←{10,30}. No cycles. D
 - `aws cloudformation validate-template`: not run (no session; it would be read-only).
 
 ## Deploy flow (documented, not executed)
+Implemented in [`.github/workflows/deploy.yml`](../../../.github/workflows/deploy.yml) (dev/stage; prod TODO) via [`scripts/ci/deploy-env.sh`](../../../scripts/ci/deploy-env.sh). AlarmEmail is passed through `env:` as `"$ALARM_EMAIL"`, not a `${{ }}` expression in the script.
 GitHub Actions (OIDC) → `cfn-lint` + `gen-routes.py` drift check → esbuild bundle and upload `<sha>/<fn>.zip` ([ADR-0014](../adr/0014-build-packaging.md)) → `create-change-set` (CFN execution role) → manual approval (prod reviewer) → `execute-change-set`. No deploy has been performed from this repo.
 
 ## Deferred / removed vs v0.1

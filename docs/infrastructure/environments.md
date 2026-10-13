@@ -47,7 +47,7 @@ Run by InfraDeploy on Vishwas's temporary `aws login` session (profile `sentinel
 1. Verify GitHub environment settings (dev/stage `AWS_DEPLOY_ROLE_ARN`, branch limits) independently.
 2. Set and verify `ALARM_EMAIL` on `dev` and `stage` (PR #6).
 3. Confirm the SNS email subscriptions for `SentinelQA-dev-alarms` and `SentinelQA-stage-alarms`.
-4. First build producing `records-api.zip` / `reports-api.zip`, then pipeline first deploy of Api, Web, Observability (dev, then stage; stage-bootstrap steps 6–9).
+4. Developer adds `npm run build:lambdas` (writes `dist/records-api.zip`, `dist/reports-api.zip`) and `npm run smoke:deployed`; `deploy.yml` (local branch `ci/deploy-workflow`, not pushed) then runs the first build and pipeline first deploy of Api, Web, Observability (dev, then stage; stage-bootstrap steps 6–9).
 5. Smoke test and sample data in stage (stage-bootstrap step 9).
 6. Decide whether to turn termination protection on for `SentinelQA-dev-Bootstrap`.
 7. Apply ADR-0017 tags once accepted.
