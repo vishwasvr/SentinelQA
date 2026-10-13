@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: SentinelQA SKELETON - CloudWatch alarms to SNS email (D-10). lean = 1 alarm, strict = 5 (all within the 10 free alarms). Agent/AI alarms (BR-30) deferred with AI. Not deployed.
+Description: SentinelQA SKELETON - CloudWatch alarms to SNS email (D-10). lean = 1 alarm, strict = 5 here (+2 in 25-backup); 12 alarm metrics account-wide. Agent/AI alarms (BR-30) deferred with AI. Not deployed.
 Parameters:
   EnvName:
     Type: String
@@ -47,32 +47,79 @@ Resources:
     Condition: IsStrict
     Properties:
       AlarmName: !Sub SentinelQA-${EnvName}-DomainSystemErrors
-      Namespace: AWS/DynamoDB
-      MetricName: SystemErrors
-      Dimensions: [{ Name: TableName, Value: !Sub 'SentinelQA-${EnvName}-Domain' }]
-      Statistic: Sum
-      Period: 300
+      AlarmDescription: DynamoDB HTTP 500s on the Domain table. SystemErrors is published only per TableName+Operation, so the main operations are summed (3 alarm metrics).
+      Metrics:
+        - Id: total
+          Expression: FILL(m0,0)+FILL(m1,0)+FILL(m2,0)
+          Label: SystemErrors
+          ReturnData: true
+        - Id: m0
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: AWS/DynamoDB
+              MetricName: SystemErrors
+              Dimensions: [{ Name: TableName, Value: !Sub 'SentinelQA-${EnvName}-Domain' }, { Name: Operation, Value: TransactWriteItems }]
+            Period: 300
+            Stat: Sum
+        - Id: m1
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: AWS/DynamoDB
+              MetricName: SystemErrors
+              Dimensions: [{ Name: TableName, Value: !Sub 'SentinelQA-${EnvName}-Domain' }, { Name: Operation, Value: Query }]
+            Period: 300
+            Stat: Sum
+        - Id: m2
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: AWS/DynamoDB
+              MetricName: SystemErrors
+              Dimensions: [{ Name: TableName, Value: !Sub 'SentinelQA-${EnvName}-Domain' }, { Name: Operation, Value: GetItem }]
+            Period: 300
+            Stat: Sum
       EvaluationPeriods: 1
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
       AlarmActions: [{ 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }]
-  AuditUserErrors:
+  AuditSystemErrors:
     Type: AWS::CloudWatch::Alarm
     Condition: IsStrict
     Properties:
-      AlarmName: !Sub SentinelQA-${EnvName}-AuditUserErrors
-      Namespace: AWS/DynamoDB
-      MetricName: UserErrors
-      Dimensions: [{ Name: TableName, Value: !Sub 'SentinelQA-${EnvName}-AuditLog' }]
-      Statistic: Sum
-      Period: 300
+      AlarmName: !Sub SentinelQA-${EnvName}-AuditSystemErrors
+      AlarmDescription: DynamoDB HTTP 500s on AuditLog writes (audit puts ride in TransactWriteItems) and timeline reads. Replaces the account-level UserErrors alarm (infra M-2).
+      Metrics:
+        - Id: total
+          Expression: FILL(m0,0)+FILL(m1,0)
+          Label: SystemErrors
+          ReturnData: true
+        - Id: m0
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: AWS/DynamoDB
+              MetricName: SystemErrors
+              Dimensions: [{ Name: TableName, Value: !Sub 'SentinelQA-${EnvName}-AuditLog' }, { Name: Operation, Value: TransactWriteItems }]
+            Period: 300
+            Stat: Sum
+        - Id: m1
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: AWS/DynamoDB
+              MetricName: SystemErrors
+              Dimensions: [{ Name: TableName, Value: !Sub 'SentinelQA-${EnvName}-AuditLog' }, { Name: Operation, Value: Query }]
+            Period: 300
+            Stat: Sum
       EvaluationPeriods: 1
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
       AlarmActions: [{ 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }]
-  GateBlocks:
+  GateBlocks:                    # metric is a CODE CONTRACT: records-api emits it via EMF (Powertools Metrics)
     Type: AWS::CloudWatch::Alarm
     Condition: IsStrict
     Properties:

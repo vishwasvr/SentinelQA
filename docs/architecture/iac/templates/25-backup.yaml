@@ -7,10 +7,10 @@ Parameters:
   EnvName:
     Type: String
     AllowedValues: [prod]          # strict profile only (ADR-0013)
-  ArtifactBucket:
-    Type: String
   ExportFnKey:
     Type: String
+    AllowedPattern: '^[0-9a-f]{7,40}/ddb-export\.zip$'
+    Description: <commit-sha>/ddb-export.zip, supplied by the pipeline (ADR-0014)
   RetentionDays:
     Type: Number
     Default: 2557                 # 7 years (D-03 as amended, O-08)
@@ -54,12 +54,15 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement: [{ Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }]
-      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole']
+      PermissionsBoundary: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AppRoleBoundaryArn' }
       Policies:
         - PolicyName: least-privilege-export
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/SentinelQA-${EnvName}-ddb-export:*'
               - Effect: Allow
                 Action: [dynamodb:ExportTableToPointInTime, dynamodb:DescribeContinuousBackups]
                 Resource:
@@ -78,6 +81,7 @@ Resources:
                 Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/backup/last-export-to'
   ExportFn:
     Type: AWS::Lambda::Function
+    DependsOn: ExportFnLogs
     Properties:
       FunctionName: !Sub SentinelQA-${EnvName}-ddb-export
       Runtime: nodejs24.x
@@ -86,7 +90,7 @@ Resources:
       Timeout: 300
       MemorySize: 256
       Role: !GetAtt ExportFnRole.Arn
-      Code: { S3Bucket: !Ref ArtifactBucket, S3Key: !Ref ExportFnKey }
+      Code: { S3Bucket: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-ArtifactBucketName' }, S3Key: !Ref ExportFnKey }
       Environment:
         Variables:
           EXPORT_BUCKET: !Ref ExportBucket
@@ -99,6 +103,10 @@ Resources:
           # INCREMENTAL_EXPORT per <=24h window (NEW_AND_OLD_IMAGES, S3SseAlgorithm=AES256,
           # ClientToken=table+window); windows must be inside the 35-day PITR window, so the job runs on day 2.
           # One-time FULL_EXPORT baseline at go-live (manual/runbook).
+          # mode=verify (daily schedule): DescribeExport on the export ARNs recorded by the last run; emit EMF
+          # metric SentinelQA/Backup ExportHealthy{Env}=1 only if every export is COMPLETED and the watermark is
+          # >= start of the current month (or today <= day 2 + 3 days grace). FAILED, lagging or no run => no datapoint.
+          METRIC_NAMESPACE: SentinelQA/Backup
   ExportFnLogs:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -108,6 +116,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub SentinelQA-${EnvName}-ddb-export-scheduler
+      PermissionsBoundary: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AppRoleBoundaryArn' }
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -134,6 +143,19 @@ Resources:
         Arn: !GetAtt ExportFn.Arn
         RoleArn: !GetAtt SchedulerRole.Arn
         RetryPolicy: { MaximumRetryAttempts: 3 }
+        Input: '{"mode":"export"}'
+  DailyVerifySchedule:            # M-4: catches async FAILED exports and missed/lagging runs
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub SentinelQA-${EnvName}-ddb-export-verify-daily
+      ScheduleExpression: cron(0 9 * * ? *)
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow: { Mode: 'OFF' }
+      Target:
+        Arn: !GetAtt ExportFn.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+        RetryPolicy: { MaximumRetryAttempts: 3 }
+        Input: '{"mode":"verify"}'
   ExportFnErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
@@ -147,6 +169,22 @@ Resources:
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
+      AlarmActions: [{ 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }]
+  ExportHealthAlarm:              # missing data = breaching: no healthy heartbeat for 3 consecutive days
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub SentinelQA-${EnvName}-ddb-export-unhealthy
+      AlarmDescription: Backup export FAILED, lagging past day 5 of the month, or the daily verify did not run (PITR window is 35 days)
+      Namespace: SentinelQA/Backup
+      MetricName: ExportHealthy
+      Dimensions: [{ Name: Env, Value: !Ref EnvName }]
+      Statistic: Maximum
+      Period: 86400
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 3
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
       AlarmActions: [{ 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }]
 Outputs:
   ExportBucketName:
