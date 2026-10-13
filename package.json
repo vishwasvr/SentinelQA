@@ -1,0 +1,27 @@
+{
+  "name": "sentinelqa",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ignore-pattern \"tests/fixtures/**\"",
+    "audit-lint": "eslint --no-error-on-unmatched-pattern src && node scripts/ci/audit-grep.mjs",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "coverage:gate": "node scripts/ci/coverage-gate.mjs",
+    "seed-fixture-lint": "node scripts/ci/seed-fixture-lint.mjs",
+    "releases-path-check": "node scripts/ci/releases-path-check.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@vitest/coverage-v8": "^3.2.7",
+    "eslint": "^9.39.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^3.2.7"
+  }
+}
