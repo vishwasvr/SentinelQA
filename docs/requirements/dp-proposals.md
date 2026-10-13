@@ -1,11 +1,11 @@
-# Decisions Pending — PROPOSED answers
+# Decisions Pending — APPROVED answers (were PROPOSED)
 
 | Item | Value |
 |---|---|
-| Status | **PROPOSED — not approved. Needs Vishwas's approval.** Nothing here is a requirement until it is folded into the BRD |
+| Status | **APPROVED by Vishwas on 2026-10-13** as recommended (Developer review notes adopted where recommended; items marked GUESS below are now Decided). Changes from the proposal: **DP-01** soft-deleted records keep their ID reserved; **DP-12** workspace timezone **America/New_York** (not Chicago); **DP-20** option (b): `dueDate` defaults to open date + N days (SSM `capa-ncmr/default-due-days`, PLACEHOLDER 30), no new form field, Overdue from step 1. Folded into [BRD.md](BRD.md) v1.5 §13.7, which is authoritative. Confidence labels below record the original evidence basis |
 | Author | Business Analyst |
 | Date | 2026-10-13 |
-| Basis | [BRD.md](BRD.md) v1.4.3 §13.3 (DP list), §4–§8, §11 (OQs), screenshots; [developer-review](../reviews/developer-review.md) (DEV-n), [qa-review](../reviews/qa-review.md) (QA-n), [ba-review](../reviews/ba-review.md) (BA-n), [architecture-overview](../architecture/architecture-overview.md), [openapi.yaml](../architecture/api/openapi.yaml) |
+| Basis | [BRD.md](BRD.md) v1.4.3 §13.3 (proposal basis; decisions in v1.5 §13.7) (DP list), §4–§8, §11 (OQs), screenshots; [developer-review](../reviews/developer-review.md) (DEV-n), [qa-review](../reviews/qa-review.md) (QA-n), [ba-review](../reviews/ba-review.md) (BA-n), [architecture-overview](../architecture/architecture-overview.md), [openapi.yaml](../architecture/api/openapi.yaml) |
 
 **Confidence legend.** *Observed* = the recommendation restates behaviour seen in a screenshot or written in the BRD/architecture. *Inferred* = follows from observed behaviour or an existing rule, but the exact rule was not seen. **GUESS** = no evidence; a BA proposal for Vishwas to accept or replace.
 
@@ -27,7 +27,7 @@ These DPs change [openapi.yaml](../architecture/api/openapi.yaml) when decided: 
 | DP-09 | Signed FAI is locked; edits need un-sign (audited); FAIL row cannot clear NCR | Inferred | No |
 | DP-10 | Supplier master is a create/edit record; on-time % and SCAR count entered; links by supplierId | **GUESS** | Yes |
 | DP-11 | Doc number/revision immutable after create; no re-release of same/older revision; revisions compared numeric/numeric or alpha/alpha, mixed rejected | Inferred | Yes |
-| DP-12 | Workspace TZ America/Chicago; thresholds inclusive; due today = Due soon; EOM clamp | Inferred / **GUESS** | Yes |
+| DP-12 | Workspace TZ America/New_York (decided; proposed Chicago); thresholds inclusive; due today = Due soon; EOM clamp | Inferred / **GUESS** | Yes |
 | DP-13 | Oldest first by openedAt; filters AND; tie-break by name | Inferred | No |
 | DP-14 | ISO weeks (Mon) in workspace TZ; opened = createdAt; Pareto cut 80% cumulative | Inferred | No |
 | DP-16 | Three bands: At risk < 60, Watch 60–79, Approved ≥ 80; SSM JSON schema | **GUESS** (bands Observed) | No |
@@ -144,7 +144,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 
 ## DP-12 — Dates and time
 - **Question:** Which timezone defines "today", are thresholds inclusive, what is due-today, and the +N months end-of-month rule?
-- **Recommended:** Workspace timezone America/Chicago (A-07 US users); day count = calendar days between today and the date in that zone; thresholds inclusive (≤ 30 is in the 30-day bucket); due today (0d) = Due soon, Overdue from day −1; +N months clamps to the last day of the month (Jan 31 + 1 → Feb 28/29).
+- **Recommended:** Workspace timezone America/New_York (**decided by Vishwas 2026-10-13**; originally proposed America/Chicago, A-07 US users); day count = calendar days between today and the date in that zone; thresholds inclusive (≤ 30 is in the 30-day bucket); due today (0d) = Due soon, Overdue from day −1; +N months clamps to the last day of the month (Jan 31 + 1 → Feb 28/29).
 - **Alternatives:** (a) UTC dates (matches the observed "Completed 2026-10-13" on Oct 12 CT, OQ-16); (b) due today = Overdue.
 - **Rationale:** UTC caused an off-by-one date for US users in the demo; inclusive buckets match "≤90d" labels.
 - **Evidence:** BR-18, BR-24, BR-25, BR-39, OQ-16; screenshots 43, 51; overview A-07; DEV-21, QA-23.
