@@ -63,9 +63,15 @@ Resources:
                 Resource:
                   - { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' }
                   - !Sub [ '${T}/index/*', { T: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' } } ]
-              - Effect: Deny                      # ADR-0006
-                Action: [dynamodb:UpdateItem, dynamodb:DeleteItem, dynamodb:BatchWriteItem]
+              - Effect: Deny                      # ADR-0006 / QA-28: no in-place change or removal of audit items, incl. PartiQL
+                Action: [dynamodb:UpdateItem, dynamodb:DeleteItem, dynamodb:BatchWriteItem, dynamodb:PartiQLUpdate, dynamodb:PartiQLDelete, dynamodb:PartiQLInsert]
                 Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' }
+              - Effect: Deny                      # QA-28: audit PutItem only inside TransactWriteItems (with its record change). UNVERIFIED until #26 dev smoke proves it.
+                Action: dynamodb:PutItem
+                Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' }
+                Condition:
+                  StringNotEquals:
+                    'dynamodb:EnclosingOperation': TransactWriteItems
               - Effect: Deny                      # ALL envs: removals are soft deletes + audit event (BRD v1.4 §13.1)
                 Action: [dynamodb:DeleteItem, dynamodb:BatchWriteItem]
                 Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' }
