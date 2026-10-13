@@ -1,0 +1,194 @@
+# Decisions Pending — PROPOSED answers
+
+| Item | Value |
+|---|---|
+| Status | **PROPOSED — not approved. Needs Vishwas's approval.** Nothing here is a requirement until it is folded into the BRD |
+| Author | Business Analyst |
+| Date | 2026-10-13 |
+| Basis | [BRD.md](BRD.md) v1.4.3 §13.3 (DP list), §4–§8, §11 (OQs), screenshots; [developer-review](../reviews/developer-review.md) (DEV-n), [qa-review](../reviews/qa-review.md) (QA-n), [ba-review](../reviews/ba-review.md) (BA-n), [architecture-overview](../architecture/architecture-overview.md), [openapi.yaml](../architecture/api/openapi.yaml) |
+
+**Confidence legend.** *Observed* = the recommendation restates behaviour seen in a screenshot or written in the BRD/architecture. *Inferred* = follows from observed behaviour or an existing rule, but the exact rule was not seen. **GUESS** = no evidence; a BA proposal for Vishwas to accept or replace.
+
+Out of this doc: DP-05 and DP-18 (decided v1.4.3; the /compare table content and fixture publication parts of DP-05 are not covered by the decision and remain open), DP-15 (resolved v1.4).
+
+## API contract impact
+These DPs change [openapi.yaml](../architecture/api/openapi.yaml) when decided: **DP-01, DP-02, DP-03, DP-06, DP-07, DP-08, DP-10, DP-11, DP-12.** (openapi already marks stage-advance rules "TBD (DP-02)".) The others are UI/derivation rules only.
+
+## Summary
+| DP | Recommended | Confidence | API |
+|---|---|---|---|
+| DP-01 | `<PREFIX>-<YYYY>-<NNNN>` sequential per type and year, no `DEMO`; user IDs unique per workspace | Inferred | Yes |
+| DP-02 | Forward-only, one step at a time; backward move to Investigation from QM Review only; QM closes; specs below | Inferred / **GUESS** | Yes |
+| DP-03 | Sign off CFR ranges; normalise case/whitespace/punctuation; screen all free text, exempt IDs/names | Inferred / **GUESS** | Yes |
+| DP-04 | Names ≤ 100 chars, titles ≤ 200, IDs ≤ 64, free text ≤ 32 KB | **GUESS** (32 KB Observed, A-06) | No |
+| DP-06 | Bands at integer cut-offs 1–5; round mean to 1 dp; no result until 8/8 | Inferred / **GUESS** | Yes |
+| DP-07 | Per-course recurrence in months; Not started = no completion and start-by date not reached | **GUESS** | Yes |
+| DP-08 | Independent = different normalised name from author and preparer; hard block | Inferred | Yes |
+| DP-09 | Signed FAI is locked; edits need un-sign (audited); FAIL row cannot clear NCR | Inferred | No |
+| DP-10 | Supplier master is a create/edit record; on-time % and SCAR count entered; links by supplierId | **GUESS** | Yes |
+| DP-11 | Doc number/revision immutable after create; no re-release of same/older revision | Inferred | Yes |
+| DP-12 | Workspace TZ America/Chicago; thresholds inclusive; due today = Due soon; EOM clamp | Inferred / **GUESS** | Yes |
+| DP-13 | Oldest first by openedAt; filters AND; tie-break by name | Inferred | No |
+| DP-14 | ISO weeks (Mon) in workspace TZ; opened = createdAt; Pareto cut 80% cumulative | Inferred | No |
+| DP-16 | Three bands: At risk < 60, Watch 60–79, Approved ≥ 80; SSM JSON schema | **GUESS** (bands Observed) | No |
+| DP-17 | FAI tile = FAI records not fully signed; Effectiveness tile = 0/hidden until entity exists | Inferred | No |
+| DP-19 | Re-evaluation date must be after approval date; approval date not in the future | **GUESS** | No |
+| DP-20 | Open CAPA/NCMR with dueDate < today = Overdue, counted in Needs attention | Inferred | No |
+
+---
+
+## DP-01 — Record ID format
+- **Question:** What is the production ID format per entity, and must user-entered IDs be unique?
+- **Recommended:** System IDs `CAPA-YYYY-NNNN`, `NCMR-YYYY-NNNN`, `SCAR-YYYY-NNNN`, `SQ-YYYY-NNN`, `CAL-YYYY-NNN`, `FAIR-YYYY-NNNN`, `DOC-YYYY-NNNN`: year of creation (workspace TZ, DP-12), zero-padded sequence per type and year, no `DEMO` literal; immutable (BR-12). User-entered Equipment ID and Document number must be unique within the workspace (case-insensitive); a duplicate is rejected with 409.
+- **Alternatives:** (a) keep the observed random suffix (`CAL-DEMO-MV5YVOKD`, `FAIR-2026-1576064A`) minus `DEMO`; (b) ULID suffix (no counter).
+- **Rationale:** The sample records (NCMR-2026-0087, SQ-2025-014, CAL-2026-001) all use year + sequence, the format a QM would cite in an audit.
+- **Evidence:** BRD §4.5, §4.8, §4.11, BR-12, BR-22, BR-39; screenshots 35, 13, 43, 41; DEV-10, QA-15, BA-15.
+- **Confidence:** Inferred (pattern Observed in samples; that prod should use it is inferred). Digit widths for FAIR/DOC are **GUESS**. A sequence counter needs a counter item (Architect).
+
+## DP-02 — CAPA/NCMR steps 2–6 and SQ steps 3, 4, 6; transitions
+- **Question:** What fields does each unobserved step hold, and what stage moves are allowed?
+- **Recommended:** The proposed specs below. Transitions: forward one stage at a time; no skipping; a single backward move QM Review → Investigation ("returned for rework"), with a required reason; Closed is terminal; only a named reviewer different from the record author may move QM Review → Closed (DP-08); NCMR needs a disposition before leaving Draft Ready. SQ: forward-only; re-evaluation starts a new SQ record for the same supplier.
+- **Alternatives:** (a) a generic stage advance only (current build fallback, §13.2a), with free-text notes per stage; (b) allow any backward move with a reason.
+- **Rationale:** Stage names and order are observed, and the existing gates (named approver, disposition approver) give the natural validation points; everything else stays minimal.
+- **Evidence:** BRD §4.6, §4.8, BR-10, BR-13, BR-35, BR-36, OQ-06, OQ-07; screenshots 25, 26, 34, 35, 38, 39; DEV-04, QA-14, BA-08.
+- **Confidence:** Stage list and order Observed; transition rules **GUESS**; field specs per below.
+
+### Proposed spec — CAPA/NCMR (all records carry the step-1 fields: ID, type, short title, event description, severity, clause, reviewer name, delivery details/need-by date, disposition for NCMR)
+Common to every step (Observed): "Your name" recorded on each step (BR-11); each advance writes a `STAGE_CHANGED` audit event with actor and from/to (BR-08, openapi generic stage advance); every free-text save carries `controlledDataAttestation=true` and passes the BR-44 gate.
+
+| Step | Proposed fields | Validation to advance | Basis / confidence |
+|---|---|---|---|
+| 2 Containment | Containment actions (free text, required); affected quantity / lot (free text, optional) | Containment actions non-empty | "segregate lot, 100% CMM on remaining stock" and "3 of 40" in the NCMR-2026-0087 drawer (34) — Inferred; field split **GUESS** |
+| 3 Investigation | Root cause candidates (list of free-text items, ≥ 1); confirmed root cause (free text) | ≥ 1 root cause and a confirmed root cause | Drawer "Root cause candidates" (34) — Inferred; "confirmed" field **GUESS** (AI hypotheses deferred, so human-entered) |
+| 4 Draft Ready | Corrective actions (list: action text, owner name, due date); proposed disposition (NCMR only: Use as is, Rework, Repair, Scrap, Return to supplier); `dueDate`; citations (clause refs) | ≥ 1 action; NCMR: disposition set; if Use as is or Repair, independent named approver set (BR-10) | Drawer "Actions", "disposition proposed", "Citations" (34); disposition enum §6 — Observed; per-action owner/due **GUESS** |
+| 5 QM Review | Reviewer decision (Approve / Return to Investigation); decision comment; reviewer name | Approve → Closed allowed; Return requires a comment | Stage name Observed (35); decision options **GUESS** |
+| 6 Closed | Closed date (system), closed by (reviewer name); read-only afterwards except audited corrections | Only from QM Review with Approve | Stage Observed; rules **GUESS** |
+
+Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity observed.
+
+### Proposed spec — Supplier Qualification
+| Step | Proposed fields | Validation to advance | Basis / confidence |
+|---|---|---|---|
+| 3 Risk | Risk classification (Critical / Standard, matching the supply-chain criticality enum); risk rationale (free text) | Classification set | Audit label "Risk classification" (39); Critical/Standard enum §6 — Inferred; rationale **GUESS**. Human-entered (BR-36 v1.2) |
+| 4 Evaluation | Evaluation method (free text, e.g. survey/audit); evaluation result (Acceptable / Not acceptable); notes | Result set; Not acceptable cannot continue to Approval | Audit label "Evaluation" (39) — stage Observed; all fields **GUESS** |
+| 6 Active on ASL | Read-only summary: approved scope, approver, approval date, re-evaluation date + days remaining; status Approved | Reached only via "Approve & add to ASL" (BR-35) | ASL tab columns (13), step 5 fields (39) — Observed; that step 6 is read-only is Inferred |
+
+## DP-03 — Controlled-data gate remainder (O-04)
+- **Question:** Do you sign off the CFR-range reading, and how are normalisation, evasion, field scope and exempt fields handled?
+- **Recommended:** (1) Sign off the v1.4.1 range reading as written in BR-44. (2) Normalise before matching: Unicode NFKC, case-fold, collapse whitespace, treat `.`/`-`/`_` between letters as separators (so `I.T.A.R` and `I T A R` hit). (3) Out of scope: base64, deliberate misspellings, other languages — covered by the attestation, not the matcher. (4) Screen every free-text field (titles, descriptions, notes, scope, location); exempt system IDs, enum values, dates, and person-name fields. (5) Writes without free text still require attestation only if the endpoint accepts any free-text field (openapi). (6) 422 message: "This text appears to contain controlled data (marker: <id>). Remove it and try again." with the input kept in the form, client-side only.
+- **Alternatives:** (a) literal-only markers, no normalisation (simplest, weakest); (b) screen names too (false-positive risk, e.g. a surname "Ear").
+- **Rationale:** Whole-word case-insensitive is already decided; light normalisation closes cheap evasion without exotic false positives.
+- **Evidence:** BR-44, BR-04; ADR-0005; overview O-04 and §4; DEV-13, DEV-27, QA-03, QA-04, QA-20.
+- **Confidence:** (1) Inferred (BA reading of Vishwas's decision); (2)–(6) **GUESS**.
+
+## DP-04 — Field limits
+- **Question:** What are the length and character limits per field?
+- **Recommended:** Person names (reviewer, approver, preparer) 1–100 chars, trimmed, letters/space/`.,'-`; titles 1–200; user IDs (Equipment ID, Document number, PO number) 1–64, `[A-Za-z0-9._/-]`; revision 1–16; free text ≤ 32 KB (A-06). PO-check fields per §13.2 with the same classes.
+- **Alternatives:** (a) only the 32 KB cap on all strings; (b) tighter names (≤ 64).
+- **Rationale:** Gives testable bounds; values are conventional, not observed.
+- **Evidence:** BR-11, §13.2; overview A-06; QA-16, DEV-04.
+- **Confidence:** **GUESS** (only the 32 KB cap is documented).
+
+## DP-06 — QMS maturity bands
+- **Question:** What are the bands besides Defined, how is the mean rounded, and what with < 8 answers?
+- **Recommended:** Mean rounded to 1 decimal (half-up); bands by floor: 1.0–1.9 Initial, 2.0–2.9 Developing, 3.0–3.9 Defined, 4.0–4.9 Managed, 5.0 Optimising; no score until 8/8 answered (progress shown).
+- **Alternatives:** (a) round to nearest band; (b) score partial answers over answered dimensions.
+- **Rationale:** 3.0 → Defined and "Managed" as next band are observed; a 1–5 ladder fits the 1–5 ratings.
+- **Evidence:** BR-28, BR-41, OQ-09; screenshots 54, 56, 57; QA-08, DEV-11.
+- **Confidence:** Defined/Managed Observed; 1-dp display Observed ("3.0 / 5"); other band names and cut-offs **GUESS**.
+
+## DP-07 — Training recurrence and Not started
+- **Question:** What is the recurrence interval and when is an assignment "Not started"?
+- **Recommended:** Recurrence is a per-course setting in months (default none = one-off); on completion the next due = completion date + interval. Not started = no completion recorded and a start-by date (assignment created + N days) in the future; once past, it becomes Overdue.
+- **Alternatives:** (a) one global recurrence (e.g. 12 months); (b) no recurrence in the pilot.
+- **Rationale:** "7d to start" on the R. Chen row implies a start-by date; re-certification courses imply recurrence.
+- **Evidence:** §4.12, BR-40; screenshot 50; DEV-22, QA-24.
+- **Confidence:** start-by concept Inferred; intervals and defaults **GUESS**.
+
+## DP-08 — Segregation of duties
+- **Question:** Who counts as "independent" and as "author", is it a hard block, and how are names compared?
+- **Recommended:** Author = the reviewer name on the record's create event. Independent = a name different from the author (and, for FAI, from the preparer). Compare after trim, collapse inner whitespace, case-fold; initials are **not** expanded ("J. Park" ≠ "Jordan Park"). Hard block (409/422) on the server; the UI disables the action with a message.
+- **Alternatives:** (a) warning only; (b) require a saved Approval Role person (but Approval Roles are not a permission system, BR-19).
+- **Rationale:** Observed gates already hard-block (Sign as Evaluator disabled, Approve disabled); names are self-asserted (ADR-0008), so only a deterministic text comparison is possible.
+- **Evidence:** BR-10, BR-20, BR-33, OQ-03; screenshots 41, 39, 44; DEV-15, QA-07, QA-25.
+- **Confidence:** hard block Inferred; comparison rules **GUESS**.
+
+## DP-09 — FAI after sign-off
+- **Question:** Can a signed FAI be edited or un-signed, and can a FAIL row lose its NCR?
+- **Recommended:** After the preparer signs, Form 1/3 are locked; the preparer may un-sign (audited) only before the evaluator signs, which unlocks editing. After both sign, no edits; corrections need a new FAI (Delta). A committed FAIL row cannot have its NCR cleared (same rule as add-row).
+- **Alternatives:** (a) edits allowed, clearing signatures automatically; (b) no un-sign at all.
+- **Rationale:** Keeps the AS9102 signature meaningful and reuses the observed add-row precondition.
+- **Evidence:** BR-33, BR-34; screenshot 41; QA-25.
+- **Confidence:** Inferred (signing was not exercised).
+
+## DP-10 — Supplier master data
+- **Question:** How are suppliers created and edited, are on-time % and SCAR counts entered or derived, and how are SQ, Supplier and SCAR linked?
+- **Recommended:** A Supplier record (name, commodity, criticality, standards, cert renewal date, on-time %) with create/edit; on-time % entered manually (no PO/receipt data in scope); open SCAR count derived from SCAR records linked by `supplierId`; SQ links to a Supplier by `supplierId` (created at SQ step 1 if new). Flags derived: open SCAR/CAPA linked → flag; next step text chosen by band.
+- **Alternatives:** (a) all fields entered (no derivation); (b) supplier exists only via SQ.
+- **Rationale:** Observed scorecard shows these fields but no data source; derive only what the build already stores.
+- **Evidence:** §4.7, §4.8, BR-16; screenshots 12, 48, 49; DEV-12, BA-12.
+- **Confidence:** **GUESS** (fields Observed; sourcing not observed).
+
+## DP-11 — Keyed record edits (Document)
+- **Question:** Can Document number/revision change, can a revision be re-released, and what is "the same document"?
+- **Recommended:** Same document = same Document number (case-insensitive). Number and revision are immutable after create; a new revision is a new record. Releasing a revision ≤ the current released one (or the same one again) is rejected (409). Concurrent releases: conditional write, second gets 409.
+- **Alternatives:** (a) allow edits to Draft records only; (b) allow re-release of older revisions with a reason.
+- **Rationale:** Matches the key `DOC#<docNo>#REV#<rev>` and the observed auto-supersede of "earlier released revision of the same document".
+- **Evidence:** BR-37, OQ-17; screenshots 44, 46; overview §5; DEV-14, QA-13.
+- **Confidence:** Inferred; revision ordering (alpha vs numeric) **GUESS** — propose simple string compare after uppercase.
+
+## DP-12 — Dates and time
+- **Question:** Which timezone defines "today", are thresholds inclusive, what is due-today, and the +N months end-of-month rule?
+- **Recommended:** Workspace timezone America/Chicago (A-07 US users); day count = calendar days between today and the date in that zone; thresholds inclusive (≤ 30 is in the 30-day bucket); due today (0d) = Due soon, Overdue from day −1; +N months clamps to the last day of the month (Jan 31 + 1 → Feb 28/29).
+- **Alternatives:** (a) UTC dates (matches the observed "Completed 2026-10-13" on Oct 12 CT, OQ-16); (b) due today = Overdue.
+- **Rationale:** UTC caused an off-by-one date for US users in the demo; inclusive buckets match "≤90d" labels.
+- **Evidence:** BR-18, BR-24, BR-25, BR-39, OQ-16; screenshots 43, 51; overview A-07; DEV-21, QA-23.
+- **Confidence:** inclusive buckets Inferred; TZ choice and due-today **GUESS**; EOM clamp **GUESS**.
+
+## DP-13 — Review queue, filters, tie-break
+- **Question:** What age direction/basis does the review queue use, how do filters combine, and how are equal supplier scores ordered?
+- **Recommended:** Severity (Critical > Major > Minor), then oldest `openedAt` first; filters combine with AND; empty state "No records match these filters" with Clear filters; equal supplier scores ordered by name A–Z.
+- **Alternatives:** (a) age by soonest due date; (b) tie-break by criticality.
+- **Rationale:** GSI1 is keyed `severityRank#openedAt`; observed queue (9d left before 12d left) is consistent with either basis.
+- **Evidence:** BR-14, US-10, US-11, US-18; screenshots 09, 12; overview §5; QA-10, QA-11.
+- **Confidence:** Inferred; empty-state text **GUESS**.
+
+## DP-14 — Trend definitions
+- **Question:** What are week boundaries, what counts as "opened", and where is the Pareto cut?
+- **Recommended:** ISO weeks (Monday start) in the workspace TZ, last 12 complete weeks plus the current one; opened = record create date, closed = date it entered Closed; Pareto shows clauses in descending count and marks those making up the first 80% cumulative.
+- **Alternatives:** (a) rolling 7-day windows; (b) top-N clauses instead of 80%.
+- **Rationale:** The observed caption "80% of findings come from …" implies an 80% cumulative cut.
+- **Evidence:** US-12, §4.5; screenshot 09; QA-09.
+- **Confidence:** 80% cut Inferred; week rules **GUESS**.
+
+## DP-16 — Supplier band cut-offs and schema
+- **Question:** What are the band cut-offs and the config schema for weights and bands?
+- **Recommended:** Bands At risk < 60, Watch 60–79, Approved ≥ 80 (PLACEHOLDER). SSM `supplier-risk/weights` JSON: `{"weights":{"openScars":n,"onTimePct":n,"criticality":n,"certFreshness":n},"bands":[{"name":"At risk","min":0},{"name":"Watch","min":60},{"name":"Approved","min":80}],"placeholder":true}`; weights sum to 1; bands sorted by `min`.
+- **Alternatives:** (a) At risk < 50 / Watch < 70; (b) four bands.
+- **Rationale:** Consistent with all observed points (48 At risk, 62 Watch, 84 Approved); 74 (Precision Heat) is unobserved and would be Watch.
+- **Evidence:** BR-16, BR-47, OQ-01; screenshots 12, 48, 49; overview §3, O-04; QA-01.
+- **Confidence:** band names Observed; cut-offs and schema **GUESS**.
+
+## DP-17 — Dashboard tile sources
+- **Question:** What feeds "FAI sign-off pending" and "Effectiveness checks due"?
+- **Recommended:** FAI sign-off pending = FAI records not removed where preparer or evaluator has not signed. Effectiveness checks due = shown as 0 with "Not tracked in this build" until an effectiveness-check entity is decided.
+- **Alternatives:** (a) hide the Effectiveness tile; (b) count CAPAs in Closed with a follow-up date (needs a new field).
+- **Rationale:** FAI signature state exists; no effectiveness entity was observed, so counting one would be invention.
+- **Evidence:** §4.4; screenshot 08; BA-16.
+- **Confidence:** FAI tile Inferred; Effectiveness handling **GUESS**.
+
+## DP-19 — SQ date validation
+- **Question:** May the re-evaluation date be before the approval date, or the approval date be in the future?
+- **Recommended:** Re-evaluation/expiry date must be after the approval date (422 otherwise); approval date must be ≤ today (workspace TZ).
+- **Alternatives:** (a) warnings only; (b) allow future approval dates (scheduled approvals).
+- **Rationale:** Both cases make the ASL entry inconsistent; dates are entered manually with no observed checks.
+- **Evidence:** BR-35; screenshot 39; QA-24.
+- **Confidence:** **GUESS** (no validation observed).
+
+## DP-20 — CAPA/NCMR overdue rule (OQ-25)
+- **Question:** Should past-due open CAPA/NCMR be flagged and counted like BR-42 items?
+- **Recommended:** A CAPA/NCMR not in Closed with `dueDate` before today (DP-12) is Overdue: Overdue badge in Records and the review queue, counted in the dashboard Needs attention list and its "items need attention" total, and an overdue split on the Awaiting review tile. No Due soon state for CAPA/NCMR (the "days left" display already covers it). Query via the existing GSI2 `dueAt`.
+- **Alternatives:** (a) display-only (red "overdue" in place of "Nd left"), not counted; (b) also add a CAPA/NCMR Due soon window (BR-47 config).
+- **Rationale:** Matches how training, calibration and supplier items are treated (BR-42) and uses the index that already exists.
+- **Evidence:** OQ-25, BR-14, BR-42; screenshots 08, 09, 34, 35; overview §5 (GSI2); Architect finding #29 (DEV-29).
+- **Confidence:** Inferred (no CAPA/NCMR overdue display observed; rule extends BR-42). Changes the BR-42 seed count only if seeded records are past due.
