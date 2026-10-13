@@ -54,6 +54,16 @@ After 10-security, AWS emails `vishwas.learn@yahoo.com`. Vishwas must click **Co
 - `stage`: deploy from `main` only. `dev`: unrestricted.
 - Store `AWS_ROLE_ARN` (the deploy role ARN from 00) as an environment variable for each environment. No AWS secrets.
 
+## 5a. Prod gate: no PLACEHOLDER parameters (before the prod deploy approval)
+
+Before the prod reviewer (Vishwas) approves the prod deploy, confirm that no prod SSM parameter is still labelled PLACEHOLDER. This is read-only:
+
+`aws ssm get-parameters-by-path --path /sentinelqa/prod/ --recursive --query "Parameters[?contains(Value, 'PLACEHOLDER')].Name"`
+
+Also check the source files: `rg -n PLACEHOLDER docs/architecture/iac/templates docs/architecture/iac/params` must show no prod-bound values. This covers risk weights, due-soon days and `capa-ncmr/default-due-days`. (SecureString values like the origin secret are not printed. The query returns names only.)
+
+If anything is found, **stop**. Don't approve. Get the tuned value from Vishwas, update it, and re-run this check. Record the result in the run log.
+
 ## 6. Post-deploy backup/export verification (prod, 25-backup) — QA-29
 
 Run after 25-backup is first deployed in prod, and again after any change to 25-backup. Use the approved temporary login. Anything marked **[WRITE]** needs Vishwas's explicit approval before it runs. Everything else is read-only.
