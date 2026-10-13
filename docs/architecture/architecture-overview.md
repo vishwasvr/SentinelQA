@@ -83,6 +83,18 @@ Powertools Logger default keys (`service`, `cold_start`, `function_arn`, `xray_t
 
 - No PII and no body in any field. Stack traces only at `ERROR`, with messages that do not echo input. Metrics stay EMF (§4 step 2).
 
+### 4.2 Runtime config: caching and failure handling (architecture rule, QA-31)
+
+All SSM parameters under `/sentinelqa/<env>/` are read through one config loader (Powertools Parameters), cached per Lambda instance for **5 minutes** (same TTL as the origin-verify secret, ADR-0015). A changed value therefore takes effect within 5 minutes, with no redeploy. If a refresh fails, the last good cached value is kept until the instance is recycled. A cold start with no cached value follows the rules below.
+
+| Parameter | Missing or unreadable | Malformed (fails schema check) |
+|---|---|---|
+| `edge/origin-verify` | Fail closed: 403 `forbidden_origin` on every request | Same as missing |
+| `controlled-data/markers`, `controlled-data/cfr-ranges` | **Fail closed:** writes that carry free text get 503 `config_unavailable`; reads still work. The gate never runs with an empty list | Same as missing (e.g. a range with `partFrom > partTo` or a non-integer title) |
+| `supplier-risk/weights` (DP-16), `due-soon-days`, `capa-ncmr/default-due-days` (DP-20), `workspace/timezone` (DP-12) | The affected routes return 503 `config_unavailable`; other routes still work. No silent built-in defaults | Same as missing. Checks: weights sum to 1 ±0.001, bands sorted by `min`, day values are positive integers, timezone is a valid IANA name |
+
+Every failure logs `errorCode=config_unavailable` with the parameter **name** only, never its value (§4.1). It also emits the EMF metric `SentinelQA`/`ConfigErrors` {`Env`}, which goes into the existing 5xx/error alarm. Test hooks: unit tests feed the loader missing, unreadable and malformed values and check the status codes above.
+
 ## 5. Data model (BRD §6)
 Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (tenancy seam). **No TTL**. Prod retained ≥ 7 years (D-03, amended: prod only, O-08). Prod may also hold labelled sample records (BR-31). Dev/stage hold synthetic or labelled sample data only, never real customer records (BR-45).
 
