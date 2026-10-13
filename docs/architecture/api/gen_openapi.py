@@ -23,7 +23,7 @@ schemas={
    'version':ro(s('integer',description='Optimistic-concurrency counter, returned as ETag "W/\\"<version>\\""')),
    'createdAt':ro(TS),'updatedAt':ro(TS),
    'deletedAt':ro({**TS,'description':'Soft delete (BRD §13.1). Removed items are excluded from lists, counts and pickers.'}),
-   'isSample':ro(s('boolean',description='BR-31: true for the illustrative seed set (labelled "ILLUSTRATIVE — SAMPLE RECORDS"). Allowed in every env.')),
+   'isSample':s('boolean',description='BR-31: true for the illustrative seed set (labelled "ILLUSTRATIVE — SAMPLE RECORDS"). Allowed in every env. Client-settable on create only (immutable after). dev/stage: required true on create, else 422 non_sample_data_forbidden (BR-45, QA-34). prod: an isSample=true create from the client is ignored and stored as false; only the seed loader sets it.'),
    'draft':ro(s('object',description='Reserved AI seam (BRD §12 #1). Always null in this build.',nullable=True)),
    'aiAssisted':ro(s('boolean',const=False))}),
  'WriteCommon':s('object',required=['actorName'],properties={
@@ -102,7 +102,7 @@ params={
 }
 def prob(st,desc): return {'description':desc,'content':{'application/problem+json':{'schema':R('Problem')}}}
 resp={'BadRequest':prob(400,'Validation error or gate:attestation_required (BR-44)'),
- 'Unprocessable':prob(422,'gate:controlled_marker (BR-44). Nothing persisted, no audit event. Message names the marker id; input is kept client-side only (DP-03).'),
+ 'Unprocessable':prob(422,'gate:controlled_marker (BR-44). Nothing persisted, no audit event. Message names the marker id; input is kept client-side only (DP-03). Also, dev/stage only: non_sample_data_forbidden (BR-45, QA-34): a create without isSample=true is rejected; nothing persisted, no audit event. Enabled by the env profile (ADR-0013); prod ignores it.'),
  'NotFound':prob(404,'Not found (or soft-deleted)'),'Conflict':prob(409,'stage_conflict, sod_violation or idempotency_conflict'),
  'PreconditionFailed':prob(412,'version_conflict'),'PreconditionRequired':prob(428,'If-Match missing'),
  'Forbidden':prob(403,'forbidden_origin: request did not come through CloudFront (ADR-0015)'),'TooMany':prob(429,'rate_limited (API Gateway throttle)')}
@@ -172,6 +172,7 @@ doc={'openapi':'3.1.0','info':{'title':'SentinelQA API','version':'0.5.0','descr
  '- **Idempotency**: `Idempotency-Key` (UUID) required on every POST; 24 h dedupe record in the Domain table plus `ClientRequestToken` on TransactWriteItems.\n'
  '- **Concurrency**: `version` attribute; responses carry `ETag`; PATCH/DELETE/actions need `If-Match` (428 if missing, 412 if stale). Stage moves are additionally conditional on `fromStage` (409).\n'
  '- **Soft delete**: DELETE sets `deletedAt` and appends a DELETED audit event; lists exclude deleted unless `includeDeleted=true` (BRD §13.1).\n'
+ '- **Real-data guard (BR-45, QA-34; dev/stage only)**: creates must carry `isSample=true`, else 422 `non_sample_data_forbidden`; nothing persisted. Prod ignores the flag. See `iac/ci-and-data-guards.md` §3.\n'
  '- **Controlled-data gate (BR-44)**: free-text fields (`x-free-text`) require `controlledDataAttestation=true` (else 400 `gate:attestation_required`); a marker hit (whole-word, case-insensitive, list in SSM) → 422 `gate:controlled_marker`; nothing persisted, no audit event, text never logged.\n'
  '- **Audit**: every successful write appends one AuditLog event in the same transaction (BR-08, BR-46).\n'
  '- **Sample data (BR-31)**: seed items carry `isSample=true` in every env.\n'

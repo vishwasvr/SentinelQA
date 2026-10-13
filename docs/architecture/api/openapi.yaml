@@ -20,6 +20,9 @@ info:
 
     - **Soft delete**: DELETE sets `deletedAt` and appends a DELETED audit event; lists exclude deleted unless `includeDeleted=true` (BRD §13.1).
 
+    - **Real-data guard (BR-45, QA-34; dev/stage only)**: creates must carry `isSample=true`, else 422 `non_sample_data_forbidden`; nothing persisted. Prod ignores the flag. See `iac/ci-and-data-guards.md`
+    §3.
+
     - **Controlled-data gate (BR-44)**: free-text fields (`x-free-text`) require `controlledDataAttestation=true` (else 400 `gate:attestation_required`); a marker hit (whole-word, case-insensitive, list
     in SSM) → 422 `gate:controlled_marker`; nothing persisted, no audit event, text never logged.
 
@@ -2036,8 +2039,8 @@ components:
           readOnly: true
         isSample:
           type: boolean
-          description: 'BR-31: true for the illustrative seed set (labelled "ILLUSTRATIVE — SAMPLE RECORDS"). Allowed in every env.'
-          readOnly: true
+          description: 'BR-31: true for the illustrative seed set (labelled "ILLUSTRATIVE — SAMPLE RECORDS"). Allowed in every env. Client-settable on create only (immutable after). dev/stage: required
+            true on create, else 422 non_sample_data_forbidden (BR-45, QA-34). prod: an isSample=true create from the client is ignored and stored as false; only the seed loader sets it.'
         draft:
           type:
           - object
@@ -2724,7 +2727,8 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
     Unprocessable:
-      description: gate:controlled_marker (BR-44). Nothing persisted, no audit event. Message names the marker id; input is kept client-side only (DP-03).
+      description: 'gate:controlled_marker (BR-44). Nothing persisted, no audit event. Message names the marker id; input is kept client-side only (DP-03). Also, dev/stage only: non_sample_data_forbidden
+        (BR-45, QA-34): a create without isSample=true is rejected; nothing persisted, no audit event. Enabled by the env profile (ADR-0013); prod ignores it.'
       content:
         application/problem+json:
           schema:
