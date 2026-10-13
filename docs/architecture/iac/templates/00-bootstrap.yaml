@@ -107,6 +107,13 @@ Resources:
             Effect: Allow
             Action: [ssm:GetParameter, ssm:GetParameters, ssm:PutParameter]
             Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*
+          - Sid: AllowSsmSecureStringDecrypt  # AWS managed aws/ssm key, via SSM only
+            Effect: Allow
+            Action: kms:Decrypt
+            Resource: !Sub arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/*
+            Condition:
+              StringEquals: { 'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com' }
+              ForAnyValue:StringEquals: { 'kms:ResourceAliases': alias/aws/ssm }
           - Sid: AllowTelemetry
             Effect: Allow
             Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents, cloudwatch:PutMetricData, xray:PutTraceSegments, xray:PutTelemetryRecords]
@@ -291,6 +298,17 @@ Resources:
                 Resource:
                   - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/SentinelQA-${EnvName}-deploy
                   - !Ref AppRoleBoundary
+              - Sid: ReadOriginVerifySecret  # ADR-0015; pipeline passes it as NoEcho OriginVerifySecret to 40-web
+                Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/edge/origin-verify
+              - Sid: DecryptOriginVerifySecret
+                Effect: Allow
+                Action: kms:Decrypt
+                Resource: !Sub arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/*
+                Condition:
+                  StringEquals: { 'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com', 'kms:EncryptionContext:PARAMETER_ARN': !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/edge/origin-verify' }
+                  ForAnyValue:StringEquals: { 'kms:ResourceAliases': alias/aws/ssm }
               - Sid: ArtifactUpload  # keys: <commit-sha>/<function>.zip
                 Effect: Allow
                 Action: [s3:PutObject, s3:GetObject]

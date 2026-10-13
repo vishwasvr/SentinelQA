@@ -2,10 +2,7 @@
   "_comment": "Per-stack parameter values for prod; convert to --parameter-overrides per template. Not deployed.",
   "all": {
     "EnvName": "prod",
-    "EnvProfile": "strict",
-    "AwsAccountId": "723940054516",
-    "AwsRegion": "us-east-1",
-    "GitHubEnvironment": "prod"
+    "EnvProfile": "strict"
   },
   "00-bootstrap": {
     "GitHubRepo": "vishwasvr/SentinelQA",
@@ -15,7 +12,6 @@
     "AlarmEmail": "vishwas.learn@yahoo.com"
   },
   "30-api": {
-    "ArtifactBucket": "sentinelqa-prod-artifacts-723940054516",
     "RecordsApiKey": "PIPELINE_SUPPLIED:<commit-sha>/records-api.zip",
     "ReportsApiKey": "PIPELINE_SUPPLIED:<commit-sha>/reports-api.zip",
     "ThrottleRate": 20,
@@ -25,10 +21,16 @@
     "WebACLArn": ""
   },
   "25-backup": {
-    "ArtifactBucket": "sentinelqa-prod-artifacts-723940054516",
     "ExportFnKey": "PIPELINE_SUPPLIED:<commit-sha>/ddb-export.zip",
     "RetentionDays": 2557
   },
   "_oidc_note": "OidcProviderArn existence is UNVERIFIED. One provider per account; it is created outside per-env stacks, only after explicit approval (see docs/runbooks/first-deploy.md).",
-  "_code_keys_note": "Lambda S3 keys are supplied by the pipeline at deploy time as <commit-sha>/<function>.zip; never hard-coded here."
+  "_code_keys_note": "Lambda S3 keys are supplied by the pipeline at deploy time as <commit-sha>/<function>.zip; never hard-coded here.",
+  "_origin_verify_note": "40-web OriginVerifySecret is NOT stored here: the pipeline reads SSM SecureString /sentinelqa/prod/edge/origin-verify and passes it as a NoEcho override (ADR-0015).",
+  "_meta": {
+    "AwsAccountId": "723940054516",
+    "AwsRegion": "us-east-1",
+    "GitHubEnvironment": "prod",
+    "_note": "Not template parameters. 'all' keys go only to stacks that declare them (EnvProfile: 20-data, 30-api, 50-observability)."
+  }
 }
