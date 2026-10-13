@@ -76,8 +76,8 @@ In-scope means not tagged Deferred. The fully deferred items are US-01, 05, 07, 
 ## 6. Responses — status after decisions (2026-10-13, BRD v1.4)
 BA responses: [ba-responses.md](ba-responses.md). Decisions: BRD §13.5.
 - **Closed:**
-  - **BA-03:** dev/stage reset procedure defined in InfraDeploy's [non-prod table reset runbook](../runbooks/nonprod-table-reset.md) (operator action, dev/stage only; BRD §13.1). The Architect's link from ADR-0006 to the runbook is not present yet; the runbook says it will be added.
-  - **BA-04:** whole-word, case-insensitive matching; marker list includes ITAR, EAR, CUI, 22 CFR 120-130 and 15 CFR 730-774 (BR-44). The IaC SSM list still needs updating to match (Architect/InfraDeploy).
+  - **BA-03:** fully closed. Dev/stage reset procedure in InfraDeploy's [non-prod table reset runbook](../runbooks/nonprod-table-reset.md) (operator action, dev/stage only; BRD §13.1). ADR-0006 now links the runbook (Architect commits incl. aad1cd1..ff3b1ef; runbook 6260965).
+  - **BA-04:** fully closed. Whole-word, case-insensitive matching; marker list in `20-data.yaml` includes ITAR, EAR, CUI, 22 CFR 120-130 and 15 CFR 730-774 (BR-44).
   - **BA-10:** ⌘K is client-side over loaded lists; no server endpoint (US-41).
 - **Partly closed:** BA-06 (PLACEHOLDER defaults in config; values, bucket structure and band schema pending DP-16); BA-15 (sample data allowed in all envs; ID format pending DP-01).
 - **Still open:** BA-05 (screened fields, write coverage → DP-03) and all other findings not listed above.
