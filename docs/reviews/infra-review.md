@@ -10,7 +10,7 @@ Paths below are relative to `docs/architecture/iac/` unless stated.
 |---|---|---|---|
 | B-1 | blocker | InfraDeploy | ~~Deploy role cannot actually deploy anything (no CFN service role, no resource perms)~~ **Fixed in 3c6dbdf** |
 | B-2 | blocker | InfraDeploy | ~~Lambda artifact bucket is referenced but never created; deploy role cannot upload to it~~ **Fixed in 3c6dbdf** (30-api/25-backup still to import `SentinelQA-<env>-ArtifactBucketName`) |
-| B-3 | blocker | Vishwas | All param files have `TODO` values (repo, OIDC ARN, alarm email, artifact keys) |
+| B-3 | blocker | Vishwas | All param files have `TODO` values (repo, OIDC ARN, alarm email, artifact keys) — **Partially resolved (commit below)**: params filled (account 723940054516, repo, OIDC ARN [existence unverified], alarm email, artifact buckets; code keys pipeline-supplied). Still pending: Lambda code (B-4, Developer); `AlarmEmail` AllowedPattern in 10-security (Architect) |
 | B-4 | blocker | Developer | Lambda code (`records-api`, `reports-api`, `ddb-export`) doesn't exist; stacks 30/25 can't be created without zips |
 | M-1 | major | InfraDeploy | Prod alarm `ApiServerErrors` uses literal `TODO-ApiId`, so it never fires |
 | M-2 | major | InfraDeploy | `AuditUserErrors` alarm uses a `TableName` dimension DynamoDB doesn't publish for `UserErrors`, so it never fires |
@@ -36,6 +36,7 @@ Paths below are relative to `docs/architecture/iac/` unless stated.
 - **B-2 fixed (3c6dbdf)**: `sentinelqa-<env>-artifacts-<AccountId>` (versioned, SSE-S3, BPA, BucketOwnerEnforced, TLS-only policy, noncurrent versions expire after 30 days by default). Exported as `SentinelQA-<env>-ArtifactBucketName`. Deploy role has `s3:PutObject/GetObject` on it. Keys: `<commit-sha>/<function>.zip`.
 - **Developer #19 fixed (3c6dbdf)**: see D-19.
 - **M-7 resolved by runbook**: docs/runbooks/nonprod-table-reset.md + draft `scripts/reset-nonprod-tables.sh`.
+- **B-3 partially resolved**: see summary row; repo and OIDC ARN `AllowedPattern` added in 00-bootstrap; runbook docs/runbooks/first-deploy.md added.
 - Still open: 30-api and 25-backup roles must set `PermissionsBoundary: !ImportValue SentinelQA-<env>-AppRoleBoundaryArn` (Architect-owned files), otherwise their CreateRole is denied. The artifact bucket must be wired into 30-api/25-backup/params (B-3/m-2). The pipeline must pass `--role-arn` with the exec role.
 
 ## Findings in detail

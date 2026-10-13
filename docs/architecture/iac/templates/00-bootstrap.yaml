@@ -10,10 +10,12 @@ Parameters:
     AllowedValues: [dev, stage, prod]
   GitHubRepo:
     Type: String
-    Description: owner/repo (open item)
+    Description: owner/repo, e.g. vishwasvr/SentinelQA
+    AllowedPattern: '^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$'
   OidcProviderArn:
     Type: String
-    Description: Existing token.actions.githubusercontent.com provider ARN (one per account)
+    Description: Existing token.actions.githubusercontent.com provider ARN (one per account, created outside this stack)
+    AllowedPattern: '^arn:aws[a-z-]*:iam::[0-9]{12}:oidc-provider/token\.actions\.githubusercontent\.com$'
   ArtifactNoncurrentDays:
     Type: Number
     Default: 30

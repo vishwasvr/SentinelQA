@@ -1,20 +1,23 @@
 {
-  "_comment": "SKELETON. Per-stack parameter values for prod; convert to --parameter-overrides per template.",
+  "_comment": "Per-stack parameter values for prod; convert to --parameter-overrides per template. Not deployed.",
   "all": {
     "EnvName": "prod",
-    "EnvProfile": "strict"
+    "EnvProfile": "strict",
+    "AwsAccountId": "723940054516",
+    "AwsRegion": "us-east-1",
+    "GitHubEnvironment": "prod"
   },
   "00-bootstrap": {
-    "GitHubRepo": "TODO/SentinelQA",
-    "OidcProviderArn": "TODO"
+    "GitHubRepo": "vishwasvr/SentinelQA",
+    "OidcProviderArn": "arn:aws:iam::723940054516:oidc-provider/token.actions.githubusercontent.com"
   },
   "10-security": {
-    "AlarmEmail": "TODO"
+    "AlarmEmail": "vishwas.learn@yahoo.com"
   },
   "30-api": {
-    "ArtifactBucket": "TODO",
-    "RecordsApiKey": "TODO",
-    "ReportsApiKey": "TODO",
+    "ArtifactBucket": "sentinelqa-prod-artifacts-723940054516",
+    "RecordsApiKey": "PIPELINE_SUPPLIED:<commit-sha>/records-api.zip",
+    "ReportsApiKey": "PIPELINE_SUPPLIED:<commit-sha>/reports-api.zip",
     "ThrottleRate": 20,
     "ThrottleBurst": 40
   },
@@ -22,8 +25,10 @@
     "WebACLArn": ""
   },
   "25-backup": {
-    "ArtifactBucket": "TODO",
-    "ExportFnKey": "TODO",
+    "ArtifactBucket": "sentinelqa-prod-artifacts-723940054516",
+    "ExportFnKey": "PIPELINE_SUPPLIED:<commit-sha>/ddb-export.zip",
     "RetentionDays": 2557
-  }
+  },
+  "_oidc_note": "OidcProviderArn existence is UNVERIFIED. One provider per account; it is created outside per-env stacks, only after explicit approval (see docs/runbooks/first-deploy.md).",
+  "_code_keys_note": "Lambda S3 keys are supplied by the pipeline at deploy time as <commit-sha>/<function>.zip; never hard-coded here."
 }
