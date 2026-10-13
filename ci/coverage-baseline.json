@@ -1,5 +1,5 @@
 {
-  "_comment": "Overall coverage on main. null = no app code yet. Update in the PR that raises coverage (CI compares against the copy on origin/main).",
-  "lines": null,
-  "branches": null
+  "_comment": "Overall coverage on main (measured 2026-10-13 on feat/shared-safety-modules: 4 safety modules + problem.ts + itemSize.ts). Update in the PR that changes coverage (CI compares against the copy on origin/main).",
+  "lines": 100,
+  "branches": 100
 }
