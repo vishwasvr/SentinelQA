@@ -8,8 +8,8 @@ Paths below are relative to `docs/architecture/iac/` unless stated.
 ## Summary
 | # | Severity | Owner | Finding |
 |---|---|---|---|
-| B-1 | blocker | InfraDeploy | Deploy role cannot actually deploy anything (no CFN service role, no resource perms) |
-| B-2 | blocker | InfraDeploy | Lambda artifact bucket is referenced but never created; deploy role cannot upload to it |
+| B-1 | blocker | InfraDeploy | ~~Deploy role cannot actually deploy anything (no CFN service role, no resource perms)~~ **Fixed in 3c6dbdf** |
+| B-2 | blocker | InfraDeploy | ~~Lambda artifact bucket is referenced but never created; deploy role cannot upload to it~~ **Fixed in 3c6dbdf** (30-api/25-backup still to import `SentinelQA-<env>-ArtifactBucketName`) |
 | B-3 | blocker | Vishwas | All param files have `TODO` values (repo, OIDC ARN, alarm email, artifact keys) |
 | B-4 | blocker | Developer | Lambda code (`records-api`, `reports-api`, `ddb-export`) doesn't exist; stacks 30/25 can't be created without zips |
 | M-1 | major | InfraDeploy | Prod alarm `ApiServerErrors` uses literal `TODO-ApiId`, so it never fires |
@@ -18,7 +18,7 @@ Paths below are relative to `docs/architecture/iac/` unless stated.
 | M-4 | major | Architect | Backup job: only Lambda `Errors` is alarmed. Async export FAILED, or a skipped run, raises no alert |
 | M-5 | major | InfraDeploy | No prod rollback/safety controls: stack policy, termination protection, rollback triggers |
 | M-6 | major | InfraDeploy | Deploy order in README table is wrong (25 is listed before 20, which it imports) |
-| M-7 | major | Architect | Lean tables are `Retain` with fixed names, so a dev/stage stack delete/recreate collides (BR-46 resets) |
+| M-7 | major | Architect | ~~Lean tables are `Retain` with fixed names, so a dev/stage stack delete/recreate collides (BR-46 resets)~~ **Resolved by runbook** [nonprod-table-reset.md](../runbooks/nonprod-table-reset.md) (option b), 3c6dbdf |
 | M-8 | major | InfraDeploy | No drift detection; no CloudTrail; no Budget (all TODO) |
 | m-1 | minor | InfraDeploy | Tagging is inconsistent: only `env` on some resources, none on roles/Lambdas/API/CloudFront/SNS/alarms |
 | m-2 | minor | InfraDeploy | Param file format is not consumable by the CLI as-is; 25-backup duplicates `ArtifactBucket` |
@@ -28,7 +28,15 @@ Paths below are relative to `docs/architecture/iac/` unless stated.
 | m-6 | minor | Developer | 30-api: no HTTP API access logging; Reports Lambda has no tracing/memory setting; no reserved concurrency |
 | m-7 | minor | Architect | Backup stays in the same account/region (single blast radius, O-03) |
 | m-8 | minor | Tester | No post-deploy smoke tests / export test are defined in the pipeline |
-| m-9 | minor | BusinessAnalyst | BR-46 dev/stage "admin table reset" has no defined mechanism/role |
+| m-9 | minor | BusinessAnalyst | BR-46 dev/stage "admin table reset" has no defined mechanism/role (mechanism defined in runbook, 3c6dbdf; reset role not yet templated) |
+| D-19 | minor | InfraDeploy | ~~Deploy role can modify its own Bootstrap stack and pass its own role (developer-review #19)~~ **Fixed in 3c6dbdf**: explicit Deny on `stack/SentinelQA-<env>-Bootstrap/*`, PassRole only on `SentinelQA-<env>-cfn-exec` (`iam:PassedToService` = CloudFormation), Deny on PassRole/modify of the deploy role itself |
+
+## Fix status (2026-10-13)
+- **B-1 fixed (3c6dbdf)**: `SentinelQA-<env>-cfn-exec` service role (trust: `cloudformation.amazonaws.com`, SourceArn limited to `SentinelQA-<env>-*` stacks) with resource-scoped permissions for IAM, DynamoDB, Lambda, API Gateway v2, S3, CloudFront, SNS, CloudWatch, Logs, Scheduler and SSM (`/sentinelqa/<env>/*`). It may create or modify IAM roles only when they carry the new `SentinelQA-<env>-app-boundary` managed policy. The deploy role must pass the exec role (`cloudformation:RoleArn` deny condition). Added ListChangeSets/DeleteChangeSet/ListStacks/ValidateTemplate. Prod exec role denies `DeleteTable`.
+- **B-2 fixed (3c6dbdf)**: `sentinelqa-<env>-artifacts-<AccountId>` (versioned, SSE-S3, BPA, BucketOwnerEnforced, TLS-only policy, noncurrent versions expire after 30 days by default). Exported as `SentinelQA-<env>-ArtifactBucketName`. Deploy role has `s3:PutObject/GetObject` on it. Keys: `<commit-sha>/<function>.zip`.
+- **Developer #19 fixed (3c6dbdf)**: see D-19.
+- **M-7 resolved by runbook**: docs/runbooks/nonprod-table-reset.md + draft `scripts/reset-nonprod-tables.sh`.
+- Still open: 30-api and 25-backup roles must set `PermissionsBoundary: !ImportValue SentinelQA-<env>-AppRoleBoundaryArn` (Architect-owned files), otherwise their CreateRole is denied. The artifact bucket must be wired into 30-api/25-backup/params (B-3/m-2). The pipeline must pass `--role-arn` with the exec role.
 
 ## Findings in detail
 
