@@ -1,7 +1,7 @@
 # Documentation Index
 | Document | Purpose | Last updated |
 |---|---|---|
-| [requirements/BRD.md](requirements/BRD.md) | Business Requirements Document for Sentinel QA v1.4.2 (as-built, observed behavior + v1.2 architecture scope decisions + v1.3 review responses and decisions pending + v1.4 Vishwas decisions + v1.4.1 BR-44 CFR range interpretation + v1.4.2 CAPA/NCMR overdue open question OQ-25/DP-20) | 2026-10-13 |
+| [requirements/BRD.md](requirements/BRD.md) | Business Requirements Document for Sentinel QA v1.4.3 (as-built, observed behavior + v1.2 architecture scope decisions + v1.3 review responses and decisions pending + v1.4 Vishwas decisions + v1.4.1 BR-44 CFR range interpretation + v1.4.2 CAPA/NCMR overdue open question OQ-25/DP-20 + v1.4.3 Vishwas decisions DP-05, DP-18, O-02, O-05) | 2026-10-13 |
 | [requirements/screenshots/README.md](requirements/screenshots/README.md) | Map of 58 evidence screenshots + reliability CSV export to routes/screens | 2026-10-12 |
 | [../README.md](../README.md) | Repository overview | 2026-10-12 |
 | [architecture/architecture-overview.md](architecture/architecture-overview.md) | AWS architecture v0.5: services, data flow, data model, IAM, controlled-data gate, retention, environments, resolved decisions D-01..D-14, open items, pre-go-live checklist | 2026-10-13 |

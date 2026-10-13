@@ -1,4 +1,4 @@
-# BA Responses to Review Findings (BRD v1.3, statuses updated v1.4 / v1.4.1)
+# BA Responses to Review Findings (BRD v1.3, statuses updated v1.4 / v1.4.1 / v1.4.2 / v1.4.3)
 
 | Item | Value |
 |---|---|
@@ -14,7 +14,7 @@ Note: developer-review states "BA 11"; the BA-owned items are DEV-04, 05 (Archit
 | DEV-04 | Partly resolved / Blocked-on-decision | PO-check manual-entry fields specified from the observed structure only (§13.2). CAPA/NCMR steps 2–6 and SQ steps 3/4/6 marked blocked (§13.2a, DP-02); field types/lengths DP-04 |
 | DEV-05 | Resolved | Soft delete for Remove role/person, Training Undo, Form 3 row removal (§13.1), per Architect's every-environment delete deny |
 | DEV-10 | Blocked-on-decision | BR-12 build criterion and US-13/17/26 ACs no longer assert `DEMO`; format itself is DP-01 |
-| DEV-11 | Partly resolved / Blocked-on-decision | Build criteria separated from seed checks (US-04/08/28/31, §13.4). /compare content, Simulate second reviewer, fixtures → DP-05; QMS bands → DP-06 |
+| DEV-11 | Partly resolved / Blocked-on-decision | Build criteria separated from seed checks (US-04/08/28/31, §13.4). /compare content, fixtures → DP-05 (Simulate second reviewer removed v1.4.3, see DEV-11 (DP-05 part) row); QMS bands → DP-06 |
 | DEV-12 | Blocked-on-decision | Supplier master create/edit and input sources are new product behavior → DP-10 |
 | DEV-13 | Partly resolved / Blocked-on-decision | 400/422 behavior added as ACs on US-02 (from BR-44). Matching rule decided v1.4 (whole-word, case-insensitive). *v1.4.1:* CFR markers are ranges (see DEV-27 / BR-44); sign-off pending DP-03. Normalisation, field scope, attestation on non-text writes, message → DP-03. SSM caching is Architect's (QA-31) |
 | DEV-14 | Partly resolved / Blocked-on-decision | Corrections = new events and Undo semantics stated (§13.1, BR-40). Document key edits/supersede edge cases → DP-11 |
@@ -43,11 +43,12 @@ Note: developer-review states "BA 11"; the BA-owned items are DEV-04, 05 (Archit
 | QA-23 | Blocked-on-decision | DP-12 |
 | QA-24 | Partly resolved / Blocked-on-decision | Undo is audited and status re-derived from the due date (BR-40, observed in screenshot 52). SQ date validation → DP-19 |
 | QA-25 | Partly resolved / Blocked-on-decision | BR-34 conflict resolved: add-row precondition vs advisory banner. SoD name variants → DP-08; edit/un-sign after sign-off → DP-09 |
-| QA-27 | Blocked-on-decision | Hidden vs static pages → DP-18 |
+| QA-27 | Resolved (v1.4.3) | DP-18 decided by Vishwas: /demo and /try-your-document stay static pages (US-05, US-07) |
 | m-9 (infra) | Resolved | Resets are an operator action via InfraDeploy's script, dev/stage only, not an app feature (§13.1) |
 | F-09 (architect) | Resolved (v1.2.3) | BR-08 aligned with BR-46/C-1 in v1.2.3 |
 | BA-10 | Resolved (v1.4) | US-41 in scope: client-side search over loaded lists |
 | BA-15 | Partly resolved (v1.4) | Seed/sample policy: labeled sample data allowed in all envs (BR-31/45); ID format → DP-01 |
 | DEV-29 (BA part) | Open (v1.4.2) | CAPA/NCMR overdue rule not observed in screenshots 08/09/10/11/25/26/34/35; raised as OQ-25 / DP-20. Index side fixed by Architect (GSI2 `dueAt` = `dueDate`) |
+| DEV-11 (DP-05 part) | Resolved (v1.4.3) | Vishwas: "Simulate second reviewer" removed from the build; BR-33, §4.10, US-35, OQ-03 marked removed per DP-05. /compare content and fixture publication not covered |
 
 Rejected: none.
