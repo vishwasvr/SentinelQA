@@ -72,3 +72,12 @@ In-scope means not tagged Deferred. The fully deferred items are US-01, 05, 07, 
 8. **Retention start and disposal (BA-14):** does the 7-year clock start at creation or closure? Is data disposed of after that?
 9. **Production ID format and seed/sample data per env (BA-15, OQ-10).**
 10. **Dev/stage reset procedure owner (BA-03):** who may run it and how. (The principle is already decided by C-1.)
+
+## 6. Responses — status after decisions (2026-10-13, BRD v1.4)
+BA responses: [ba-responses.md](ba-responses.md). Decisions: BRD §13.5.
+- **Closed:**
+  - **BA-03:** dev/stage reset procedure defined in InfraDeploy's [non-prod table reset runbook](../runbooks/nonprod-table-reset.md) (operator action, dev/stage only; BRD §13.1). The Architect's link from ADR-0006 to the runbook is not present yet; the runbook says it will be added.
+  - **BA-04:** whole-word, case-insensitive matching; marker list includes ITAR, EAR, CUI, 22 CFR 120-130 and 15 CFR 730-774 (BR-44). The IaC SSM list still needs updating to match (Architect/InfraDeploy).
+  - **BA-10:** ⌘K is client-side over loaded lists; no server endpoint (US-41).
+- **Partly closed:** BA-06 (PLACEHOLDER defaults in config; values, bucket structure and band schema pending DP-16); BA-15 (sample data allowed in all envs; ID format pending DP-01).
+- **Still open:** BA-05 (screened fields, write coverage → DP-03) and all other findings not listed above.

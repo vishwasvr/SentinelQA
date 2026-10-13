@@ -1,10 +1,10 @@
-# BA Responses to Review Findings (BRD v1.3)
+# BA Responses to Review Findings (BRD v1.3, statuses updated v1.4)
 
 | Item | Value |
 |---|---|
 | Author | Business Analyst |
 | Date | 2026-10-13 |
-| BRD | [BRD.md](../requirements/BRD.md) v1.3, §13 (clarifications), §13.3 (decisions pending DP-xx) |
+| BRD | [BRD.md](../requirements/BRD.md) v1.4, §13 (clarifications), §13.3 (decisions pending DP-xx) |
 | Sources | developer-review.md (be0a8d5; IDs DEV-n = finding #n), qa-review.md (QA-n), ba-review.md (BA-n), infra-review.md (m-n), architect-review.md (F-n) |
 
 Note: developer-review states "BA 11"; the BA-owned items are DEV-04, 05 (Architect with BA for semantics), 10, 11, 12, 13 (BA rules), 14, 15, 21, 22 = 10. No eleventh BA item was found.
@@ -16,15 +16,15 @@ Note: developer-review states "BA 11"; the BA-owned items are DEV-04, 05 (Archit
 | DEV-10 | Blocked-on-decision | BR-12 build criterion and US-13/17/26 ACs no longer assert `DEMO`; format itself is DP-01 |
 | DEV-11 | Partly resolved / Blocked-on-decision | Build criteria separated from seed checks (US-04/08/28/31, §13.4). /compare content, Simulate second reviewer, fixtures → DP-05; QMS bands → DP-06 |
 | DEV-12 | Blocked-on-decision | Supplier master create/edit and input sources are new product behavior → DP-10 |
-| DEV-13 | Partly resolved / Blocked-on-decision | 400/422 behavior added as ACs on US-02 (from BR-44). Matching, field scope, attestation on non-text writes, message → DP-03. SSM caching is Architect's (QA-31) |
+| DEV-13 | Partly resolved / Blocked-on-decision | 400/422 behavior added as ACs on US-02 (from BR-44). Matching rule decided v1.4 (whole-word, case-insensitive). Normalisation, field scope, attestation on non-text writes, message → DP-03. SSM caching is Architect's (QA-31) |
 | DEV-14 | Partly resolved / Blocked-on-decision | Corrections = new events and Undo semantics stated (§13.1, BR-40). Document key edits/supersede edge cases → DP-11 |
 | DEV-15 | Blocked-on-decision | SoD semantics, hard vs warning, name comparison → DP-08 |
 | DEV-21 | Blocked-on-decision | Timezone, boundaries, end-of-month rule are new rules → DP-12 |
 | DEV-22 | Blocked-on-decision | Recurrence and Not-started rule not observable → DP-07 |
 | BA-08 | Blocked-on-decision | Transition rules → DP-02 |
 | BA-16 | Blocked-on-decision | Tile data sources (no effectiveness-check entity observed) → DP-17 |
-| QA-01 | Blocked-on-decision | BR-47 values/schema → DP-16 |
-| QA-03 | Blocked-on-decision | Marker list and matching → DP-03 |
+| QA-01 | Resolved (v1.4) | PLACEHOLDER defaults in config (BR-47); tuned values remain DP-16 (partial) |
+| QA-03 | Resolved (v1.4) | Whole-word, case-insensitive; markers incl. ITAR, EAR, CUI, 22 CFR 120-130, 15 CFR 730-774 (BR-44) |
 | QA-04 | Partly resolved / Blocked-on-decision | 400/422 Given/When/Then added to US-02; message and input retention → DP-03 |
 | QA-06 | Resolved | US-08 restated as a formula (BR-42); "8" moved to a seed check |
 | QA-07 | Blocked-on-decision | DP-08 |
@@ -32,18 +32,20 @@ Note: developer-review states "BA 11"; the BA-owned items are DEV-04, 05 (Archit
 | QA-09 | Blocked-on-decision | DP-14 |
 | QA-10 | Blocked-on-decision | DP-13 |
 | QA-11 | Blocked-on-decision | Not inferable from the two observed rows (different severities) → DP-13 |
-| QA-12 | Blocked-on-decision | DP-15 |
+| QA-12 | Resolved (v1.4) | Client-side ⌘K over loaded lists, no server endpoint (US-41); DP-15 resolved |
 | QA-13 | Blocked-on-decision | DP-11 |
 | QA-14 | Blocked-on-decision | DP-02 |
 | QA-15 | Blocked-on-decision | DP-01 |
 | QA-16 | Blocked-on-decision | DP-04 |
 | QA-18 | Resolved | §1.1 persistence wording fixed; BR-31/32 moved before BR-33 |
-| QA-20 | Blocked-on-decision | Expected behavior per evasion case depends on matching rule → DP-03 |
+| QA-20 | Partly resolved / Blocked-on-decision | Matching rule decided v1.4 (whole-word, case-insensitive, BR-44); normalisation/evasion cases → DP-03 |
 | QA-23 | Blocked-on-decision | DP-12 |
 | QA-24 | Partly resolved / Blocked-on-decision | Undo is audited and status re-derived from the due date (BR-40, observed in screenshot 52). SQ date validation → DP-19 |
 | QA-25 | Partly resolved / Blocked-on-decision | BR-34 conflict resolved: add-row precondition vs advisory banner. SoD name variants → DP-08; edit/un-sign after sign-off → DP-09 |
 | QA-27 | Blocked-on-decision | Hidden vs static pages → DP-18 |
 | m-9 (infra) | Resolved | Resets are an operator action via InfraDeploy's script, dev/stage only, not an app feature (§13.1) |
 | F-09 (architect) | Resolved (v1.2.3) | BR-08 aligned with BR-46/C-1 in v1.2.3 |
+| BA-10 | Resolved (v1.4) | US-41 in scope: client-side search over loaded lists |
+| BA-15 | Partly resolved (v1.4) | Seed/sample policy: labeled sample data allowed in all envs (BR-31/45); ID format → DP-01 |
 
 Rejected: none.

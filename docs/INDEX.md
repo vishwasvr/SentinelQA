@@ -1,7 +1,7 @@
 # Documentation Index
 | Document | Purpose | Last updated |
 |---|---|---|
-| [requirements/BRD.md](requirements/BRD.md) | Business Requirements Document for Sentinel QA v1.3 (as-built, observed behavior + v1.2 architecture scope decisions + v1.3 review responses and decisions pending) | 2026-10-13 |
+| [requirements/BRD.md](requirements/BRD.md) | Business Requirements Document for Sentinel QA v1.4 (as-built, observed behavior + v1.2 architecture scope decisions + v1.3 review responses and decisions pending + v1.4 Vishwas decisions) | 2026-10-13 |
 | [requirements/screenshots/README.md](requirements/screenshots/README.md) | Map of 58 evidence screenshots + reliability CSV export to routes/screens | 2026-10-12 |
 | [../README.md](../README.md) | Repository overview | 2026-10-12 |
 | [architecture/architecture-overview.md](architecture/architecture-overview.md) | AWS architecture v0.4: services, data flow, data model, IAM, controlled-data gate, retention, environments, resolved decisions D-01..D-14, open items, pre-go-live checklist | 2026-10-13 |
@@ -10,4 +10,4 @@
 | [architecture/iac/README.md](architecture/iac/README.md) | CloudFormation templates outline/skeleton incl. prod-only backup stack (not deployed) | 2026-10-13 |
 | [architecture/cost-estimate.md](architecture/cost-estimate.md) | Cost estimate v0.4: prod / non-prod (lean vs strict), AWS managed keys, export backup, 20/50/100 users, savings review, 7-year retention and backup options, sources | 2026-10-13 |
 - [Architect self-review (v0.4 vs BRD v1.2.2)](reviews/architect-review.md)
-- [BA responses to review findings (BRD v1.3)](reviews/ba-responses.md)
+- [BA responses to review findings (BRD v1.3, statuses v1.4)](reviews/ba-responses.md)
