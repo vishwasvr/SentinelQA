@@ -44,7 +44,7 @@ Same templates and stack order as dev ([first-deploy.md](../runbooks/first-deplo
 
 Agents open PRs; Vishwas (or a designated reviewer) approves the merge. Branch protection is a GitHub setting, so Vishwas makes the change himself or approves it.
 
-### 2a. GitHub settings (DECIDED design; Vishwas applies or approves, [WRITE, repo settings])
+### 2a. GitHub settings (design; **main protection PENDING**, needs GitHub Pro on a private repo, see §3; Vishwas applies or approves, [WRITE, repo settings])
 **Environments** (ADR-0012, first-deploy §5, prod-account-split §4):
 
 | Env | Account | Variables (not secrets) | Required reviewer | Deployment branches/tags |
@@ -72,6 +72,14 @@ No AWS secrets anywhere; OIDC only. Note: first-deploy §5 names the role variab
 | A | Everything manual (workflow_dispatch). |
 | **B (DECIDED by Vishwas, decision 3, 2026-10-13)** | dev deploys automatically on merge once the unit tests and coverage gate pass. stage has no required reviewer and is promoted once the Developer's dev check passes. prod is approved by Vishwas. All three use the same artifact. |
 | C | Fully automatic to stage. Possible later, once tests are trusted. |
+
+**Dev-to-stage sign-off (DECIDED by Vishwas, 2026-10-13):** stage has no required reviewer, so the Developer's dev check is enforced through a sign-off file.
+- After the dev deploy, the Developer commits `releases/<sha>/dev-signoff.md`, where `<sha>` is the commit whose artifact is being promoted. It records the SHA, that QA-36 and the dev smoke test passed for that SHA, and what was checked.
+- **Standing approval (Vishwas):** the Developer may push and merge sign-off-only PRs limited to `releases/**`. Every other push still needs Vishwas's approval, and prod stays gated on him.
+- A required check fails any sign-off PR that changes files outside `releases/**`.
+- `deploy.yml` ignores `releases/**` (`paths-ignore`), so merging a sign-off doesn't start a build or a dev deploy.
+- The stage job runs only if `releases/<sha>/dev-signoff.md` exists and its SHA matches the artifact being promoted. Stage then deploys that original artifact, never the sign-off commit.
+- **Pending:** main is not protected yet. Branch protection and rulesets need GitHub Pro for a private repo (403 on 2026-10-13), and Vishwas is deciding whether to upgrade, stay unprotected or make the repo public. Until he decides, §2a's protection and required-review settings aren't in effect, and nothing here relies on a review rule or a ruleset.
 
 **Infra gates in the flow:**
 - **QA-32:** `ci.yml` and `deploy.yml` must exist and pass on a PR before the first application-code merge to `main` (ci-and-data-guards §3.3).
