@@ -20,5 +20,10 @@
   },
   "40-web": {
     "WebACLArn": ""
+  },
+  "25-backup": {
+    "ArtifactBucket": "TODO",
+    "ExportFnKey": "TODO",
+    "RetentionDays": 2557
   }
 }

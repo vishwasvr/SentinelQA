@@ -24,6 +24,7 @@ Parameters:
 Conditions:
   IsStrict: !Equals [!Ref EnvProfile, strict]
 Resources:
+  # O-09: no kms:* permissions needed; tables use the AWS managed key aws/dynamodb (authorized via the DynamoDB service)
   RecordsApiRole:
     Type: AWS::IAM::Role
     Properties:
@@ -54,12 +55,6 @@ Resources:
               - Effect: Allow
                 Action: [ssm:GetParameter, ssm:GetParameters, ssm:GetParametersByPath]
                 Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*'
-              - !If
-                - IsStrict
-                - Effect: Allow
-                  Action: [kms:Decrypt, kms:GenerateDataKey]
-                  Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
-                - !Ref AWS::NoValue
   ReportsApiRole:
     Type: AWS::IAM::Role
     Properties:
@@ -81,12 +76,6 @@ Resources:
               - Effect: Allow
                 Action: [ssm:GetParameter, ssm:GetParameters]
                 Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*'
-              - !If
-                - IsStrict
-                - Effect: Allow
-                  Action: kms:Decrypt
-                  Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
-                - !Ref AWS::NoValue
   RecordsApiFn:
     Type: AWS::Lambda::Function
     Properties:

@@ -1,0 +1,153 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  SentinelQA SKELETON - prod backup (O-01). Monthly job issues DynamoDB INCREMENTAL exports (daily windows,
+  max 24 h per export) for the previous month to an S3 bucket that transitions to Glacier Flexible Retrieval and
+  expires after 7 years. Deploy for prod (strict) only. Not deployed.
+Parameters:
+  EnvName:
+    Type: String
+    AllowedValues: [prod]          # strict profile only (ADR-0013)
+  ArtifactBucket:
+    Type: String
+  ExportFnKey:
+    Type: String
+  RetentionDays:
+    Type: Number
+    Default: 2557                 # 7 years (D-03 as amended, O-08)
+Resources:
+  ExportBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub sentinelqa-${EnvName}-ddb-exports-${AWS::AccountId}
+      PublicAccessBlockConfiguration: { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true }
+      BucketEncryption: { ServerSideEncryptionConfiguration: [{ ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 } }] }   # SSE-S3 (O-09)
+      OwnershipControls: { Rules: [{ ObjectOwnership: BucketOwnerEnforced }] }
+      VersioningConfiguration: { Status: Enabled }      # overwrite protection; NOT Object Lock (D-05)
+      LifecycleConfiguration:
+        Rules:
+          - Id: glacier-then-expire-7y
+            Status: Enabled
+            Transitions: [{ StorageClass: GLACIER, TransitionInDays: 1 }]
+            ExpirationInDays: !Ref RetentionDays
+            NoncurrentVersionExpiration: { NoncurrentDays: 30 }
+            AbortIncompleteMultipartUpload: { DaysAfterInitiation: 7 }
+      Tags: [{ Key: env, Value: !Ref EnvName }]
+  ExportBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ExportBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: TlsOnly
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: [!GetAtt ExportBucket.Arn, !Sub '${ExportBucket.Arn}/*']
+            Condition: { Bool: { 'aws:SecureTransport': 'false' } }
+  ExportFnRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub SentinelQA-${EnvName}-ddb-export
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{ Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }]
+      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole']
+      Policies:
+        - PolicyName: least-privilege-export
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:ExportTableToPointInTime, dynamodb:DescribeContinuousBackups]
+                Resource:
+                  - { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' }
+                  - { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' }
+              - Effect: Allow
+                Action: dynamodb:DescribeExport
+                Resource:
+                  - !Sub [ '${T}/export/*', { T: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' } } ]
+                  - !Sub [ '${T}/export/*', { T: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' } } ]
+              - Effect: Allow             # permissions DynamoDB export uses on the caller's behalf
+                Action: [s3:PutObject, s3:PutObjectAcl, s3:AbortMultipartUpload]
+                Resource: !Sub '${ExportBucket.Arn}/exports/*'
+              - Effect: Allow             # watermark of last exported window (idempotent re-runs)
+                Action: [ssm:GetParameter, ssm:PutParameter]
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/backup/last-export-to'
+  ExportFn:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub SentinelQA-${EnvName}-ddb-export
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Architectures: [arm64]
+      Timeout: 300
+      MemorySize: 256
+      Role: !GetAtt ExportFnRole.Arn
+      Code: { S3Bucket: !Ref ArtifactBucket, S3Key: !Ref ExportFnKey }
+      Environment:
+        Variables:
+          EXPORT_BUCKET: !Ref ExportBucket
+          EXPORT_PREFIX: exports/
+          TABLE_ARNS: !Join
+            - ','
+            - - { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' }
+              - { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' }
+          # Logic (TODO code): for each table, from watermark to start of current month, issue
+          # INCREMENTAL_EXPORT per <=24h window (NEW_AND_OLD_IMAGES, S3SseAlgorithm=AES256,
+          # ClientToken=table+window); windows must be inside the 35-day PITR window, so the job runs on day 2.
+          # One-time FULL_EXPORT baseline at go-live (manual/runbook).
+  ExportFnLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/SentinelQA-${EnvName}-ddb-export
+      RetentionInDays: 90
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub SentinelQA-${EnvName}-ddb-export-scheduler
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: scheduler.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition: { StringEquals: { 'aws:SourceAccount': !Ref AWS::AccountId } }
+      Policies:
+        - PolicyName: invoke-export-fn
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt ExportFn.Arn
+  MonthlySchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub SentinelQA-${EnvName}-ddb-export-monthly
+      ScheduleExpression: cron(0 7 2 * ? *)      # 07:00 UTC on day 2 of each month
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow: { Mode: 'OFF' }
+      Target:
+        Arn: !GetAtt ExportFn.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+        RetryPolicy: { MaximumRetryAttempts: 3 }
+  ExportFnErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub SentinelQA-${EnvName}-ddb-export-errors
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{ Name: FunctionName, Value: !Ref ExportFn }]
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [{ 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }]
+Outputs:
+  ExportBucketName:
+    Value: !Ref ExportBucket

@@ -1,55 +1,20 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: SentinelQA SKELETON - KMS key (strict profile only), alarm topic (email), budget. Not deployed.
+Description: SentinelQA SKELETON - alarm topic (email), budget. No customer-managed KMS keys (O-09). Not deployed.
 Parameters:
   EnvName:
     Type: String
     AllowedValues: [dev, stage, prod]
-  EnvProfile:
-    Type: String
-    AllowedValues: [lean, strict]
-    Default: lean
-    Description: lean = non-prod (dev/stage), strict = prod (ADR-0013)
   AlarmEmail:
     Type: String
-Conditions:
-  IsStrict: !Equals [!Ref EnvProfile, strict]
 Resources:
-  DataKey:                     # strict only; lean uses AWS owned keys (no charge)
-    Type: AWS::KMS::Key
-    Condition: IsStrict
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      Description: !Sub SentinelQA ${EnvName} data key
-      EnableKeyRotation: true
-      KeyPolicy:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: AccountAdmin
-            Effect: Allow
-            Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root' }
-            Action: kms:*
-            Resource: '*'
-          # Service roles get kms:Decrypt/GenerateDataKey through their IAM policies
-      Tags: [{ Key: env, Value: !Ref EnvName }]
-  DataKeyAlias:
-    Type: AWS::KMS::Alias
-    Condition: IsStrict
-    Properties:
-      AliasName: !Sub alias/sentinelqa-${EnvName}-data
-      TargetKeyId: !Ref DataKey
   AlarmTopic:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub SentinelQA-${EnvName}-alarms
-      KmsMasterKeyId: alias/aws/sns
+      KmsMasterKeyId: alias/aws/sns     # AWS managed key (O-09)
       Subscription: [{ Protocol: email, Endpoint: !Ref AlarmEmail }]   # D-10 email only
   # TODO: CloudTrail trail (account-level, create once, not per env); AWS::Budgets::Budget
 Outputs:
-  DataKeyArn:
-    Condition: IsStrict
-    Value: !GetAtt DataKey.Arn
-    Export: { Name: !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
   AlarmTopicArn:
     Value: !Ref AlarmTopic
     Export: { Name: !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }

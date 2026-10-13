@@ -14,19 +14,16 @@ Conditions:
 Resources:
   DomainTable:
     Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain          # D-03: 7-year retention (strict). Lean stacks: synthetic data, delete table manually if needed
+    DeletionPolicy: Retain          # D-03 as amended (O-08): 7-year retention in prod only. Lean = synthetic data, delete manually if needed
     UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub SentinelQA-${EnvName}-Domain
       BillingMode: PAY_PER_REQUEST
       DeletionProtectionEnabled: !If [IsStrict, true, false]
-      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: !If [IsStrict, true, false] }   # lean: no PITR
-      SSESpecification: !If
-        - IsStrict
-        - SSEEnabled: true
-          SSEType: KMS
-          KMSMasterKeyId: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
-        - SSEEnabled: false        # lean: encrypted at rest with AWS owned key (DynamoDB default)
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: !If [IsStrict, true, false] }   # strict: REQUIRED for incremental export (O-01); lean: off
+      SSESpecification:            # O-09: strict = AWS managed key aws/dynamodb (no KMSMasterKeyId); lean = AWS owned key
+        SSEEnabled: !If [IsStrict, true, false]
+        SSEType: !If [IsStrict, KMS, !Ref AWS::NoValue]
       AttributeDefinitions:
         - { AttributeName: PK, AttributeType: S }
         - { AttributeName: SK, AttributeType: S }
@@ -53,13 +50,10 @@ Resources:
       TableName: !Sub SentinelQA-${EnvName}-AuditLog
       BillingMode: PAY_PER_REQUEST
       DeletionProtectionEnabled: !If [IsStrict, true, false]
-      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: !If [IsStrict, true, false] }   # lean: no PITR
-      SSESpecification: !If
-        - IsStrict
-        - SSEEnabled: true
-          SSEType: KMS
-          KMSMasterKeyId: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
-        - SSEEnabled: false        # lean: encrypted at rest with AWS owned key (DynamoDB default)
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: !If [IsStrict, true, false] }   # strict: REQUIRED for incremental export (O-01); lean: off
+      SSESpecification:            # O-09: strict = AWS managed key aws/dynamodb (no KMSMasterKeyId); lean = AWS owned key
+        SSEEnabled: !If [IsStrict, true, false]
+        SSEType: !If [IsStrict, KMS, !Ref AWS::NoValue]
       AttributeDefinitions:
         - { AttributeName: PK, AttributeType: S }   # WS#<ws>#ENT#<entityId>
         - { AttributeName: SK, AttributeType: S }   # <ts>#<ulid>
