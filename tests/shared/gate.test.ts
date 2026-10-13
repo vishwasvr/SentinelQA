@@ -31,6 +31,13 @@ describe('controlled-data gate matcher (BR-44, DP-03)', () => {
       expect(findMarker(`15 CFR ${n}`, cfg) === 'R2').toBe(n >= 730 && n <= 774);
     }
   });
+  // DP-03: '.'/'-'/'_' are separators only BETWEEN LETTERS; a hyphen between digits is kept as-is.
+  it.each(['22 CFR 1-20', '22 CFR 13-0', '15 CFR 7-30', '15 CFR 77-4', '22 CFR 12_5', '22 CFR 1.20'])(
+    'digit separators are not removed (no CFR hit): %s', (t) => expect(findMarker(t, cfg)).toBeNull());
+  it('literal range text 120-130 keeps the hyphen and still hits on its first part', () => {
+    expect(findMarker('22 CFR 120-130', cfg)).toBe('R1');
+    expect(findMarker('22 CFR 119-130', cfg)).toBeNull();
+  });
   it('never runs with an empty list', () => {
     expect(() => findMarker('x', { ...cfg, markers: [] })).toThrow();
     expect(() => findMarker('x', { ...cfg, cfrRanges: [] })).toThrow();
