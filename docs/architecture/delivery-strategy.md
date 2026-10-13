@@ -79,14 +79,11 @@ No AWS secrets anywhere; OIDC only. Note: first-deploy §5 names the role variab
 - **Before prod approval:** first-deploy §5a PLACEHOLDER gate; after first 25-backup deploy, §6 backup check (QA-29). Prod requires the O-03 account split first.
 - One deploy per env at a time (`concurrency: deploy-<env>`); change sets fail if they replace or delete a `Retain` resource.
 
-### 3b. Unit-test coverage gate (PROPOSAL for Vishwas to confirm)
-The `unit-coverage` job runs in `ci.yml` on every PR and on `main`. Its result is required before deploy.yml can deploy to dev.
-- **Overall:** at least **80% line and 80% branch coverage** across the app code (handlers and shared libraries). Generated code (the openapi types), test files and seed fixtures don't count.
-- **100% line and branch coverage** for the safety-critical modules: the controlled-data gate matcher, `buildAuditPut` (the audit write path), the `isSample` checks and the config loader (overview §4.2).
-- **No regression:** a PR that lowers overall coverage by more than 1 percentage point fails, even if it stays above 80%.
-- Developer can propose different numbers at build time. Any change is recorded here and in ci-and-data-guards §1.2, and Vishwas confirms it.
-
-Options: A is 70% overall, which is lighter but weak for an audit-relevant QMS. **B is 80% overall with 100% on the safety-critical modules (recommended).** C is 90% overall, which slows early builds without much benefit beyond B.
+### 3b. Unit-test coverage gate (DECIDED by Vishwas, option C, 2026-10-13)
+The `unit-coverage` job runs in `ci.yml` on every PR and on `main`. It must pass before deploy.yml can deploy to dev.
+- **Overall:** at least **90% line and 90% branch coverage** across the app code (handlers and shared libraries). Generated code (the openapi types), test files and seed fixtures don't count.
+- **Open question for Vishwas, not yet applied:** should two parts of the option B proposal carry over to C? One is a 100% floor for the safety-critical modules (the controlled-data gate matcher, `buildAuditPut`, the `isSample` checks and the config loader). The other is failing any PR that lowers overall coverage by more than 1 percentage point. Until he answers, only the 90% overall gate applies.
+- Any change is recorded here and in ci-and-data-guards §1.2.
 
 ### 3a. Test stages (Tester to fill in)
 Author: QA, 2026-10-13. Sources: [qa-review.md](../reviews/qa-review.md) §3 and §5 and its re-checks; [ci-and-data-guards.md](iac/ci-and-data-guards.md) §1 and §3; [audit-write-path.md](../specs/audit-write-path.md) §3–§7; [first-deploy.md](../runbooks/first-deploy.md) §5a, §5b and §6; [api/openapi.yaml](api/openapi.yaml). This section adds no new requirements. Each stage must pass before the next one runs, and a failure stops promotion. Evidence (JUnit reports, logs, command output) is kept as workflow artifacts.
@@ -117,5 +114,5 @@ Author: QA, 2026-10-13. Sources: [qa-review.md](../reviews/qa-review.md) §3 and
 ## Decisions for Vishwas
 1. DECIDED (2026-10-13): bootstrap stage as the test environment. It's created only once building opens, using Vishwas's admin session, with step-by-step approval (§1a).
 2. DECIDED (2026-10-13): PR flow with branch protection on main and the §2a required checks. The stage reviewer is the Developer, per decision 3.
-3. DECIDED (2026-10-13): unit tests and a coverage gate must pass before the dev deploy. The Developer approves stage after checking dev, with no Vishwas approval. Vishwas approves prod. The QA-36 check still runs before stage. **Still open: confirm the coverage threshold in §3b (recommended B: 80% overall, 100% on the safety-critical modules).**
+3. DECIDED (2026-10-13): unit tests and a coverage gate must pass before the dev deploy. The Developer approves stage after checking dev, with no Vishwas approval. Vishwas approves prod. The QA-36 check still runs before stage. Coverage gate: 90% overall (option C, decided). **Still open: whether the 100% safety-critical floor and the 1-point drop rule also apply (§3b).**
 4. Single SemVer tags with immutable SHA artifacts and rollback by redeploying the previous tag (B)? PROPOSAL.
