@@ -11,15 +11,15 @@
 Architect will link this runbook from ADR-0006.
 
 ## 1. When to use it
-BR-46 keeps the audit log append-only in every environment as application behavior. Single-event updates and deletes are always denied. In **dev/stage only**, an admin may perform a **full table reset**, which is allowed because those environments hold synthetic data only (BR-45). A reset deletes all items in both tables. It never runs on single events, and **never on prod**. Prod stays strictly append-only.
+BR-46 keeps the audit log append-only in every environment as application behavior. Single-event updates and deletes are always denied. In **dev/stage only**, an admin may perform a **full table reset**, which is allowed because those environments hold synthetic or labelled sample data only, never real customer records (BR-31, BR-45). Sample data carries the label "ILLUSTRATIVE — SAMPLE RECORDS". A reset deletes all items in both tables. It never runs on single events, and **never on prod**. Prod stays strictly append-only.
 
-Typical triggers are corrupt synthetic data, a key-schema change that forces replacement (M-7), or a test-suite reset.
+Typical triggers are corrupt synthetic or sample data, a key-schema change that forces replacement (M-7), or a test-suite reset.
 
 ## 2. Method: DeleteTable + stack update
 The tables have fixed names and `DeletionPolicy: Retain` (20-data, M-7). That means:
 1. The operator deletes the two tables with the script. Deletion goes through the `DeleteTable` API; the script does not scan and delete items.
 2. The operator re-creates them by running a normal change set on `SentinelQA-<env>-Data` through the pipeline (deploy role → `SentinelQA-<env>-cfn-exec`). CFN detects drift-deleted resources only on update, so if the change set shows no changes, add or bump a harmless table tag such as `reset=<date>` to force an update, or import the tables.
-3. Optional: re-seed the synthetic data.
+3. Optional: re-seed the synthetic data and the "ILLUSTRATIVE — SAMPLE RECORDS" sample set.
 
 Item-by-item deletion is not used. The app's roles and the permissions boundary deny `DeleteItem/BatchWriteItem`, and a full reset is cleaner.
 
@@ -82,4 +82,4 @@ Use a dedicated operator role `SentinelQA-<env>-table-reset`, assumed by named a
 6. Record the date, operator, env and reason in the ops log.
 
 ## 6. Rollback
-No rollback is possible, and none is needed: dev/stage data is synthetic (BR-45). If the re-create fails, fix the change set and redeploy. Lean profile has PITR off, so there is no restore.
+No rollback is possible, and none is needed: dev/stage hold synthetic or labelled sample data only, never real customer records (BR-31, BR-45). If the re-create fails, fix the change set and redeploy. Lean profile has PITR off, so there is no restore.
