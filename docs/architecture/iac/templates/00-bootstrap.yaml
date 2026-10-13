@@ -286,10 +286,14 @@ Resources:
                 Resource: '*'
                 Condition:
                   StringNotEquals: { 'cloudformation:RoleArn': !GetAtt CfnExecRole.Arn }
-              - Sid: DenyBootstrapStack
+              - Sid: DenyBootstrapStack  # read-only DescribeStacks allowed: deploy-env.sh reads CfnExecRoleArn/ArtifactBucketName outputs
                 Effect: Deny
-                Action: 'cloudformation:*'
+                NotAction: cloudformation:DescribeStacks
                 Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/SentinelQA-${EnvName}-Bootstrap/*
+              - Sid: TagEnvStacksOnChangeSet  # aws cloudformation deploy --tags (ADR-0017) on SentinelQA-<env>-* stacks
+                Effect: Allow
+                Action: cloudformation:TagResource
+                Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/SentinelQA-${EnvName}-*/*
               - Sid: PassExecRoleOnly
                 Effect: Allow
                 Action: iam:PassRole
@@ -317,6 +321,14 @@ Resources:
                 Effect: Allow
                 Action: [s3:PutObject, s3:GetObject]
                 Resource: !Sub '${ArtifactBucket.Arn}/*'
+              - Sid: ArtifactHeadObject404  # without ListBucket, head-object on a missing key returns 403 instead of 404
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt ArtifactBucket.Arn
+              - Sid: RecordDeployedVersion  # delivery-strategy §4 decision 4: /sentinelqa/<env>/version
+                Effect: Allow
+                Action: ssm:PutParameter
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/version
 Outputs:
   DeployRoleArn:
     Value: !GetAtt DeployRole.Arn

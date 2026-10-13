@@ -38,6 +38,7 @@ As of **2026-10-13 ~15:40 CT**. Account `723940054516`, region `us-east-1` (dev 
 
 ## Known drift
 - **Tags:** stacks are tagged `app=SentinelQA`, `env=<env>`. The proposed ADR-0017 standard (`Project`, `Environment`, `ManagedBy`, `Repo`) is not yet applied.
+- **Deploy role policy (branch `ci/deploy-workflow`):** `00-bootstrap.yaml` now lets `SentinelQA-<env>-deploy` read Bootstrap outputs (`DescribeStacks` only), tag `SentinelQA-<env>-*` stacks (`cloudformation:TagResource`, for `--tags`), `s3:ListBucket` on the env artifact bucket (head-object 404), and `ssm:PutParameter` on `/sentinelqa/<env>/version`. The live dev (and stage) Bootstrap stacks do not have this yet: a Bootstrap redeploy with admin credentials is needed, with Vishwas's approval, before the first `deploy.yml` run. The deploy role cannot apply it itself.
 - **AlarmEmail:** the deployed Security stacks got `AlarmEmail` passed directly at deploy time. Future redeploys must take it from the `ALARM_EMAIL` GitHub environment variable (PR #6). The address is never written in the repo.
 
 ## Admin session (2026-10-13)
