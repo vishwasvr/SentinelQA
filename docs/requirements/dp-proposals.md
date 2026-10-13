@@ -61,11 +61,11 @@ Common to every step (Observed): "Your name" recorded on each step (BR-11); each
 |---|---|---|---|
 | 2 Containment | Containment actions (free text, required); affected quantity / lot (free text, optional) | Containment actions non-empty | "segregate lot, 100% CMM on remaining stock" and "3 of 40" in the NCMR-2026-0087 drawer (34) — Inferred; field split **GUESS** |
 | 3 Investigation | Root cause candidates (list of free-text items, ≥ 1); confirmed root cause (free text) | ≥ 1 root cause and a confirmed root cause | Drawer "Root cause candidates" (34) — Inferred; "confirmed" field **GUESS** (AI hypotheses deferred, so human-entered) |
-| 4 Draft Ready | Corrective actions (list: action text, owner name, due date); proposed disposition (NCMR only: Use as is, Rework, Repair, Scrap, Return to supplier); `dueDate` (see Developer review note below: proposed to move to step 1); citations (clause refs) | ≥ 1 action; NCMR: disposition set; if Use as is or Repair, independent named approver set (BR-10) | Drawer "Actions", "disposition proposed", "Citations" (34); disposition enum §6 — Observed; per-action owner/due **GUESS** |
+| 4 Draft Ready | Corrective actions (list: action text, owner name, due date); proposed disposition (NCMR only: Use as is, Rework, Repair, Scrap, Return to supplier); `dueDate` (see Developer review note below: proposed to move to step 1, which needs a new create-form field or a default of open date + N days, **GUESS**); citations (clause refs) | ≥ 1 action; NCMR: disposition set; if Use as is or Repair, independent named approver set (BR-10) | Drawer "Actions", "disposition proposed", "Citations" (34); disposition enum §6 — Observed; per-action owner/due **GUESS** |
 | 5 QM Review | Reviewer decision (Approve / Return to Investigation); decision comment; reviewer name | Approve → Closed allowed; Return requires a comment | Stage name Observed (35); decision options **GUESS** |
 | 6 Closed | Closed date (system), closed by (reviewer name); read-only afterwards except audited corrections | Only from QM Review with Approve | Stage Observed; rules **GUESS** |
 
-**Developer review note (DP-02 + DP-20):** with `dueDate` set only at step 4, records in Containment and Investigation could never be overdue. Recommended: set `dueDate` at **step 1** (create). Alternative: keep it at step 4 and state in the BRD that steps 1–3 are never overdue. Confidence: **GUESS**.
+**Developer review note (DP-02 + DP-20):** with `dueDate` set only at step 4, records in Containment and Investigation could never be overdue. Recommended: set `dueDate` at **step 1** (create). Alternative: keep it at step 4 and state in the BRD that steps 1–3 are never overdue. Confidence: **GUESS**. **Developer review note:** setting `dueDate` at step 1 adds a **new field**: the observed create forms (screenshots 25, 26) have no due date. Options: (a) add a required or optional `dueDate` field to the create form; (b) default `dueDate` to the open date + N days, with N configurable (BR-47 config). The choice between (a) and (b) and the value of N are **GUESS**, for Vishwas to decide.
 
 Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity observed.
 
@@ -79,7 +79,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 ## DP-03 — Controlled-data gate remainder (O-04)
 - **Question:** Do you sign off the CFR-range reading, and how are normalisation, evasion, field scope and exempt fields handled?
 - **Recommended:** (1) Sign off the v1.4.1 range reading as written in BR-44. (2) Normalise before matching: Unicode NFKC, case-fold, collapse whitespace, treat `.`/`-`/`_` between letters as separators (so `I.T.A.R` and `I T A R` hit). (3) Out of scope: base64, deliberate misspellings, other languages — covered by the attestation, not the matcher. (4) Screen every free-text field (titles, descriptions, notes, scope, location); exempt system IDs, enum values, dates, and person-name fields. (5) Writes without free text still require attestation only if the endpoint accepts any free-text field (openapi). (6) 422 message: "This text appears to contain controlled data (marker: <id>). Remove it and try again." with the input kept in the form, client-side only.
-- **Developer review note:** `.`, `-` and `_` between letters are treated as separators, so `15 C.F.R. 734` matches the 15 CFR 730–774 range. A hyphen between digits (as in `120-130`) is unaffected. Once DP-03 is approved, add these as cases to `test_marker_patterns.py`: `15 C.F.R. 734` (hit), `I.T.A.R` (hit), `C-U-I` (hit), `22 CFR 120-130` (range kept, hit).
+- **Developer review note:** `.`, `-` and `_` between letters are treated as separators, so `15 C.F.R. 734` matches the 15 CFR 730–774 range. A hyphen between digits (as in `120-130`) is unaffected. Once DP-03 is approved, add these as cases to `test_marker_patterns.py`: `15 C.F.R. 734` (hit), and, as **GUESS** (not specified by Developer), `I.T.A.R` (hit), `C-U-I` (hit), `22 CFR 120-130` (range kept, hit).
 - **Alternatives:** (a) literal-only markers, no normalisation (simplest, weakest); (b) screen names too (false-positive risk, e.g. a surname "Ear").
 - **Rationale:** Whole-word case-insensitive is already decided; light normalisation closes cheap evasion without exotic false positives.
 - **Evidence:** BR-44, BR-04; ADR-0005; overview O-04 and §4; DEV-13, DEV-27, QA-03, QA-04, QA-20.
@@ -139,7 +139,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 - **Alternatives:** (a) allow edits to Draft records only; (b) allow re-release of older revisions with a reason.
 - **Rationale:** Matches the key `DOC#<docNo>#REV#<rev>` and the observed auto-supersede of "earlier released revision of the same document".
 - **Evidence:** BR-37, OQ-17; screenshots 44, 46; overview §5; DEV-14, QA-13.
-- **Developer review note:** revisions are compared **numerically** when both values are numbers and **alphabetically** when both are letters; a mix of number and letter (e.g. `3` vs `B`) is rejected (422). This is the recommendation for revision ordering.
+- **Developer review note:** revisions are compared **numerically** when both values are numbers and **alphabetically** when both are letters; a mix of number and letter (e.g. `3` vs `B`) is rejected (HTTP 422 — **GUESS**, code not specified). This is the recommendation for revision ordering.
 - **Confidence:** Inferred (ordering rule per Developer review note).
 
 ## DP-12 — Dates and time
@@ -154,7 +154,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 - **Question:** What age direction/basis does the review queue use, how do filters combine, and how are equal supplier scores ordered?
 - **Recommended:** Severity (Critical > Major > Minor), then oldest `openedAt` first; filters combine with AND; empty state "No records match these filters" with Clear filters; equal supplier scores ordered by name A–Z.
 - **Alternatives:** (a) age by soonest due date; (b) tie-break by criticality.
-- **Developer review note:** the queue order needs the GSI1 severity rank to sort Critical first (Critical=1, Major=2, Minor=3).
+- **Developer review note:** the queue order needs the GSI1 severity rank to sort Critical first (Critical=1; Major=2 and Minor=3 are **GUESS**, not specified).
 - **Rationale:** GSI1 is keyed `severityRank#openedAt`; observed queue (9d left before 12d left) is consistent with either basis.
 - **Evidence:** BR-14, US-10, US-11, US-18; screenshots 09, 12; overview §5; QA-10, QA-11.
 - **Confidence:** Inferred; empty-state text **GUESS**.
@@ -198,5 +198,5 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 - **Alternatives:** (a) display-only (red "overdue" in place of "Nd left"), not counted; (b) also add a CAPA/NCMR Due soon window (BR-47 config).
 - **Rationale:** Matches how training, calibration and supplier items are treated (BR-42) and uses the index that already exists.
 - **Evidence:** OQ-25, BR-14, BR-42; screenshots 08, 09, 34, 35; overview §5 (GSI2); Architect finding #29 (DEV-29).
-- **Developer review note:** depends on `dueDate` being set at step 1 (see DP-02 note); otherwise Containment and Investigation records are never overdue. **GUESS**.
+- **Developer review note:** depends on `dueDate` being set at step 1 (see DP-02 note); otherwise Containment and Investigation records are never overdue. **GUESS**. Setting it at step 1 needs a new field (create form has no due date): (a) a `dueDate` field on the create form or (b) default open date + N days, N configurable; choice and N are **GUESS** (see DP-02).
 - **Confidence:** Inferred (no CAPA/NCMR overdue display observed; rule extends BR-42). Changes the BR-42 seed count only if seeded records are past due.
