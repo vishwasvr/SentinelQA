@@ -1,44 +1,42 @@
-# SentinelQA: Cost Estimate (architecture v0.2)
+# SentinelQA: Cost Estimate (architecture v0.3: prod / non-prod profiles)
 
 | Item | Value |
 |---|---|
-| Scope | Current design only: [architecture-overview.md](architecture-overview.md) v0.2 and [iac/templates](iac/README.md). AI/Bedrock is deferred and **not** costed. WAF is shown as an optional add-on only |
+| Scope | [architecture-overview.md](architecture-overview.md) v0.3 and [iac/templates](iac/README.md) with `EnvProfile` = **lean** (dev, stage) / **strict** (prod), see [ADR-0013](adr/0013-environment-profiles.md). AI is deferred and not costed. WAF is an optional add-on only |
 | Region / pricing | us-east-1, public on-demand list prices, USD, excl. tax |
-| Prices retrieved | **2026-10-13** (all sources below). Prices change, so re-check before budgeting |
-| Method | Usage assumptions (§1) × list prices (§2), computed with a small script. Figures rounded |
+| Prices retrieved | **2026-10-13** (sources in §2). Re-check before budgeting |
+| Method | Usage assumptions (§1) × list prices (§2), scripted. Rounded |
 
-## 0. Summary
-| Users | Monthly, **no free tier** | Monthly, **with always-free tiers** | Notes |
+## 0. Summary (year 1)
+| Users | Prod, no free tier | Prod, always-free | Non-prod (dev+stage), no free tier | Non-prod, always-free | **Total, no free tier** | **Total, always-free** |
+|---|---|---|---|---|---|---|
+| **20** | $2.92 | $1.33 | $2.03 | $0.06 | **≈ $4.95** | **≈ $1.39** |
+| 50 | $4.13 | $1.89 | $2.23 | $0.14 | ≈ $6.36 | ≈ $2.03 |
+| 100 | $6.15 | $2.83 | $2.56 | $0.26 | ≈ $8.71 | ≈ $3.09 |
+
+- **Versus the v0.2 estimate (20 users):** $7.80 → $4.95 without free tier, $3.90 → $1.39 with always-free. By year 7 it drops from about $16 to about $9 without free tier.
+- **Prod year 7 (20 users)** (data ≈ 4.7 GB, CMK rotated twice): about **$6.90/month without free tier, $4.20 with always-free**, plus about $0.03 for the recommended backup option C.
+- **One-time setup:** about $0 AWS.
+- **Optional WAF (not in totals):** about $8.06/month for one prod web ACL.
+- **Non-prod "no free tier" is mostly GitHub Actions minutes** ($1.68). In practice those minutes are included in the GitHub plan.
+
+## 1. Usage assumptions
+Same as v0.2 (U-1 … U-17), restated by environment:
+
+| # | Assumption | Prod | Non-prod (dev+stage combined) |
 |---|---|---|---|
-| **20 (baseline)** | **≈ $7.80** | **≈ $3.90** | Year 1. Fixed costs dominate |
-| 50 | ≈ $9.20 | ≈ $4.60 | |
-| 100 | ≈ $11.70 | ≈ $5.70 | |
-
-- **One-time setup (AWS):** ≈ $0. The deploys themselves are free, and resources start billing pro-rata. Engineering effort is not priced. Optional domain registration is unverified (§6).
-- **Year-7 run rate at 20 users** (storage grown, KMS rotations billed): ≈ $16/month without free tier, ≈ $11/month with always-free tiers, plus any O-01 backup option (§5).
-- **Optional WAF add-on** (not in totals): ≈ $8/month per web ACL (§6).
-- **Bottom line:** at this scale the bill is set by **fixed per-resource fees** (KMS keys, alarms, CI minutes), not by traffic.
-
-## 1. Usage assumptions (explicit)
-| # | Assumption | Value (20 users) |
-|---|---|---|
-| U-1 | Active users / working days | 20 users, 22 working days/month |
-| U-2 | API requests per user per day | 150 (page loads, lists, saves) → **66,000 prod API req/month** |
-| U-3 | Non-prod traffic (dev + stage) | +20% of prod → **79,200 API req/month total** |
-| U-4 | Static asset requests | 30/user/day (SPA cached by browser) → ~95k CloudFront requests total incl. API |
-| U-5 | Response sizes | API 10 KB avg. Static 2 MB per user per day → **≈ 1.9 GB CloudFront egress/month** |
-| U-6 | Lambda | arm64, 512 MB, 150 ms avg → ≈ 5,900 GB-s/month |
-| U-7 | Writes | 20% of API requests are writes. Each is a transaction (record ≈ 2 KB + audit event ≈ 4 KB with snapshot); transactional writes cost 2× → ≈ 12 WRU per write |
-| U-8 | Reads | ≈ 10 RRU per API request (queries/lists, eventually consistent mixes ignored) |
-| U-9 | Records created | ≈ 25 domain items/user/month (CAPA/NCMR/SCAR, FAI rows, calibration, training, docs, …). The BRD ROI default is 20 records/month for drafting. GSIs with ALL projection ≈ 3× item storage |
-| U-10 | Storage growth | audit ≈ 53 MB/month + domain ≈ 3 MB/month (prod, 20 users) → **≈ 0.67 GB/year prod, ≈ 0.8 GB/year incl. non-prod; ≈ 5.6 GB after 7 years** |
-| U-11 | Logs | ≈ 1.5 KB per invocation (structured, no bodies) → ≈ 0.12 GB/month. 90-day retention |
-| U-12 | Alarms | 5 per environment × 3 = **15 alarms** (the template has 1 per env; overview plans ~5) |
-| U-13 | KMS | 3 CMKs (one per env) with annual rotation. ≈ 0.3 KMS requests per API call (DynamoDB caches data keys) |
-| U-14 | SNS email | < 100 alarm emails/month |
-| U-15 | Deploys / CI | 20 deploys/month × 3 envs × 5 min + 40 PR lint runs × 2 min ≈ **380 Linux minutes/month** |
-| U-16 | S3 | site bundle ~5 MB × 3, Lambda artifacts, CloudTrail logs: ≈ 1 GB total, ~500 PUT, ~20k GET |
-| U-17 | Scaling | All traffic and storage scale linearly with users. Fixed fees do not |
+| U-1/2 | Users × API req/user/day × 22 days | 20 × 150 → **66,000 req/mo** | 20% of prod → **13,200 req/mo** |
+| U-4/5 | Static requests, egress | 30/user/day. ≈ 1.5 GB/mo | ≈ 0.3 GB/mo |
+| U-6 | Lambda | arm64, 512 MB, 150 ms | same |
+| U-7/8 | DynamoDB | 20% writes × 12 WRU. 10 RRU per request | same ratios |
+| U-10 | Storage growth | ≈ 0.67 GB/yr (audit-dominated) → **≈ 4.7 GB at year 7**, retained | ≈ 0.13 GB/yr. Synthetic, may be purged |
+| U-11 | Log retention | 90 days | **7 days** |
+| U-12 | Alarms | **5** | **1 per env = 2** (total 7 ≤ 10 free) |
+| U-13 | KMS | **1 CMK** (rotation on) | **none** (AWS owned keys) |
+| PITR / backup | | PITR on + O-01 option | **none** |
+| U-15 | CI minutes | ≈ 100 (prod deploys) | ≈ 280 (dev/stage deploys + PR lint) |
+| U-16 | S3 | ≈ 0.6 GB (site, artifacts, CloudTrail) | ≈ 0.4 GB |
+| — | Free-tier allocation | Always-free allowances are **account-wide** (single account, D-08). Combined prod + non-prod usage stays within every allowance, so both columns apply them | |
 
 ## 2. Unit prices and sources (retrieved 2026-10-13)
 Bulk price list base: `https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/<service>/current/us-east-1/index.json` (CloudFront, Route 53, WAF: `.../current/index.json`).
@@ -61,32 +59,47 @@ Bulk price list base: `https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/<
 | GitHub OIDC / IAM OIDC provider | Free (no AWS line item; IAM is not billed) | — |
 | AWS Free Tier (new accounts) | Accounts created **on/after 2025-07-15**: up to $200 credits ($100 at sign-up + up to $100 earned). Free plan lasts 6 months. Credits expire 12 months after account creation. **Always-free** allowances apply on both Free and Paid plans | [aws.amazon.com/free](https://aws.amazon.com/free/), [Free Tier FAQs](https://aws.amazon.com/free/free-tier-faqs/), [API Gateway pricing](https://aws.amazon.com/api-gateway/pricing/) note |
 
-## 3. Monthly line items: 20 users, year 1
-"With free tier" applies **always-free** allowances only (they don't expire). 12-month legacy offers and credits are **not** applied (see §4).
+| CloudWatch composite alarm | $0.50 per composite alarm-month | [https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonCloudWatch/current/us-east-1/index.json](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonCloudWatch/current/us-east-1/index.json) (2026-10-07) |
+| KMS AWS-managed / AWS-owned keys | No monthly key charge for AWS managed or AWS owned keys. API requests to AWS-managed keys **are** charged ($0.03/10k) | [aws.amazon.com/kms/pricing](https://aws.amazon.com/kms/pricing/) (2026-10-13) |
+| Lambda Function URLs | No separate Function URL line item in the Lambda price list. Requests/duration billed as normal Lambda. **"No extra charge" treated as unverified** | [https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSLambda/current/us-east-1/index.json](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSLambda/current/us-east-1/index.json) (2026-10-12). Throttling behaviour: [Lambda docs, function URLs](https://docs.aws.amazon.com/lambda/latest/dg/urls-configuration.html) |
+| DynamoDB Standard-IA | Storage $0.10/GB-mo. WRU $0.78/M. RRU $0.155/M. IA PITR price **not found in the price list (unverified)** | [https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonDynamoDB/current/us-east-1/index.json](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonDynamoDB/current/us-east-1/index.json) (2026-09-11) |
+| X-Ray (prod tracing) | **Not retrieved (unverified)**. Assumed ≈ $0 at this volume | — |
 
-| Service | Quantity / month | No free tier | With always-free | Free tier type |
-|---|---|---|---|---|
-| CloudFront requests | ≈ 95,000 | $0.10 | $0.00 | Always free (10M) |
-| CloudFront egress | ≈ 1.9 GB | $0.16 | $0.00 | Always free (1 TB) |
-| S3 (site, artifacts, CloudTrail) | ≈ 1 GB, 500 PUT, 20k GET | $0.03 | $0.03 | (12-month legacy only) |
-| API Gateway HTTP API | 79,200 req | $0.08 | $0.08 | (12-month legacy only) |
-| Lambda requests | 79,200 | $0.02 | $0.00 | Always free |
-| Lambda compute (arm64) | ≈ 5,900 GB-s | $0.08 | $0.00 | Always free |
-| DynamoDB writes (on-demand) | ≈ 190k WRU | $0.12 | $0.12 | On-demand: no free requests |
-| DynamoDB reads (on-demand) | ≈ 792k RRU | $0.10 | $0.10 | On-demand: no free requests |
-| DynamoDB storage | ≈ 0.4 GB avg in year 1 | $0.10 | $0.00 | Always free (25 GB) |
-| DynamoDB PITR | ≈ 0.4 GB | $0.08 | $0.08 | None |
-| KMS CMKs | 3 keys | $3.00 | $3.00 | None |
-| KMS requests | ≈ 24k | $0.07 | $0.01 | Always free (20k) |
-| CloudWatch Logs ingest + storage | 0.12 GB, 90-day retention | $0.07 | $0.00 | Always free (5 GB) |
-| CloudWatch alarms | 15 | $1.50 | $0.50 | Always free (10) |
-| SNS email | < 100 | $0.00 | $0.00 | Always free (1,000) |
-| CloudTrail (1 trail, mgmt events) | — | $0.00 | $0.00 | First copy free |
-| GitHub Actions (private repo) | ≈ 380 min | $2.28 | $0.00 | Included in GitHub plan |
-| Route 53 / ACM | **Not in design** (CloudFront default domain) | $0.00 | $0.00 | — |
-| **Total** | | **≈ $7.80** | **≈ $3.90** | |
+## 3. Monthly line items, 20 users, year 1
 
-**DynamoDB on-demand vs provisioned:** the 25 WCU/25 RCU always-free applies only to *provisioned* mode. At this load, provisioned mode at the minimum of 1 WCU/1 RCU per table and GSI would be free, saving ≈ $0.20/month. That isn't worth the throttling risk and autoscaling configuration. On-demand stays (overview §3).
+### 3a. Prod (EnvProfile = strict)
+| Service | Quantity / month | No free tier | Always-free |
+|---|---|---|---|
+| CloudFront (requests + egress) | ≈ 79k req, ≈ 1.5 GB | $0.21 | $0.00 |
+| API Gateway HTTP API | 66,000 req | $0.07 | $0.07 |
+| Lambda (requests + arm64 compute) | 66k req, ≈ 4,950 GB-s | $0.08 | $0.00 |
+| DynamoDB on-demand requests | ≈ 158k WRU, 660k RRU | $0.18 | $0.18 |
+| DynamoDB storage | ≈ 0.34 GB avg | $0.08 | $0.00 |
+| DynamoDB PITR | ≈ 0.34 GB | $0.07 | $0.07 |
+| KMS: 1 CMK + ≈ 20k requests | | $1.06 | $1.00 |
+| CloudWatch Logs (90 d) | ≈ 0.1 GB | $0.06 | $0.00 |
+| CloudWatch alarms | 5 | $0.50 | $0.00 |
+| S3 | ≈ 0.6 GB | $0.02 | $0.02 |
+| SNS email / CloudTrail | | $0.00 | $0.00 |
+| GitHub Actions | ≈ 100 min | $0.60 | $0.00 |
+| Backup (O-01, option C, incremental export) | | ≈ $0.00 in year 1 (≈ $0.03 at year 7) | same |
+| **Prod total** | | **≈ $2.92** | **≈ $1.33** |
+
+### 3b. Non-prod: dev + stage (EnvProfile = lean)
+| Service | Quantity / month | No free tier | Always-free |
+|---|---|---|---|
+| CloudFront | ≈ 16k req, ≈ 0.3 GB | $0.04 | $0.00 |
+| API Gateway HTTP API | 13,200 req | $0.01 | $0.01 |
+| Lambda | 13k req | $0.02 | $0.00 |
+| DynamoDB requests | | $0.04 | $0.04 |
+| DynamoDB storage (AWS owned key) | ≈ 0.07 GB | $0.02 | $0.00 |
+| PITR / backup | none | $0.00 | $0.00 |
+| KMS | none (AWS owned keys) | $0.00 | $0.00 |
+| CloudWatch Logs (7 d) | ≈ 0.02 GB | $0.01 | $0.00 |
+| CloudWatch alarms | 2 | $0.20 | $0.00 |
+| S3 | ≈ 0.4 GB | $0.01 | $0.01 |
+| GitHub Actions | ≈ 280 min | $1.68 | $0.00 |
+| **Non-prod total** | | **≈ $2.03** | **≈ $0.06** |
 
 ## 4. Free-tier notes
 - **Always-free (used above):** Lambda 1M req/400k GB-s, CloudFront 1 TB/10M req, DynamoDB 25 GB storage, KMS 20k requests, CloudWatch 5 GB logs/10 alarms/3 dashboards, SNS 1,000 emails/1M API calls, CloudTrail first copy.
@@ -94,18 +107,18 @@ Bulk price list base: `https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/<
 - **New credit-based free tier** (accounts on/after 2025-07-15): up to $200 credits that expire after 12 months. At ≈ $4–8/month the credits would cover **roughly the first year completely**. The Free plan closes after 6 months unless upgraded to Paid, and limits which services are available (not verified which of ours are included). Use the Paid plan for this workload.
 
 ## 5. Seven-year retention projection (D-03) and backup options (O-01)
-Total DynamoDB data (all envs, 20 users): ≈ 0.8 GB/year → **5.6 GB at year 7** (≈ 4.7 GB prod).
+Total DynamoDB data (all envs, 20 users; non-prod is synthetic and not retained, see ADR-0013): ≈ 0.8 GB/year → **5.6 GB at year 7** (≈ 4.7 GB prod).
 
 | Year-end | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
 |---|---|---|---|---|---|---|---|
 | DynamoDB GB (20 users) | 0.8 | 1.6 | 2.4 | 3.2 | 4.0 | 4.8 | 5.6 |
 | Storage $/mo (no free tier, $0.25) | 0.20 | 0.40 | 0.60 | 0.80 | 1.00 | 1.21 | 1.41 |
 | PITR $/mo ($0.20) | 0.16 | 0.32 | 0.48 | 0.64 | 0.80 | 0.96 | 1.12 |
-| KMS keys $/mo (3 keys, rotations) | 3 → 6 | 6 → 9 | 9 | 9 | 9 | 9 | 9 |
+| Prod KMS key $/mo (1 CMK, rotations) | 1 → 2 | 2 → 3 | 3 | 3 | 3 | 3 | 3 |
 
 At 50 / 100 users, year-7 data is ≈ 14 / 28 GB (storage $3.52 / $7.03, PITR $2.81 / $5.62 per month). With the always-free 25 GB, storage stays free up to ~90 users at year 7.
 
-**KMS rotation:** with annual rotation, each key adds $1/month after the first and second rotation. 3 keys cost $3 → $6 → $9/month, which **becomes the largest single line item**.
+**KMS rotation:** with annual rotation, each key adds $1/month after the first and second rotation, capped. With the lean profile only prod has a CMK: $1 → $2 → $3/month (the v0.2 baseline with 3 keys went to $9).
 
 **O-01 backup options** (prod table ≈ 4.7 GB at year 7, 20 users; steady-state monthly cost at year 7):
 
@@ -131,36 +144,43 @@ Recommendation for the O-01 decision: **C (incremental export)** or **B (annual 
 | AWS Budgets | **Unverified** | TODO in template |
 | Bedrock / AI | Deferred (D-01) | Will become the dominant variable cost when AI is enabled |
 
-## 7. Sensitivity
+## 7. Savings review: alternatives evaluated
+Savings are per month, 20 users, versus the v0.2 design (3 CMKs, PITR everywhere, 15 alarms, 90-day logs in all envs).
+
+| # | Alternative | Saving $/mo (now → year 7) | Trade-off | Recommendation | Affects prior decision? |
+|---|---|---|---|---|---|
+| S-1 | **Lean non-prod profile**: AWS owned keys, no PITR, 1 alarm/env, 7-day logs, no X-Ray, no deletion protection | **≈ $2.85 now → ≈ $7** (2 CMKs incl. rotations, ≈ $0.8 alarms, PITR, logs) | Non-prod encryption is AWS owned (still encrypted, no key policy or CloudTrail key usage). Non-prod data is unrecoverable, so it must hold synthetic data only | **Adopt** (ADR-0013) | D-03 is applied to **prod only**. Non-prod holds no real records. **Needs confirmation** |
+| S-2a | Prod: **1 CMK** instead of 3 (one per env) | Included in S-1 | None for prod | **Adopt** | No (overview §7 previously said "CMK per env") |
+| S-2b | Prod: **AWS-managed key** (aws/dynamodb) instead of a CMK | $1 → $3 (key fee), requests still charged | Lose key-policy control, custom rotation, and the ability to disable the key (crypto-shred). CloudTrail still logs use | Optional, **Vishwas to decide** | No D-x. Changes the security posture in overview §7 |
+| S-2c | Prod: **AWS owned key** (DynamoDB default) | $1.06 → $3.06 | Also lose CloudTrail visibility of key use. Weakest audit story for an AS9100 supplier | Not recommended | Same as S-2b |
+| S-2d | Prod CMK with **automatic rotation off** | $0 now → $2 | Weaker crypto hygiene. Some customer security questionnaires expect rotation | Not recommended | No |
+| S-3 | **Lambda Function URL** (behind CloudFront OAC) instead of HTTP API | $0.07 ($0.33 at 100 users) | Loses stage throttling (only reserved concurrency: RPS = 10 × concurrency, 429 beyond). Loses the **JWT authorizer seam** (ADR-0008): auth would move into code or the edge. Two functions mean two origins/URLs. The WAF slot stays on CloudFront (ADR-0011 unaffected) | **Not recommended**. The saving is negligible | Would change ADR-0008 (seam) and O-05 (throttling) |
+| S-4 | **Composite alarms** to reduce alarm count | **Negative** ($0.50 each vs $0.10 standard) | Fewer emails, but costs more | Not recommended. Keep ≤ 10 standard alarms (free) | No |
+| S-5 | **Fewer prod alarms** (5 → 3) | $0.20 without free tier, $0 with free tier | Less coverage (drop the audit-errors and gate-blocks alarms) | Not recommended | D-10 unaffected |
+| S-6 | O-01: **S3 incremental export** vs AWS Backup monthly | vs A: **≈ $19.70 at year 7**. vs B (annual): ≈ $1.60 | Restore = import into a new table (slower, $0.15/GB). Glacier minimums and retrieval fees. Not WORM | **Adopt C** (prod only). B if in-place restore matters | Consistent with D-05. Resolves O-01 **if Vishwas agrees** |
+| S-7 | **DynamoDB Standard-IA** for prod AuditLog | No free tier: ≈ $0.66 at year 7 (4.4 GB × $0.15) minus ≈ $0.03 extra requests. **With the 25 GB always-free: negative** (the free storage applies to Standard) | IA request prices are ~25% higher. IA PITR price unverified | **Not now**. Revisit if table storage exceeds 25 GB (≈ 90+ users at year 7) | No |
+| S-8 | Prod log retention 90 → 30 days | < $0.01 | Shorter forensic window | Not worth it | O-02 |
+| S-9 | arm64 GitHub runners / skip CI on docs-only changes | ≈ $0.40 / up to $1+ (only if beyond included minutes) | Minor | Adopt opportunistically | D-12 unaffected |
+| S-10 | Merge dev + stage into one non-prod env | ≈ $0.10 (one alarm) | Loses the rehearsal stage before prod | Not recommended | Changes the environments in overview §10 |
+| S-11 | CloudFront flat-rate **Free plan** | ≈ $0 (pay-as-you-go is already free under the 1 TB/10M always-free) | Not available to Free-plan accounts | Not needed | No |
+
+**Unchanged in every profile:** controlled-data gate (D-14), append-only audit with IAM deny (D-05), no file storage (BR-07), SoD rules, API throttling, auth seam, WAF slot (D-11), email alerts (D-10), single account (D-08), us-east-1 (D-02), CloudFormation (D-13), GitHub OIDC (D-12). No BRD requirement is dropped.
+
+## 8. Sensitivity
 | | 20 users | 50 users | 100 users |
 |---|---|---|---|
-| API requests/month (all envs) | 79k | 198k | 396k |
-| Monthly, no free tier (year 1) | ≈ $7.80 | ≈ $9.20 | ≈ $11.70 |
-| Monthly, always-free (year 1) | ≈ $3.90 | ≈ $4.60 | ≈ $5.70 |
-| Year-7 DynamoDB data | 5.6 GB | 14 GB | 28 GB |
-| Year-7 run rate, no free tier (incl. KMS $9, excl. backup) | ≈ $16.10 | ≈ $21.10 | ≈ $29.40 |
+| Prod / non-prod / **total**, no free tier | $2.92 / $2.03 / **$4.95** | $4.13 / $2.23 / **$6.36** | $6.15 / $2.56 / **$8.71** |
+| Prod / non-prod / **total**, always-free | $1.33 / $0.06 / **$1.39** | $1.89 / $0.14 / **$2.03** | $2.83 / $0.26 / **$3.09** |
+| Prod year-7 data | 4.7 GB | 11.7 GB | 23.4 GB |
 
-Variable cost is only ≈ $0.05/user/month. Even 10× the request assumption (1,500 req/user/day) adds only ≈ $3–4/month at 20 users.
-
-## 8. Biggest cost drivers
-1. **KMS customer-managed keys:** $3/month now, $9/month after two rotations (3 env keys).
-2. **GitHub Actions minutes:** $2.28/month if the plan's included minutes are exhausted or unavailable. $0 on the included quota or a public repo.
-3. **CloudWatch alarms:** $1.50/month for 15 alarms ($0.50 after the 10 free).
-4. **Long-term backup choice (O-01):** $0.03 to $20/month at year 7, depending on the option.
-5. **DynamoDB storage + PITR growth:** ≈ $2.50/month at year 7 (20 users). Audit snapshots dominate growth.
-6. Traffic-based items (CloudFront, API GW, Lambda, DynamoDB requests): < $1/month combined.
-
-## 9. Cost-saving levers
-- **One CMK for dev+stage** (or AWS-owned/AWS-managed keys in dev) saves $1–6/month. Keep the CMK in prod. This trades away some env isolation (D-08).
-- Fewer alarms in dev/stage (≤ 10 total stays free).
-- **Keep audit snapshots lean:** store diffs, not full snapshots. Halves storage growth and PITR.
-- Disable PITR in dev. Shorten log retention in dev to 7–14 days.
-- Use arm64 runners ($0.005/min) or the included GitHub minutes. Skip CI on docs-only commits.
-- Backup option C or B instead of monthly AWS Backup.
-- Use an account created on/after 2025-07-15 on the **Paid** plan to use up to $200 credits (≈ year 1 free).
-- Keep CloudFront caching of static assets (already Managed-CachingOptimized).
+## 9. Biggest remaining cost drivers
+1. **Prod CMK:** $1 → $3/month with rotation (S-2b/c can remove it; decision needed).
+2. **GitHub Actions minutes:** $2.28/month only if not covered by the plan.
+3. **CloudWatch alarms:** $0.70 (7 alarms) without free tier, $0 with it.
+4. **Prod storage + PITR growth:** ≈ $2.10/month at year 7 without free tier (≈ $0.94 PITR with it).
+5. Traffic (CloudFront, API GW, Lambda, DynamoDB requests): < $0.60/month combined.
 
 ## 10. Caveats
-- All usage numbers are assumptions (§1), not measurements. Validate with Cost Explorer after the first month of a pilot.
-- Prices are list prices retrieved 2026-10-13. No discounts, Savings Plans, tax or support plans included (AWS Support plans are not priced).
-- DynamoDB GSI write amplification and transaction costs are approximated (U-7). Actual WRU depends on item sizes.
+- Usage is assumed, not measured. Validate with Cost Explorer after month 1.
+- List prices retrieved 2026-10-13. No tax, Support plan, discounts, or credits included. New accounts (on/after 2025-07-15) get up to $200 credits, which would cover several years at this run rate if the credits didn't expire after 12 months.
+- Unverified: legacy 12-month free tier, Function URL "no extra charge", IA PITR price, X-Ray, Route 53 queries, domain registration, ACM, Budgets, Deep Archive.
