@@ -296,3 +296,33 @@ No blockers. Remaining non-blocking items:
 | QA-42: specific codes for the Issue SCAR / Assign training 422s | minor | Architect |
 | QA-43: how the SPA sets `isSample` in dev/stage | minor | Architect |
 | QA-44: seed path runs the BR-44 gate; log prod seed runs | minor | Developer / InfraDeploy |
+
+---
+
+## Re-verify — 2026-10-13 (2:58 PM CT) against local HEAD 95ad554 (BRD v1.7.2)
+
+**Ancestry check (`git merge-base --is-ancestor <c> HEAD`):** 06820a8, 3cb4c6a, f6c9458, 95ad554, e444435, 86afdff and d7f94b8 are **all ancestors of HEAD 95ad554**. Diff 0502feb..95ad554: 5 commits (also 9e5fbd1), 7 files, docs/specs only.
+
+| Item | Status | Evidence |
+|---|---|---|
+| QA-41 (missing error codes, 413/503) | **Resolved** | The Problem `code` enum (`openapi.yaml:2242-2260`) now includes `non_sample_data_forbidden`, `sample_flag_forbidden_in_prod`, `sample_flag_immutable`, `item_too_large`, `config_unavailable`, `scar_source_invalid` and `training_source_invalid`. Shared 503 response at `openapi.yaml:85`, 413 at `:113`; 100 `'413'`/`'503'` response entries in total. Tests: `docs/specs/audit-write-path.md:96`ff §7, with a contract check of every documented response. |
+| QA-42 (SCAR / training 422 codes) | **Resolved** | BR-52 `training_source_invalid` (BRD:335). BR-53 `scar_source_invalid` for a SCAR or Closed source (BRD:336). US-46/47 ACs (BRD:481, :485, :487). Matching openapi enum entries. |
+| QA-43 (how the SPA sets isSample) | **Resolved** | Overview §4.6 (`architecture-overview.md:122`ff): the per-env build `config.json` decides; dev/stage add `isSample: true` to every create; prod never sends it; no UI control. US-43 AC at BRD:471. Tests in audit-write-path.md §7. |
+| QA-44 (seed bypasses gate; prod seed runs not logged) | **Resolved as spec; IaC pending** | The seed runs the shared BR-44 gate before any write and aborts with zero writes on a hit; prod runs need an approval reference and write a run record to `/sentinelqa/prod/seed-runs` with 7-year retention and a scoped operator write (`iac/ci-and-data-guards.md:62-63`). Tests in audit-write-path.md §7. **Gap (QA-45):** the doc says the log group is "created by IaC in the prod stack", but no template defines it (`rg seed-runs` matches nothing under `iac/templates/`), and the operator policy is also undefined. Build-time item. |
+
+**Scan of new content:** BRD v1.7.2 only names codes that were already implied, and no conflicting codes remain (BRD changelog 1.7.2). The prod `isSample` behaviour is consistent across overview §4.6 (prod never sends the flag), BR-49 (prod returns 422 if it's sent) and US-43. No new untestable criteria.
+
+| ID | Finding | Sev | Owner |
+|---|---|---|---|
+| QA-45 | Add the `/sentinelqa/prod/seed-runs` log group (7-year retention) and the scoped `logs:CreateLogStream/PutLogEvents` permission for the prod seed operator to the prod IaC. With O-03 that belongs in the new prod account. | minor (build-time) | InfraDeploy |
+
+### Verdict: **FINAL SIGN-OFF on 95ad554 / BRD v1.7.2** (QA)
+Only build-time or pre-go-live items remain open:
+| Item | Sev | Owner | When |
+|---|---|---|---|
+| QA-32: create `ci.yml`/`deploy.yml` and have them pass before the first application-code merge | major | InfraDeploy | build-time |
+| QA-36: run the first-deploy §5b dev smoke test (transactional put passes, bare put denied) before promotion | major | InfraDeploy / Developer | build-time |
+| QA-45: seed-runs log group and operator permission in the prod IaC | minor | InfraDeploy | build-time / pre-go-live |
+| OI-4: tune PLACEHOLDER weights, bands and due days (§5a gate) | minor | Vishwas → BusinessAnalyst / InfraDeploy | pre-go-live |
+| OI-5: verify FAI Form 2 fields | minor | Vishwas → BusinessAnalyst / Architect | pre-go-live |
+| OI-7 / O-03: separate prod account | — | InfraDeploy (Vishwas approval) | pre-go-live |
