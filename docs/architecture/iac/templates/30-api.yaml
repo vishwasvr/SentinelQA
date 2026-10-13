@@ -26,7 +26,10 @@ Parameters:
 Conditions:
   IsStrict: !Equals [!Ref EnvProfile, strict]
 Resources:
-  # O-09: no kms:* permissions needed; tables use the AWS managed key aws/dynamodb (authorized via the DynamoDB service)
+  # O-09: tables use the AWS managed key aws/dynamodb (authorized via the DynamoDB service, no kms:* needed for DynamoDB).
+  # The origin-verify SecureString (ADR-0015, aws/ssm) DOES need kms:Decrypt: conditioned on ViaService ssm, alias aws/ssm
+  # (mirrors AppRoleBoundary AllowSsmSecureStringDecrypt in 00-bootstrap.yaml) and pinned to that parameter's encryption context.
+  # kms:ResourceAliases on an AWS managed key is UNVERIFIED in a live account (dev smoke test, developer review #26).
   RecordsApiRole:
     Type: AWS::IAM::Role
     Properties:
@@ -69,6 +72,14 @@ Resources:
               - Effect: Allow
                 Action: [ssm:GetParameter, ssm:GetParameters]   # BR-47 config, markers, origin-verify SecureString (ADR-0015)
                 Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*'
+              - Effect: Allow                     # ADR-0015: decrypt ONLY the origin-verify SecureString (aws/ssm, via SSM)
+                Action: kms:Decrypt
+                Resource: !Sub 'arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/*'
+                Condition:
+                  StringEquals:
+                    'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com'
+                    'kms:EncryptionContext:PARAMETER_ARN': !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/edge/origin-verify'
+                  'ForAnyValue:StringEquals': { 'kms:ResourceAliases': alias/aws/ssm }
   ReportsApiRole:
     Type: AWS::IAM::Role
     Properties:
@@ -91,8 +102,16 @@ Resources:
                   - { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' }
                   - !Sub [ '${T}/index/*', { T: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' } } ]
               - Effect: Allow
-                Action: [ssm:GetParameter, ssm:GetParameters]
+                Action: [ssm:GetParameter, ssm:GetParameters]   # config, markers, origin-verify SecureString (ADR-0015)
                 Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*'
+              - Effect: Allow                     # ADR-0015: decrypt ONLY the origin-verify SecureString (aws/ssm, via SSM)
+                Action: kms:Decrypt
+                Resource: !Sub 'arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/*'
+                Condition:
+                  StringEquals:
+                    'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com'
+                    'kms:EncryptionContext:PARAMETER_ARN': !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/edge/origin-verify'
+                  'ForAnyValue:StringEquals': { 'kms:ResourceAliases': alias/aws/ssm }
   RecordsApiFn:
     Type: AWS::Lambda::Function
     DependsOn: RecordsLogs        # create the log group first (dev #18)
