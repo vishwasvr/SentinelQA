@@ -15,13 +15,17 @@
     "coverage:gate": "node scripts/ci/coverage-gate.mjs",
     "seed-fixture-lint": "node scripts/ci/seed-fixture-lint.mjs",
     "params-schema": "node scripts/ci/params-schema.mjs",
-    "releases-path-check": "node scripts/ci/releases-path-check.mjs"
+    "releases-path-check": "node scripts/ci/releases-path-check.mjs",
+    "build:lambdas": "node scripts/build-lambdas.mjs",
+    "smoke:deployed": "node scripts/smoke-deployed.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
     "@vitest/coverage-v8": "^3.2.7",
     "ajv": "^8.20.0",
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.5",
+    "fflate": "^0.8.3",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.2",
     "vitest": "^3.2.7"
