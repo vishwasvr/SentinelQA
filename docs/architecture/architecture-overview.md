@@ -4,7 +4,7 @@
 |---|---|
 | Status | **v0.2: decisions D-01..D-14 resolved (2026-10-13).** Nothing deployed and no AWS resources created |
 | Basis | [BRD v1.1](../requirements/BRD.md) (approved), screenshots 01–58, reliability CSV |
-| Diagrams | [diagrams.md](diagrams.md) · Decisions: [adr/](adr/) · IaC: [iac/README.md](iac/README.md) (CloudFormation) |
+| Diagrams | [diagrams.md](diagrams.md) · Decisions: [adr/](adr/) · IaC: [iac/README.md](iac/README.md) (CloudFormation) · Cost: [cost-estimate.md](cost-estimate.md) |
 
 > Scope: only BRD-observed behavior. **AI features are deferred (D-01)**. The current build has no model provider. An `ai` seam is reserved (§6). Auth, logins and multi-tenancy are out of scope, with seams kept ([ADR-0008](adr/0008-auth-and-tenancy-ready-seams.md)). Roadmap items are not designed.
 
@@ -91,6 +91,8 @@ Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (te
 - CloudWatch Logs retention: proposed 90 days (logs contain no record content). O-02.
 
 ## 9. Cost drivers
+Detailed estimate with sources: **[cost-estimate.md](cost-estimate.md)** (≈ $7.80/month without free tier, ≈ $3.90 with always-free, 20 users).
+
 Near zero at pilot volume: Lambda, API GW, DynamoDB on-demand, S3/CloudFront. Fixed: KMS CMKs (one per env), CloudWatch alarms. DynamoDB storage grows linearly over 7 years (small). Bedrock and WAF costs are gone for now.
 
 ## 10. Environments
