@@ -3,7 +3,7 @@
 | Item | Value |
 |---|---|
 | Status | **v0.5: D-01..D-14 (D-03 amended by O-08) + environment profiles ([ADR-0013](adr/0013-environment-profiles.md)); peer-review changes 2026-10-13 (API contract, build ADR-0014, origin header ADR-0015, GSI/access patterns, backup health alarm, permissions boundary).** Nothing deployed and no AWS resources created |
-| Basis | [BRD v1.4.1](../requirements/BRD.md) (commit ff3fd01, BR-44 CFR ranges; v1.4 a2874e6: Vishwas decisions on BR-31/45, US-41, BR-47, BR-44; pending DP-01..DP-19 in §13.3), incl. rules BR-44..BR-47; screenshots 01–58, reliability CSV |
+| Basis | [BRD v1.4.1](../requirements/BRD.md) (commit ff3fd01, BR-44 CFR ranges; v1.4 a2874e6: Vishwas decisions on BR-31/45, US-41, BR-47, BR-44; pending DP-01..DP-20 in §13.3, v1.4.2 2374e7e), incl. rules BR-44..BR-47; screenshots 01–58, reliability CSV |
 | Diagrams | [diagrams.md](diagrams.md) · API: [api/openapi.yaml](api/openapi.yaml) (OpenAPI 3.1) · Decisions: [adr/](adr/) · IaC: [iac/README.md](iac/README.md) (CloudFormation) · Cost: [cost-estimate.md](cost-estimate.md) |
 
 > Scope: only BRD-observed behavior. **AI features are deferred (D-01)**. The current build has no model provider. An `ai` seam is reserved (§6). Auth, logins and multi-tenancy are out of scope, with seams kept ([ADR-0008](adr/0008-auth-and-tenancy-ready-seams.md)). Roadmap items are not designed.
@@ -57,6 +57,29 @@ The contract is [api/openapi.yaml](api/openapi.yaml) (OpenAPI 3.1, BRD v1.4). Fi
 5. **Soft delete everywhere** (BRD v1.4 §13.1): DELETE sets `deletedAt` plus a `DELETED` audit event. Undo is a reversal event. Lists, counts and pickers exclude deleted items. `DeleteItem`/`BatchWriteItem` are denied on both tables in **every** environment.
 6. Lists use cursor pagination (`limit` ≤ 100, opaque `cursor`). Reads compute derived status from dates and the SSM thresholds. The timeline is `GET /api/audit/{entityType}/{id}/events` (read-only Query on AuditLog).
 7. Not routed: `/api/ai/*` (AI seam) and `/api/search`. ⌘K is **client-side over loaded lists** (US-41, BRD v1.4).
+
+### 4.1 Logging rule (architecture rule, Developer review #24)
+Applies to every Lambda (`records-api`, `reports-api`, backup functions). Code is frozen; this is the contract for when it starts.
+- **Never log:** request or response bodies; any header value carrying a secret (`X-Origin-Verify`, `Authorization`, cookies); record field values (titles, descriptions, names, free text, matched gate text); SSM parameter values. Query strings are not logged either, only the route template.
+- **Format:** one JSON object per line via Powertools Logger, these fields only:
+
+| Field | Meaning |
+|---|---|
+| `ts` | ISO 8601 UTC timestamp |
+| `level` | `DEBUG` / `INFO` / `WARN` / `ERROR` (`DEBUG` off in strict) |
+| `env` | `dev` / `stage` / `prod` (`ENV_NAME`) |
+| `fn` | function name, e.g. `SentinelQA-<env>-records-api` |
+| `requestId` | API Gateway request id (also the Lambda request id where present) |
+| `route` | route template, e.g. `GET /api/quality-records/{id}` (never the raw path) |
+| `method` | HTTP method |
+| `status` | HTTP status returned |
+| `latencyMs` | handler duration in ms |
+| `errorCode` | problem code when not 2xx, e.g. `forbidden_origin`, `gate:controlled_marker` |
+| `markerId` | gate only: `K<n>` / `R<n>` (ADR-0005), never the matched text |
+| `workspaceId` | only if present (tenancy seam, ADR-0008) |
+| `entityId` | optional record id (opaque id, not field values) |
+
+- No PII and no body in any field. Stack traces only at `ERROR`, with messages that do not echo input. Metrics stay EMF (§4 step 2).
 
 ## 5. Data model (BRD §6)
 Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (tenancy seam). **No TTL**. Prod retained ≥ 7 years (D-03, amended: prod only, O-08). Prod may also hold labelled sample records (BR-31). Dev/stage hold synthetic or labelled sample data only, never real customer records (BR-45).
@@ -156,9 +179,9 @@ A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as 
 - **O-02** CloudWatch Logs retention (90 days proposed).
 - **O-03** Single-account blast radius. Revisit before production customer data.
 - **O-04** Tuned values for D-07 (the PLACEHOLDER defaults ship, DP-16). Marker list decided in BRD v1.4, CFR ranges per v1.4.1 (ff3fd01) (incl. ITAR, EAR, CUI, `22 CFR 120-130`, `15 CFR 730-774`; whole-word, case-insensitive). CFR ranges are stored as structured ranges and checked in code (dev #27, §4); exact range rules pending Vishwas sign-off. Normalisation, evasion and exempt fields are still pending (DP-03).
-- **O-05** Without WAF (D-11), public endpoints rely on API Gateway throttling. Set the throttle values.
+- **O-05** Without WAF (D-11), public endpoints rely on API Gateway throttling. **PROPOSED (pending Vishwas approval):** HTTP API stage default route throttle **rate 20 req/s, burst 40**, the values already set as `ThrottleRate`/`ThrottleBurst` defaults in `30-api.yaml` (`DefaultRouteSettings`). Sizing: ~20 users in year 1; even all 20 active at once at ~1 req/s is 20 req/s, so normal use stays well under the cap while a scripted direct hit is capped (excess gets 429). No template change needed; per-route overrides only if real traffic shows a need.
 - **O-06** Whether hidden AI modules show a "coming later" state or are removed from navigation (UX).
-- **O-13** Decisions pending in BRD v1.4 §13.3 (DP-01..DP-19). Fields that depend on them are `x-tbd` in the OpenAPI spec.
+- **O-13** Decisions pending in BRD v1.4.2 §13.3 (commit 2374e7e; DP-01..DP-20, DP-20 = CAPA/NCMR overdue rule). DPs that change the API contract: DP-01, DP-02, DP-03, DP-06, DP-07, DP-08, DP-10, DP-11, DP-12. Fields that depend on them are `x-tbd` in the OpenAPI spec.
 - **O-07** BRD OQs still open (aligned with BRD v1.4 §12; OQ-10 partially answered by BR-31): OQ-03, 06, 07, 08, 09, 10, 14, 15, 17, 18, 21, 22, 23. OQ-05 is deferred with AI. OQ-13 is **closed** (attestation logged on audit events, §4 step 4 / ADR-0005). OQ-01/02/04 are resolved (BR-47 / BR-45).
 
 ## 14. Pre-go-live checklist (prod)
