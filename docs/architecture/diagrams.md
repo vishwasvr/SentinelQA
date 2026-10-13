@@ -1,5 +1,5 @@
 # SentinelQA — Architecture Diagrams
-Status: v0.2 (decisions resolved 2026-10-13). See [architecture-overview.md](architecture-overview.md).
+Status: v0.4 (O-01/O-08/O-09 applied 2026-10-13). See [architecture-overview.md](architecture-overview.md).
 
 ## Component view (current build)
 ```mermaid
@@ -9,12 +9,15 @@ flowchart LR
   CF -->|/api/*| API[API Gateway HTTP API<br/>throttling]
   API --> RA[Lambda records-api TS<br/>controlled-data gate,<br/>workflow, SoD]
   API --> RP[Lambda reports-api TS<br/>dashboard, trends]
-  RA --> DDB[(DynamoDB Domain<br/>WS# keys, 7y, no TTL)]
+  RA --> DDB[(DynamoDB Domain<br/>WS# keys, prod 7y, no TTL, PITR)]
   RA -->|append only<br/>IAM deny update/delete| AL[(DynamoDB AuditLog<br/>7y)]
   RP --> DDB
   RA & RP --> SSM[SSM params<br/>weights, thresholds, markers]
   RA & RP --> CW[CloudWatch alarms] --> SNS[SNS -> Email]
-  KMS[KMS CMK per env] -.encrypts.-> DDB & AL
+  KMS[AWS managed key aws/dynamodb - prod<br/>AWS owned key - dev/stage] -.encrypts.-> DDB & AL
+  SCH[EventBridge Scheduler<br/>monthly, prod] --> EXP[Lambda ddb-export]
+  EXP -->|daily-window incremental exports| DDB & AL
+  EXP --> BK[(S3 exports SSE-S3<br/>-> Glacier, expire 7y)]
   subgraph Deferred[Deferred - not built]
     BR[Bedrock AI /api/ai/*]
     COG[Cognito authorizer]
