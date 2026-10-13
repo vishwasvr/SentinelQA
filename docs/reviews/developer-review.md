@@ -252,3 +252,10 @@ Basis: committed HEAD `ff3b1ef`, verified from a `git archive HEAD` export, so u
 - Compare the incoming `X-Origin-Verify` against **each** accepted value. **SHA-256 hash both the header and each candidate first**, then compare the 32-byte digests with `crypto.timingSafeEqual`. `timingSafeEqual` throws on unequal lengths, so comparing raw strings would turn a wrong-length header into a 500; hashing keeps every mismatch a **403** `forbidden_origin` (problem+json) and doesn't leak the length.
 - A missing header or no match returns 403 before any other middleware. The header and secret are never logged.
 - If the SSM read itself fails, return 503/500 with an alarmable log, not 403, so misconfiguration (e.g. #26) is visible.
+
+## Re-verify 2026-10-13 (Architect db34cc6, 5ad1796, aec7a7a, bc02f61; InfraDeploy ba4fa73; BA ff3fd01, 2374e7e)
+- #26 Resolved pending dev smoke test: kms:Decrypt scoped by kms:ViaService ssm, EncryptionContext PARAMETER_ARN = origin-verify, alias aws/ssm (alias condition unverified; fallback in ADR-0015).
+- #27 Resolved: plain keywords in markers list; structured ranges in SSM `/sentinelqa/<env>/controlled-data/cfr-ranges`; `test_marker_patterns.py` passes (22 cases + exhaustive 100..999). Exact rule pending DP-03.
+- #28 Resolved in ba4fa73.
+- #29 Resolved for the index (GSI2 dueAt = CAPA/NCMR dueDate; sparse GSI3 needByAt for BR-15). No CAPA/NCMR overdue logic until DP-20 / OQ-25.
+- cfn-lint not installed on this box at re-check; relying on Architect's clean lint report.
