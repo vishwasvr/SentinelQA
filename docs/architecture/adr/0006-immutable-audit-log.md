@@ -25,3 +25,8 @@ The O-01 backup (incremental exports to a versioned S3 bucket, 7-year lifecycle)
 
 ## C-1 resolution (2026-10-13, BRD v1.2.2 BR-46)
 Append-only is **application behaviour**: the app only adds events (conditional put), and single-event `UpdateItem`/`DeleteItem`/`BatchWriteItem` are explicitly denied in **every** environment. **Prod is strictly append-only** (deletion protection, Retain). **Dev/stage admins may fully reset tables** (synthetic data only, BR-45). This is an out-of-app admin action, not an app capability.
+
+## Soft delete and resets (2026-10-13, BRD v1.4 §13.1)
+- Domain `DeleteItem`/`BatchWriteItem` are denied in **every** environment, as on AuditLog. Removals and undo are soft deletes or reversals plus a new audit event.
+- records-api has read-only `GetItem`/`Query` on AuditLog for the timeline. Update/Delete/BatchWrite stay explicitly denied.
+- Dev/stage full-table resets are an operator action: [docs/runbooks/nonprod-table-reset.md](../../runbooks/nonprod-table-reset.md) (InfraDeploy). Never in prod. Re-seed the labelled sample set afterwards (overview §5.2).

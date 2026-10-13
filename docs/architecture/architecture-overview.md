@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Status | **v0.4: D-01..D-14 (D-03 amended by O-08) + environment profiles ([ADR-0013](adr/0013-environment-profiles.md), accepted). O-01/O-08/O-09 resolved 2026-10-13.** Nothing deployed and no AWS resources created |
-| Basis | [BRD v1.2.2](../requirements/BRD.md) (commit 9836af2; BR-46 amended per C-1), incl. rules BR-44..BR-47; screenshots 01–58, reliability CSV |
-| Diagrams | [diagrams.md](diagrams.md) · Decisions: [adr/](adr/) · IaC: [iac/README.md](iac/README.md) (CloudFormation) · Cost: [cost-estimate.md](cost-estimate.md) |
+| Status | **v0.5: D-01..D-14 (D-03 amended by O-08) + environment profiles ([ADR-0013](adr/0013-environment-profiles.md)); peer-review changes 2026-10-13 (API contract, build ADR-0014, origin header ADR-0015, GSI/access patterns, backup health alarm, permissions boundary).** Nothing deployed and no AWS resources created |
+| Basis | [BRD v1.4](../requirements/BRD.md) (commit a2874e6; Vishwas decisions on BR-31/45, US-41, BR-47, BR-44; pending DP-01..DP-19 in §13.3), incl. rules BR-44..BR-47; screenshots 01–58, reliability CSV |
+| Diagrams | [diagrams.md](diagrams.md) · API: [api/openapi.yaml](api/openapi.yaml) (OpenAPI 3.1) · Decisions: [adr/](adr/) · IaC: [iac/README.md](iac/README.md) (CloudFormation) · Cost: [cost-estimate.md](cost-estimate.md) |
 
 > Scope: only BRD-observed behavior. **AI features are deferred (D-01)**. The current build has no model provider. An `ai` seam is reserved (§6). Auth, logins and multi-tenancy are out of scope, with seams kept ([ADR-0008](adr/0008-auth-and-tenancy-ready-seams.md)). Roadmap items are not designed.
 
@@ -17,7 +17,8 @@
 | No file storage | BR-07 | References only ([ADR-0007](adr/0007-references-only-no-file-storage.md)) |
 | Immutable audit trail | BR-08, BR-36, **BR-46** | Append-only DynamoDB + IAM explicit deny (D-05). No WORM archive |
 | Segregation of duties by named person | BR-10/20/33/35/37 | Domain-logic checks. Advisory until auth exists |
-| Configurable thresholds | **BR-47** (BR-16/18/25, training); D-07, OQ-01/02 | SSM parameters, values TBD |
+| Sample data in every env | **BR-31**, BR-45 (v1.4) | Seed set flagged `isSample`, labelled "ILLUSTRATIVE — SAMPLE RECORDS" (§5.2) |
+| Configurable thresholds | **BR-47** (BR-16/18/25, training); D-07, OQ-01/02 | SSM parameters with **PLACEHOLDER** defaults (BRD v1.4), tuned later (DP-16) |
 
 ## 2. In scope for the current build vs deferred
 | Module (BRD §4) | Current build | Deferred (AI, D-01) |
@@ -37,25 +38,28 @@
 |---|---|---|
 | Edge | CloudFront (+ WAF **deferred**, D-11) | SPA + `/api/*` routing. Baseline: API Gateway throttling only |
 | Static | S3 (private, OAC, Block Public Access) | SPA bundle |
-| API | API Gateway HTTP API | REST endpoints, stage throttling |
+| API | API Gateway HTTP API | Explicit routes generated from [api/openapi.yaml](api/openapi.yaml) (`iac/tools/gen-routes.py`), stage throttling. Default endpoint guarded by the CloudFront `X-Origin-Verify` header ([ADR-0015](adr/0015-origin-verify-header.md)) |
 | Compute | Lambda, **Node.js/TypeScript** (D-06, D-09) | `records-api` (CRUD, workflow, SoD, controlled-data gate), `reports-api` (dashboard aggregates, trends) |
 | Data | DynamoDB on-demand. Prod: PITR, AWS managed key `aws/dynamodb`, deletion protection. Non-prod: AWS owned key, no PITR | `Domain` table + `AuditLog` table |
-| Backup (prod) | DynamoDB incremental export → S3 (SSE-S3) → Glacier Flexible Retrieval, 7-year lifecycle; EventBridge Scheduler + export Lambda (monthly) | O-01, `25-backup` stack |
-| Config | SSM Parameter Store | Risk weights/bands, due-soon thresholds, controlled-data marker list |
-| Observability | CloudWatch Logs/metrics/alarms → **SNS email** (D-10) | Lambda errors, API 5xx, throttles, DynamoDB errors |
+| Backup (prod) | DynamoDB incremental export → S3 (SSE-S3) → Glacier Flexible Retrieval, 7-year lifecycle; EventBridge Scheduler + export Lambda (monthly export, daily verify + `ExportHealthy` heartbeat alarm) | O-01, `25-backup` stack |
+| Config | SSM Parameter Store | Risk weights/bands and due-soon thresholds (**PLACEHOLDER** defaults, BR-47), controlled-data marker list, origin-verify SecureString |
+| Observability | CloudWatch Logs/metrics/alarms → **SNS email** (D-10) | Lambda errors, API 5xx, DynamoDB SystemErrors (per operation), gate blocks (EMF), backup health |
 | Governance | CloudTrail, Budgets | Account baseline |
-| CI/CD | GitHub Actions + OIDC → deploy role (D-12) | `cfn-lint`, change sets, manual approval for prod |
+| CI/CD | GitHub Actions + OIDC → deploy role (D-12), repo `vishwasvr/SentinelQA`, environments dev/stage/prod (prod: required reviewer), account 723940054516 | `cfn-lint`, esbuild bundles at `<sha>/<function>.zip` ([ADR-0014](adr/0014-build-packaging.md)), change sets, manual approval for prod |
 | Deferred | Bedrock, Cognito, WAF, digest (EventBridge/SES) | Seams only |
 
-## 4. Data flow (current build)
-1. The SPA calls e.g. `POST /api/quality-records` with `{ ..., controlledDataAttestation: true, actorName }`.
-2. `records-api` middleware: resolve workspace (`aerospace`), then **controlled-data gate (BR-44)** on endpoints that accept free text. A missing attestation → 400. A marker hit → 422 (block, D-14). Neither the text nor the matched substring is logged. Only the marker id is logged.
-3. Domain validation (BR-17/22/23/26/35/37, SoD).
-4. `TransactWriteItems`: the record put/update plus an `AuditLog` put (`attribute_not_exists`) holding actor, event, from/to stage, snapshot and `controlledDataAttested`.
-5. Reads compute derived status (calibration BR-25, training, re-eval buckets) from dates and SSM thresholds.
+## 4. Data flow and API conventions (current build)
+The contract is [api/openapi.yaml](api/openapi.yaml) (OpenAPI 3.1, BRD v1.4). Fields that depend on an open decision are marked `x-tbd: DP-nn`.
+1. The SPA calls CloudFront, e.g. `POST /api/quality-records` with `Idempotency-Key`, body `{ ..., controlledDataAttestation: true, actorName }`. CloudFront adds `X-Origin-Verify`.
+2. Middleware order: **origin header check** (403 `forbidden_origin`, ADR-0015) → workspace (`aerospace`) → **controlled-data gate (BR-44)** on free-text fields: missing attestation → 400 `gate:attestation_required`; marker hit (whole-word, case-insensitive, SSM list) → 422 `gate:controlled_marker`. Nothing is persisted and no audit event is written. Only the marker id is logged; the matched text never is. The gate metric `SentinelQA` / `ControlledDataBlocked` {`Env`} is emitted via EMF (Powertools Metrics). Request bodies are never logged.
+3. Domain validation (BR-17/22/23/26/35/37; SoD per DP-08) → errors as `application/problem+json`.
+4. `TransactWriteItems` (`ClientRequestToken` = Idempotency-Key) puts or updates the item with `ConditionExpression version = :expected` (`If-Match`, 412 when stale, 428 when missing), and stage moves are also conditional on `stage = :from` (409). It appends an `AuditLog` put (`attribute_not_exists`) holding actor, event, from/to stage, snapshot and `controlledDataAttested`. The idempotency record is kept 24 h.
+5. **Soft delete everywhere** (BRD v1.4 §13.1): DELETE sets `deletedAt` plus a `DELETED` audit event. Undo is a reversal event. Lists, counts and pickers exclude deleted items. `DeleteItem`/`BatchWriteItem` are denied on both tables in **every** environment.
+6. Lists use cursor pagination (`limit` ≤ 100, opaque `cursor`). Reads compute derived status from dates and the SSM thresholds. The timeline is `GET /api/audit/{entityType}/{id}/events` (read-only Query on AuditLog).
+7. Not routed: `/api/ai/*` (AI seam) and `/api/search`. ⌘K is **client-side over loaded lists** (US-41, BRD v1.4).
 
 ## 5. Data model (BRD §6)
-Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (tenancy seam). **No TTL**. Prod retained ≥ 7 years (D-03, amended: prod only, O-08). Dev/stage hold synthetic data only.
+Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (tenancy seam). **No TTL**. Prod retained ≥ 7 years (D-03, amended: prod only, O-08). Prod may also hold labelled sample records (BR-31). Dev/stage hold synthetic or labelled sample data only, never real customer records (BR-45).
 
 | BRD entity | PK / SK | Notes |
 |---|---|---|
@@ -72,6 +76,23 @@ Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (te
 | Maturity assessment | `WS#ws` / `QMS#<id>` | ratings[8], mean (BR-41) |
 | Agent task, alert rule | **Deferred** with AI | Table not created |
 
+### 5.1 Access patterns and GSIs
+| Pattern | Index | Key condition | Notes |
+|---|---|---|---|
+| List an entity type | table | `PK=WS#ws`, `begins_with(SK,'<TYPE>#')` | Filter `attribute_not_exists(deletedAt)`. Projection: lists return summary fields |
+| Review queue (BR-14) | **GSI1 (sparse)** | `GSI1PK=WS#ws#REVIEWQ` | `GSI1SK=<severityRank>#<openedAt>` (Critical=1). Written only while the record is awaiting review; which stages count, and the age basis, are TBD (DP-13, DP-02) |
+| Due / need-by / re-eval / next-due (BR-15/18/25, training) | **GSI2 (sparse)** | `GSI2PK=WS#ws#DUE#<entityType>`, `dueAt <= :date` | `dueAt` copied from each entity's own date (below). Removed on close/complete/soft delete |
+| Timeline | AuditLog | `PK=WS#ws#ENT#<id>` | Ascending SK |
+| FAI Form 3 rows | table | `PK=WS#ws`, `begins_with(SK,'FAI#<uuid>#CH#')` | `CH#<zero-padded 4-digit charNo>`. One row + its audit event per transaction (dev #20) |
+
+**`dueAt` mapping (sparse: set only while the item is open/active):** Quality record → `needByDate` (open CAPA/NCMR, BR-15) · Supplier qualification → `reevalDate` (Active on ASL, BR-18) · Calibration → `nextDueDate` (BR-25) · Training → `dueDate` (until completed) · Document → `nextReviewDate` (only when set; reminders not observed, OQ-17).
+
+### 5.2 Sample data seed (BR-31, BRD v1.4: allowed in every env incl. prod)
+- A versioned seed set (`seed/sample-v<n>.json`, synthetic only) is loaded by a **one-off seed command** (`npm run seed -- --env <env>`), run through the normal `records-api` write path, so the gate, validation and audit apply. Each item carries `isSample=true`. The SPA labels these items "ILLUSTRATIVE — SAMPLE RECORDS" (plus the DEMO badge where observed).
+- Seed IDs are deterministic (the idempotency key is derived from the seed id), so re-runs are no-ops. The audit events carry `actorName="seed"` and event type `CREATED`. They are real append-only events: in prod they stay for 7 years like any other event.
+- **Removal is a soft delete** (`deletedAt` + `DELETED` event), never a hard delete, in every env. In dev/stage, a full reset with InfraDeploy's [reset runbook](../runbooks/nonprod-table-reset.md) is followed by a seed re-run. Prod never gets resets.
+- Reports and KPIs can include or exclude `isSample` items. The default follows the observed UI (samples counted). **Which way is TBD (OQ-10, partially answered).**
+
 ## 6. AI seam (deferred, D-01)
 - Reserved API path `/api/ai/*` (not routed). Reserved package `src/ai/` with a `DraftProvider` interface (`draft(taskType, text) → {draft, citations[], confidence}`) and no implementation.
 - Domain records already allow `draft` and `aiAssisted:false` fields, and the audit log reserves event types `AI_DRAFT_ACCEPTED/MODIFIED/REJECTED`.
@@ -79,8 +100,9 @@ Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (te
 
 ## 7. Security / IAM (single account, D-08)
 - Environments are separated **by name prefix** `SentinelQA-<env>-*`. Every IAM policy is scoped to ARNs containing its own env prefix. Resources are tagged `env`, and deploy roles carry an `aws:ResourceTag/env` condition where supported.
-- `records-api` role: Get/Query/PutItem/UpdateItem/ConditionCheckItem/TransactWrite on its own Domain table + indexes. PutItem only on its AuditLog. **Explicit deny** of `UpdateItem/DeleteItem/BatchWriteItem` on AuditLog, and of `DeleteItem` on Domain in prod. `ssm:GetParameter(s)` on `/sentinelqa/<env>/*`. `kms:Decrypt/GenerateDataKey` on its env key.
+- `records-api` role: GetItem/Query/PutItem/UpdateItem/ConditionCheckItem on its own Domain table + indexes (`TransactWriteItems` is authorised per contained action; there is no separate IAM action). On AuditLog: PutItem (conditional, in code) plus **read-only GetItem/Query** for the timeline. **Explicit deny** of `UpdateItem/DeleteItem/BatchWriteItem` on AuditLog and of `DeleteItem/BatchWriteItem` on Domain, **in every environment** (soft delete, §4). `ssm:GetParameter(s)` on `/sentinelqa/<env>/*`. Logs only to its own log group. X-Ray in strict. No `kms:*` (O-09).
 - `reports-api`: read-only on its env Domain table.
+- **Permissions boundary:** every app role (records-api, reports-api, ddb-export, scheduler) sets `PermissionsBoundary` = `SentinelQA-<env>-AppRoleBoundaryArn` (InfraDeploy `00-bootstrap`). The CloudFormation execution role can only create roles with that boundary.
 - GitHub OIDC deploy role per env: trust restricted to `repo:<org>/SentinelQA:environment:<env>`. Permission to manage only `SentinelQA-<env>-*` stacks.
 - **Single-account risk:** a principal with admin rights can affect all envs. Mitigation is a naming/tag discipline and separate deploy roles. Revisit before handling real customer data (open item O-03).
 - TLS only, S3 Block Public Access, CloudTrail on. **Encryption at rest (O-09): no customer-managed KMS keys anywhere.** Prod DynamoDB uses the AWS managed key `aws/dynamodb`; prod/non-prod S3 buckets use SSE-S3; SNS uses `alias/aws/sns`; dev/stage DynamoDB uses the AWS owned key ([ADR-0013](adr/0013-environment-profiles.md)). Trade-offs: no custom key policy, no customer-controlled rotation schedule (AWS rotates managed keys automatically), and the key cannot be disabled to crypto-shred data; CloudTrail still logs use of `aws/dynamodb`. KMS API requests to AWS managed keys are billed ($0.03/10k, within 20k/month free at 20 users). No `kms:*` IAM permissions or key policies are needed.
@@ -88,17 +110,17 @@ Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (te
 
 ## 8. Retention (D-03 as amended by O-08)
 - **Prod:** records and audit events kept **≥ 7 years**. No TTL, `DeletionProtectionEnabled`, `DeletionPolicy/UpdateReplacePolicy: Retain`, PITR on (35 days, also required for exports).
-- **Dev/stage:** synthetic data only. No retention obligation, no PITR, no backup. Real customer records must never be loaded there.
+- **Dev/stage:** synthetic or labelled sample data only ("ILLUSTRATIVE — SAMPLE RECORDS"), never real customer records (BR-45, BR-31 v1.4). Full table resets only via the InfraDeploy [reset runbook](../runbooks/nonprod-table-reset.md). No retention obligation, no PITR, no backup. Real customer records must never be loaded there.
 - **Long-term backup (O-01, decided):** a monthly job (EventBridge Scheduler, day 2) runs a Lambda that issues DynamoDB **incremental exports** for the previous month. Each export window is ≤ 24 h (an API limit), so a month is about 30 windows per table, all inside the 35-day PITR window. Exports land in S3 (SSE-S3, versioned), move to Glacier Flexible Retrieval after 1 day, and expire after 2,557 days (≈ 7 y). A one-time full export is the baseline. Not WORM, consistent with D-05.
 - CloudWatch Logs retention: proposed 90 days (logs contain no record content). O-02.
 
 ## 9. Cost drivers
-Detailed estimate with sources, split by prod and non-prod: **[cost-estimate.md](cost-estimate.md)**. At 20 users, year 1: prod ≈ $2.09, non-prod ≈ $2.03, combined ≈ $4.12 without free tier (≈ $0.40 / $0.06 / $0.46 with always-free). Year 7 combined ≈ $6.31 / $1.34.
+Detailed estimate with sources, split by prod and non-prod: **[cost-estimate.md](cost-estimate.md)**. At 20 users, year 1 (v0.5): prod ≈ $3.09, non-prod ≈ $2.63, combined ≈ $5.72 without free tier (≈ $0.60 / $0.06 / $0.66 with always-free). Year 7 combined ≈ $7.91 / $1.54.
 
-Near zero at pilot volume: Lambda, API GW, DynamoDB on-demand, S3/CloudFront. Fixed: CloudWatch alarms (8 total, within 10 free), CI minutes. No KMS key fees (O-09). DynamoDB storage grows linearly over 7 years (small). Bedrock and WAF costs are gone for now.
+Near zero at pilot volume: Lambda, API GW, DynamoDB on-demand, S3/CloudFront. Fixed: CloudWatch alarm metrics (12 total: 10 prod + 1 per lean env; 2 over the 10 free), 4 EMF custom metrics (within 10 free), CI minutes. No KMS key fees (O-09). DynamoDB storage grows linearly over 7 years (small). Bedrock and WAF costs are gone for now.
 
 ## 10. Environments
-Profiles per [ADR-0013](adr/0013-environment-profiles.md): `EnvProfile=lean` for dev/stage (synthetic data only, **admin full-table resets allowed** per BR-46 v1.2.2 / C-1; item-level audit update/delete still denied; AWS owned keys, no PITR/backup, 7-day logs, 1 alarm) and `EnvProfile=strict` for prod (AWS managed key, PITR, deletion protection, 7-year retention, 90-day logs, 5 alarms + export-errors alarm, monthly incremental export backup).
+Profiles per [ADR-0013](adr/0013-environment-profiles.md): `EnvProfile=lean` for dev/stage (synthetic or labelled sample data only, never real customer records; **admin full-table resets allowed**, via the [reset runbook](../runbooks/nonprod-table-reset.md), per BR-46 v1.2.2 / C-1; item-level audit update/delete still denied; AWS owned keys, no PITR/backup, 7-day logs, 1 alarm) and `EnvProfile=strict` for prod (AWS managed key, PITR, deletion protection, 7-year retention, 90-day logs, 7 alarms (10 alarm metrics) incl. export-errors and backup-health, monthly incremental export backup with a daily verify).
 
 dev / stage / prod as stack sets in **one AWS account, us-east-1**. Stack names `SentinelQA-<env>-<Stack>`, parameters per env file (`iac/params/<env>.json`). GitHub Actions: lint → create change set → manual approval (stage/prod) → execute.
 
@@ -132,10 +154,11 @@ A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as 
 - ~~O-01~~ **Resolved:** monthly job running daily-window incremental DynamoDB exports to S3 Glacier, 7-year lifecycle (`25-backup`).
 - **O-02** CloudWatch Logs retention (90 days proposed).
 - **O-03** Single-account blast radius. Revisit before production customer data.
-- **O-04** Values for D-07 (weights, bands, due-soon windows) and the controlled-data marker list (D-14).
+- **O-04** Tuned values for D-07 (the PLACEHOLDER defaults ship, DP-16). Marker list decided in BRD v1.4 (incl. ITAR, EAR, CUI, `22 CFR 120-130`, `15 CFR 730-774`; whole-word, case-insensitive). Normalisation, evasion and exempt fields are still pending (DP-03).
 - **O-05** Without WAF (D-11), public endpoints rely on API Gateway throttling. Set the throttle values.
 - **O-06** Whether hidden AI modules show a "coming later" state or are removed from navigation (UX).
-- **O-07** BRD OQs still open (aligned with BRD v1.2.2 §12): OQ-03, 06, 07, 08, 09, 10, 14, 15, 17, 18, 21, 22, 23. OQ-05 is deferred with AI. OQ-13 is **closed** (attestation logged on audit events, §4 step 4 / ADR-0005). OQ-01/02/04 are resolved (BR-47 / BR-45).
+- **O-13** Decisions pending in BRD v1.4 §13.3 (DP-01..DP-19). Fields that depend on them are `x-tbd` in the OpenAPI spec.
+- **O-07** BRD OQs still open (aligned with BRD v1.4 §12; OQ-10 partially answered by BR-31): OQ-03, 06, 07, 08, 09, 10, 14, 15, 17, 18, 21, 22, 23. OQ-05 is deferred with AI. OQ-13 is **closed** (attestation logged on audit events, §4 step 4 / ADR-0005). OQ-01/02/04 are resolved (BR-47 / BR-45).
 
 ## 14. Pre-go-live checklist (prod)
 Complete before the prod go-live. Items deferred by Vishwas on 2026-10-13.
@@ -143,15 +166,16 @@ Complete before the prod go-live. Items deferred by Vishwas on 2026-10-13.
 - [ ] **O-10** — *Deferred to pre-go-live (2026-10-13)* Restore runbook: DynamoDB *import from S3* reads full exports. Replaying incremental exports onto a restored baseline needs a custom job. Decide whether to also take a periodic (e.g. annual) **full** export to shorten the restore chain (≈ $0.10/GB per full export).
 - [ ] **O-11** — *Deferred to pre-go-live (2026-10-13)* S3 lifecycle does not transition objects smaller than 128 KB by default (behaviour **unverified** in this review). Small export files may stay in S3 Standard. The cost impact is cents, but confirm.
 - [ ] **O-12** — *Deferred to pre-go-live (2026-10-13)* Export bucket deletion protection: versioning only (no Object Lock per D-05). Decide whether to add a bucket-policy deny on `s3:DeleteObject*` for all principals except a break-glass role.
+- [ ] **Stack protection:** enable termination protection on every `SentinelQA-prod-*` stack, and set a stack policy denying `Update:Replace`/`Update:Delete` on `DomainTable`, `AuditLogTable` and `ExportBucket` (see [iac/README.md](iac/README.md#prod-stack-protection)).
 - [ ] **Go-live step: one-time FULL export** of the prod `Domain` and `AuditLog` tables (`ExportType=FULL_EXPORT`, PITR on) to the `25-backup` export bucket. This is the baseline for the monthly incremental exports, ≈ $0.10/GB of table size, ≈ $0 at go-live. Record the export time as the initial watermark (`/sentinelqa/prod/backup/last-export-to`).
 
-## 15. BRD v1.2 traceability (BR-44..BR-47)
+## 15. BRD traceability (BR-44..BR-47; v1.4)
 | BR | Design element | Status |
 |---|---|---|
-| BR-44 gate on all free-text saves (400 / 422, marker id only logged, `controlledDataAttested` on audit event) | §4 data flow, [ADR-0005](adr/0005-controlled-data-gate-enforcement.md), `CONTROLLED_GATE_MODE: block`, SSM marker list | Consistent. Marker values pending (O-04) |
+| BR-44 gate on all free-text saves (400 / 422, marker id only logged, `controlledDataAttested` on audit event) | §4 data flow, [ADR-0005](adr/0005-controlled-data-gate-enforcement.md), `CONTROLLED_GATE_MODE: block`, SSM marker list | Consistent. Matching rule and markers decided (BRD v1.4); normalisation/exempt fields pending (DP-03) |
 | BR-45 server-side persistence; prod ≥ 7 y; dev/stage synthetic only | §8, [ADR-0003](adr/0003-datastore.md), [ADR-0013](adr/0013-environment-profiles.md), 20-data Retain/no TTL, 25-backup | Consistent |
 | BR-46 audit log append-only, IAM deny, corrections as new events, no WORM | §7 IAM, [ADR-0006](adr/0006-immutable-audit-log.md), 30-api deny statements (all profiles) | Consistent. C-1 **resolved** (BRD v1.2.2: covers app behaviour; prod strictly append-only; dev/stage full resets allowed) |
-| BR-47 weights/bands and due-soon thresholds configurable (SSM) | §3 Config, 20-data SSM params (`supplier-risk/weights`, `due-soon-days` incl. training) | Consistent. Values pending (O-04) |
+| BR-47 weights/bands and due-soon thresholds configurable (SSM) | §3 Config, 20-data SSM params (`supplier-risk/weights`, `due-soon-days` incl. training) | Consistent. PLACEHOLDER defaults in 20-data (BRD v1.4); tuned values pending (DP-16) |
 
 **C-1: Resolved (2026-10-13, BRD v1.2.2, commit 9836af2).** Vishwas approved: BR-46 covers application behaviour. Single-event updates/deletes are denied in every environment (IAM explicit deny). Prod is strictly append-only (deletion protection + Retain). In dev/stage only, admins may do full table resets (synthetic data, BR-45).
 

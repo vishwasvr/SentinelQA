@@ -1,30 +1,32 @@
-# SentinelQA: Cost Estimate (architecture v0.4: prod / non-prod, AWS managed keys, export backup)
+# SentinelQA: Cost Estimate (architecture v0.5: prod / non-prod, AWS managed keys, export backup, peer-review alarms)
 
 | Item | Value |
 |---|---|
-| Scope | [architecture-overview.md](architecture-overview.md) v0.4 and [iac/templates](iac/README.md) with `EnvProfile` = **lean** (dev, stage) / **strict** (prod), see [ADR-0013](adr/0013-environment-profiles.md). AI is deferred and not costed. WAF is an optional add-on only |
+| Scope | [architecture-overview.md](architecture-overview.md) v0.5 and [iac/templates](iac/README.md) with `EnvProfile` = **lean** (dev, stage) / **strict** (prod), see [ADR-0013](adr/0013-environment-profiles.md). AI is deferred and not costed. WAF is an optional add-on only |
 | Region / pricing | us-east-1, public on-demand list prices, USD, excl. tax |
 | Prices retrieved | **2026-10-13** (sources in §2). Re-check before budgeting |
 | Method | Usage assumptions (§1) × list prices (§2), scripted. Rounded |
 
 ## 0. Summary
+**v0.5 change (2026-10-13, peer reviews):** prod alarms go from 6 alarms/6 alarm metrics to **7 alarms/10 alarm metrics**. SystemErrors alarms need one metric per DynamoDB operation, and the backup-health alarm is new. Plus **4 EMF custom metrics** (`ControlledDataBlocked` ×3 envs, `ExportHealthy`). Effect: prod +$1.00 no free tier / +$0.20 always-free; non-prod +$0.60 / $0. The origin-verify secret in SSM standard SecureString costs $0 (Secrets Manager would be $1.20/month for 3 envs; [ADR-0015](adr/0015-origin-verify-header.md)). The daily verify run (≈ 30 Lambda/Scheduler invocations) is $0.
+
 Decisions applied (2026-10-13): **O-08** (7-year retention in prod only), **O-09** (AWS managed/owned keys, no CMKs), **O-01** (monthly incremental DynamoDB export to S3 Glacier).
 
 **Year 1, $/month**
 
 | Users | Prod, no free tier | Prod, always-free | Non-prod, no free tier | Non-prod, always-free | **Combined, no free tier** | **Combined, always-free** |
 |---|---|---|---|---|---|---|
-| **20** | $2.09 | $0.40 | $2.03 | $0.06 | **≈ $4.12** | **≈ $0.46** |
-| 50 | $3.30 | $0.96 | $2.23 | $0.14 | ≈ $5.53 | ≈ $1.10 |
-| 100 | $5.31 | $1.90 | $2.56 | $0.26 | ≈ $7.87 | ≈ $2.16 |
+| **20** | $3.09 | $0.60 | $2.63 | $0.06 | **≈ $5.72** | **≈ $0.66** |
+| 50 | $4.30 | $1.16 | $2.83 | $0.14 | ≈ $7.13 | ≈ $1.30 |
+| 100 | $6.31 | $2.10 | $3.16 | $0.26 | ≈ $9.47 | ≈ $2.36 |
 
 **Year 7, $/month** (prod data ≈ 4.7 / 11.7 / 23.4 GB; backup included. Non-prod is shown with accumulated synthetic data, which is conservative because it may be purged)
 
 | Users | Prod, no free tier | Prod, always-free | Non-prod, no free tier | Non-prod, always-free | **Combined, no free tier** | **Combined, always-free** |
 |---|---|---|---|---|---|---|
-| **20** | $4.06 | $1.28 | $2.25 | $0.06 | **≈ $6.31** | **≈ $1.34** |
-| 50 | $8.23 | $3.17 | $2.77 | $0.14 | ≈ $11.00 | ≈ $3.31 |
-| 100 | $15.18 | $6.33 | $3.65 | $0.26 | ≈ $18.83 | ≈ $7.37* |
+| **20** | $5.06 | $1.48 | $2.85 | $0.06 | **≈ $7.91** | **≈ $1.54** |
+| 50 | $9.23 | $3.37 | $3.37 | $0.14 | ≈ $12.60 | ≈ $3.51 |
+| 100 | $16.18 | $6.53 | $4.25 | $0.26 | ≈ $20.43 | ≈ $7.57* |
 
 \* At 100 users in year 7, combined DynamoDB storage (≈ 28 GB) exceeds the account-wide 25 GB always-free by ≈ 3 GB (+$0.78, included).
 
@@ -61,7 +63,7 @@ Bulk price list base: `https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/<
 | Lambda | $0.20 per 1M requests. arm64 $0.0000133334/GB-s (tier 1). **Always free: 1M requests + 400,000 GB-s/month** | [https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSLambda/current/us-east-1/index.json](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSLambda/current/us-east-1/index.json) (2026-10-12). Free tier: [aws.amazon.com/lambda/pricing](https://aws.amazon.com/lambda/pricing/) |
 | DynamoDB (on-demand, Standard) | $0.625/M WRU. $0.125/M RRU. Storage $0.25/GB-mo with **first 25 GB-mo free**. PITR $0.20/GB-mo. On-demand backup $0.10/GB-mo. Export to S3 $0.10/GB (full and incremental). Restore $0.15/GB. Provisioned: $0.00065/WCU-h, $0.00013/RCU-h, **25 WCU + 25 RCU free** | [https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonDynamoDB/current/us-east-1/index.json](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonDynamoDB/current/us-east-1/index.json) (2026-09-11) |
 | KMS | (CMK prices no longer used, O-09) $1/CMK-month. **First and second rotation each add $1/month** (capped). $0.03 per 10k requests. **20,000 requests/month free** | [https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/awskms/current/us-east-1/index.json](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/awskms/current/us-east-1/index.json) (2026-09-11). Rotation: [aws.amazon.com/kms/pricing](https://aws.amazon.com/kms/pricing/) |
-| CloudWatch | Logs ingest $0.50/GB (standard and Lambda vended first tier). Storage $0.03/GB-mo. Alarm $0.10/standard alarm-month. **Free: 5 GB logs, 10 alarms, 3 dashboards** | [https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonCloudWatch/current/us-east-1/index.json](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonCloudWatch/current/us-east-1/index.json) (2026-10-07). Free tier: [aws.amazon.com/cloudwatch/pricing](https://aws.amazon.com/cloudwatch/pricing/) |
+| CloudWatch | Logs ingest $0.50/GB (standard and Lambda vended first tier). Storage $0.03/GB-mo. Alarm **$0.10 per alarm metric-month** (standard; a metric-math alarm is billed per metric). Custom metrics $0.30/metric-month (first 10k), re-checked 2026-10-13 (price list publication 2026-10-07). **Free: 5 GB logs, 10 alarms, 3 dashboards** | [https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonCloudWatch/current/us-east-1/index.json](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonCloudWatch/current/us-east-1/index.json) (2026-10-07). Free tier: [aws.amazon.com/cloudwatch/pricing](https://aws.amazon.com/cloudwatch/pricing/) |
 | SNS | Email: first 1,000/month free, then $2.00 per 100k. API: first 1M free | [https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonSNS/current/us-east-1/index.json](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonSNS/current/us-east-1/index.json) (2026-09-15) |
 | S3 | Standard $0.023/GB-mo (first 50 TB). PUT $0.005/1k. GET $0.004/10k. Glacier Flexible Retrieval $0.0036/GB-mo. Glacier Instant Retrieval $0.004/GB-mo | [https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/us-east-1/index.json](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/us-east-1/index.json) (2026-10-12) |
 | AWS Backup (DynamoDB) | Warm $0.10/GB-mo. Cold $0.03/GB-mo (cold needs DynamoDB advanced features opt-in) | [https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSBackup/current/us-east-1/index.json](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSBackup/current/us-east-1/index.json) (2026-09-28). Cold note: [aws.amazon.com/backup/pricing](https://aws.amazon.com/backup/pricing/) |
@@ -94,14 +96,15 @@ Bulk price list base: `https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/<
 | DynamoDB PITR (required for export) | ≈ 0.34 GB | $0.07 | $0.07 |
 | KMS: **no key fee** (AWS managed). Requests to `aws/dynamodb` | ≈ 19.8k | $0.06 | $0.00 (≤ 20k free) |
 | CloudWatch Logs (90 d) | ≈ 0.1 GB | $0.06 | $0.00 |
-| CloudWatch alarms | **6** (5 + export-errors) | $0.60 | $0.00 (8 total ≤ 10) |
+| CloudWatch alarm metrics | **10** (7 alarms; SystemErrors metric-math 3 + 2) | $1.00 | $0.20 (12 account-wide, 2 over the 10 free) |
+| CloudWatch custom metrics (EMF) | 2 (`ControlledDataBlocked{prod}`, `ExportHealthy`) at $0.30/metric-month | $0.60 | $0.00 (4 account-wide ≤ 10 free) |
 | S3 (site, artifacts, CloudTrail; SSE-S3) | ≈ 0.6 GB | $0.02 | $0.02 |
 | **Backup:** incremental exports | 2 tables × ≈ 30 daily windows × **10 MB minimum** = 0.6 GB billed | $0.06 | $0.06 |
 | Backup: Glacier Flexible storage + PUTs | ≈ 0.3 GB avg, ≈ 300 objects | < $0.01 | < $0.01 |
 | Backup: EventBridge Scheduler + export Lambda | 1 invocation, seconds of compute | $0.00 | $0.00 |
 | SNS email / CloudTrail | | $0.00 | $0.00 |
 | GitHub Actions | ≈ 100 min | $0.60 | $0.00 |
-| **Prod total** | | **≈ $2.09** | **≈ $0.40** |
+| **Prod total** | | **≈ $3.09** | **≈ $0.60** |
 
 ### 3b. Non-prod: dev + stage (EnvProfile = lean): unchanged from v0.3
 | Service | Quantity / month | No free tier | Always-free |
@@ -114,9 +117,10 @@ Bulk price list base: `https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/<
 | PITR / backup / KMS | none | $0.00 | $0.00 |
 | CloudWatch Logs (7 d) | ≈ 0.02 GB | $0.01 | $0.00 |
 | CloudWatch alarms | 2 | $0.20 | $0.00 |
+| CloudWatch custom metrics (EMF) | 2 (`ControlledDataBlocked{dev,stage}`) | $0.60 | $0.00 |
 | S3 | ≈ 0.4 GB | $0.01 | $0.01 |
 | GitHub Actions | ≈ 280 min | $1.68 | $0.00 |
-| **Non-prod total** | | **≈ $2.03** | **≈ $0.06** |
+| **Non-prod total** | | **≈ $2.63** | **≈ $0.06** |
 
 ## 4. Free-tier notes
 - **Always-free (used above):** Lambda 1M req/400k GB-s, CloudFront 1 TB/10M req, DynamoDB 25 GB storage, KMS 20k requests, CloudWatch 5 GB logs/10 alarms/3 dashboards, SNS 1,000 emails/1M API calls, CloudTrail first copy.
@@ -167,7 +171,7 @@ Savings are per month, 20 users, versus the v0.2 design (3 CMKs, PITR everywhere
 | S-2d | Prod CMK with **automatic rotation off** (moot, no CMK) | $0 now → $2 | Weaker crypto hygiene. Some customer security questionnaires expect rotation | Not recommended | No |
 | S-3 | **Lambda Function URL** (behind CloudFront OAC) instead of HTTP API | $0.07 ($0.33 at 100 users) | Loses stage throttling (only reserved concurrency: RPS = 10 × concurrency, 429 beyond). Loses the **JWT authorizer seam** (ADR-0008): auth would move into code or the edge. Two functions mean two origins/URLs. The WAF slot stays on CloudFront (ADR-0011 unaffected) | **Not recommended**. The saving is negligible | Would change ADR-0008 (seam) and O-05 (throttling) |
 | S-4 | **Composite alarms** to reduce alarm count | **Negative** ($0.50 each vs $0.10 standard) | Fewer emails, but costs more | Not recommended. Keep ≤ 10 standard alarms (free) | No |
-| S-5 | **Fewer prod alarms** (6 → 4) | $0.20 without free tier, $0 with free tier | Less coverage (drop the audit-errors and gate-blocks alarms) | Not recommended | D-10 unaffected |
+| S-5 | **Fewer prod alarm metrics** (10 → 8, e.g. Domain SystemErrors on TransactWriteItems only) | $0.20 without free tier, $0.20 with free tier | Less coverage (drop the audit-errors and gate-blocks alarms) | Not recommended | D-10 unaffected |
 | S-6 | O-01: **S3 incremental export** vs AWS Backup monthly | vs A: **≈ $19.70 at year 7**. vs B (annual): ≈ $1.60 | Restore = import into a new table (slower, $0.15/GB). Glacier minimums and retrieval fees. Not WORM | **Adopted (O-01)**: monthly job, daily-window incremental exports | Consistent with D-05. Restore runbook deferred to pre-go-live (O-10) |
 | S-7 | **DynamoDB Standard-IA** for prod AuditLog | No free tier: ≈ $0.66 at year 7 (4.4 GB × $0.15) minus ≈ $0.03 extra requests. **With the 25 GB always-free: negative** (the free storage applies to Standard) | IA request prices are ~25% higher. IA PITR price unverified | **Not now**. Revisit if table storage exceeds 25 GB (≈ 90+ users at year 7) | No |
 | S-8 | Prod log retention 90 → 30 days | < $0.01 | Shorter forensic window | Not worth it | O-02 |
@@ -183,7 +187,7 @@ See §0 (20 / 50 / 100 users, year 1 and year 7). Variable cost ≈ $0.04–0.05
 ## 9. Biggest remaining cost drivers
 1. **GitHub Actions minutes:** $2.28/month only if not covered by the plan.
 2. **Prod DynamoDB storage + PITR growth:** ≈ $2.10/month at year 7 (20 users) without free tier. PITR ($0.94) is the part the free tier doesn't cover.
-3. **CloudWatch alarms:** $0.80 (8 alarms) without free tier, $0 with it.
+3. **CloudWatch alarms + custom metrics:** $1.20 alarm metrics (12) + $1.20 custom metrics (4) without free tier; $0.20 with it (alarm metrics 11–12).
 4. **Traffic** (CloudFront, API GW, Lambda, DynamoDB requests): < $0.60/month combined.
 5. **Backup exports:** ≈ $0.06–0.09/month (10 MB minimum per export dominates).
 6. **KMS requests to `aws/dynamodb`:** ≈ $0.06 without free tier at 20 users. ≈ $0.24 at 100 users after the 20k free.

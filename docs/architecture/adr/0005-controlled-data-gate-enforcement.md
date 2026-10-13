@@ -19,3 +19,9 @@ Users can be blocked falsely and need clear messaging. The marker list is owned 
 
 ## Resolution (2026-10-13)
 Keyword hit = **block** (HTTP 422). Layers in the current build: (1) attestation required server-side, (2) configurable marker list (SSM) block. Layer 3 (Bedrock Guardrails) is **removed** with AI. The gate is reconsidered and kept: without AI, pasted/typed free text is persisted for 7 years, so the gate applies to all free-text write endpoints in `records-api`, not only AI calls.
+
+## Amendment (2026-10-13, BRD v1.4 BR-44, Vishwas)
+- **Matching:** whole-word, case-insensitive (`CUI` does not match "circuit", `EAR` does not match "year"). Multi-word markers match as a phrase on word boundaries.
+- **Marker list** (SSM `/sentinelqa/<env>/controlled-data/markers`, `20-data.yaml`): ITAR, EAR, EAR99, ECCN, CUI, NOFORN, Distribution Statement, export controlled, `22 CFR 120-130`, `15 CFR 730-774`. The marker id is the list position. Only the id is logged.
+- Still pending (DP-03): normalisation and evasion cases (e.g. `I.T.A.R`, `22 CFR 121`), screened vs exempt fields, attestation on writes without free text, 422 user message and input retention, and whether the marker id is shown. Note: a whole-word `EAR` will also block the ordinary English word "ear". Accepted as a deliberate false positive.
+- Contract: [api/openapi.yaml](../api/openapi.yaml) (`x-free-text` fields; 400 `gate:attestation_required`, 422 `gate:controlled_marker`). Metric contract: namespace `SentinelQA`, metric `ControlledDataBlocked`, dimension `Env`, emitted via EMF.
