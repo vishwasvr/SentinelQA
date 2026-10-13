@@ -18,7 +18,7 @@ The scope decisions are clear enough to start: AI is cut cleanly to a seam (BRD 
 
 Many acceptance criteria are written against **demo seed data and demo strings** ("8 items", `CAPA-DEMO-xxxx`, "Simulate second reviewer"). Several in-scope workflows have **no field-level spec** (CAPA/NCMR steps 2–6, SQ steps 3/4/6, manual PO-check entry, supplier master data). These block feature work on those modules, not the platform.
 
-**Counts:** blocker 4 · major 12 · minor 9 (25 total). Owners: BA 11, Architect 14.
+**Counts:** blocker 4 · major 12 · minor 9 (25 total). Owners (corrected 2026-10-13): **BA 9** as primary owner (#4, #10, #11, #12, #13, #14, #15, #21, #22), plus #5 shared (Architect, with BA for semantics) = **10 with BA involvement**; **Architect 16** (#1, #2, #3, #5, #6, #7, #8, #9, #16, #17, #18, #19, #20, #23, #24, #25). The original "BA 11, Architect 14" was a miscount; BA's count of 10 in [ba-responses.md](ba-responses.md) is correct.
 
 ## Issues
 
@@ -120,3 +120,54 @@ Assumptions: 1 full-stack TypeScript developer, with infra B-1/B-2/B-3 resolved 
 | | **Total** | | | **≈ 37–48 dev-days (~8–10 weeks for one developer; ~5–6 weeks for two working phases 3/4 in parallel)** |
 
 Critical path: blocker #1 (contract) → Phase 2 middleware → Phase 4 workflows (blocked on #4). Phases 0–3 can proceed before #4 is answered. Prod (`25-backup`, strict profile, pre-go-live checklist §14) is excluded and adds ≈ 3–4 days for export Lambda, export-status alarming (infra M-4) and a restore drill.
+
+## Status update (2026-10-13, after BRD v1.3 and decisions)
+Basis: HEAD `1a574e5`. Commits checked: `5df831e` (BRD v1.3, [ba-responses.md](ba-responses.md), DP-01..19), `3c6dbdf` (00-bootstrap: CFN exec role, artifact bucket, deploy-role lockdown, reset runbook), `84f4b74` (infra-review status), `a2874e6` (BRD v1.4: Vishwas decisions, §13.5), `1a574e5` (params filled, B-3 partial; repo/OIDC AllowedPattern; first-deploy runbook). `docs/architecture/api/openapi.yaml` exists in the working tree but is **untracked** (not committed), so it doesn't count.
+
+Rule used here: **Resolved** only when the fix is in a commit. Architect commitments and Vishwas decisions that aren't in a commit yet are marked *committed to by X, pending* or *decided by Vishwas, pending commit*. At HEAD, `openapi.yaml` is not committed and `30-api.yaml` is unchanged since `2c28676`. The Vishwas decisions are committed in BRD v1.4 (`a2874e6` §13.5), but `20-data.yaml` hasn't been updated: line 83 still has the old marker list (no EAR or CFR ranges) and lines 71/77 still say `TODO`, not `PLACEHOLDER`.
+
+| # | Sev | Owner | Status | Note |
+|---|---|---|---|---|
+| 1 | blocker | Architect | **Open**: committed to by Architect, pending | Architect committed to OpenAPI at `docs/architecture/api/openapi.yaml` with explicit routes, error, pagination, idempotency and concurrency rules. The file exists only untracked in the working tree; `30-api.yaml:147,153` are still `{proxy+}` |
+| 2 | blocker | Architect | **Open**: committed to by Architect, pending | Read-only `Query`/`GetItem` on AuditLog for records-api committed to. `30-api.yaml:49-51` still PutItem only |
+| 3 | blocker | Architect | **Partly**: committed to by Architect, pending | Artifact bucket now exists (`3c6dbdf`, infra B-2). Convention committed to (esbuild, `src/functions/<name>`, key `<sha>/<function>.zip`) but not documented in a commit. Note: the key order differs from my suggested `<fn>/<sha>.zip`; either works if `RecordsApiKey`/`ReportsApiKey` change every deploy |
+| 4 | blocker | BA | **Partly** | BRD v1.3 §13.2 specifies PO-check manual-entry fields (observed structure only; types/lengths DP-04). CAPA/NCMR steps 2–6 and SQ steps 3/4/6 still blocked on DP-02 (Vishwas) |
+| 5 | major | Architect (+BA) | **Partly** | BA side resolved in `5df831e` (§13.1 soft delete for Remove role/person, Training Undo, Form 3 rows). Architect committed to keeping the delete deny in all envs with soft delete everywhere, but overview §7 still says "in prod" and §5 has no `deletedAt` rule: pending |
+| 6 | major | Architect | **Open**: committed to by Architect, pending | Committed to: per-entity date copied to a shared `dueAt` sparse GSI. `20-data.yaml:33,42` still uses `dueDate`; no access-pattern table |
+| 7 | major | Architect | **Open**: committed to by Architect, pending | Pagination rules are part of the OpenAPI commitment (#1) |
+| 8 | major | Architect | **Open**: committed to by Architect, pending | Idempotency and concurrency rules are part of the OpenAPI commitment (#1) |
+| 9 | major | Architect | **Open**: committed to by Architect, pending | Secret origin header, checked in middleware with the value in SSM, committed to. Not in `40-web.yaml`/`30-api.yaml`. Note: if it's a `SecureString`, records-api needs `kms:Decrypt` via `aws/ssm` (or use a `String` param), and reports-api needs the same check |
+| 10 | major | BA | **Partly** | `5df831e`: BR-12 build criterion and US-13/17/26 no longer assert `DEMO`. Format itself is DP-01 (Vishwas) |
+| 11 | major | BA | **Partly** | `5df831e` §13.4: build criteria separated from *seed checks* (US-04/08/28/31). BR-31 sample data is allowed in all envs incl. prod (`a2874e6`, BR-31/BR-45, §13.5 #1; also answers Architect F-03's question). /compare content, Simulate second reviewer and fixtures still DP-05; QMS bands DP-06 |
+| 12 | major | BA | **Open** | DP-10 (supplier master create/edit, derived inputs) awaiting Vishwas |
+| 13 | major | BA / Architect | **Partly** | `5df831e` added 400/422 ACs to US-02. Whole-word, case-insensitive matching with EAR, 22 CFR 120–130 and 15 CFR 730–774 is in BR-44 (`a2874e6`, DP-03 partial), but the SSM marker list at `20-data.yaml:83` is not updated (Architect, pending). Note for implementation: CFR ranges must be patterns (e.g. `\b22\s*CFR\s*(12\d|130)\b`), not literals, and a `StringList` can't hold them cleanly, so a JSON `String` param is still needed. Field scope and attestation on non-text writes still DP-03; SSM caching still Architect |
+| 14 | major | BA | **Partly** | `5df831e` §13.1 and BR-40: corrections as new events, Undo semantics. Document key edits and supersede edge cases still DP-11 |
+| 15 | major | BA | **Open** | DP-08 (SoD semantics, hard vs warning, name comparison) awaiting Vishwas |
+| 16 | major | Architect | **Partly** | Non-prod reset runbook and draft script in `3c6dbdf` (`docs/runbooks/nonprod-table-reset.md`, `scripts/reset-nonprod-tables.sh`; infra M-7 marked resolved by runbook). Personal/ephemeral envs (`EnvName` AllowedPattern) and a conditional `DeletionPolicy` are not addressed |
+| 17 | minor | Architect | **Open** | reports-api memory, env vars and SSM path unchanged (`30-api.yaml:100-112`) |
+| 18 | minor | Architect | **Open** | Log-group `DependsOn` and inline logs policy not done. 00-bootstrap now has a permissions boundary (`3c6dbdf`), which caps app roles but doesn't remove the managed-policy wildcards |
+| 19 | minor | Architect | **Resolved** (`3c6dbdf`) | `DenyBootstrapStack` / `DenyBootstrapIdentities` statements, and `iam:PassRole` limited by `iam:PassedToService` (lambda, scheduler). Infra review marks it fixed (`84f4b74`) |
+| 20 | minor | Architect | **Open** | FAI Form 3 key padding and transaction sizing not addressed |
+| 21 | minor | BA | **Open** | DP-12 (timezone, boundaries, end-of-month) awaiting Vishwas |
+| 22 | minor | BA | **Open** | DP-07 (training recurrence, Not started) awaiting Vishwas |
+| 23 | minor | Architect | **Resolved** (`a2874e6`) | US-41 ⌘K is client-side over loaded lists (BRD v1.4, DP-15 resolved). The Industry-filter part stays minor/open (OQ-22). Implication for #7: the SPA must page through the lists it searches, or search only what's loaded; record which in the OpenAPI notes |
+| 24 | minor | Architect | **Open** | Logging/EMF conventions not documented. Emission is a developer action (below; infra M-3) |
+| 25 | minor | Architect | **Open** | Overview §3/§7 KMS/`TransactWrite` wording unchanged |
+
+Other decisions (committed in `a2874e6`): **BR-47** ships `PLACEHOLDER` weights/thresholds, which unblocks coding against SSM. The JSON schema and band cut-offs are still DP-16, and `20-data.yaml:71,77` still say `TODO` (Architect, pending).
+
+**Status totals:** Resolved 2 (#19, #23) · Partly 8 (#3, #4, #5, #10, #11, #13, #14, #16) · Open 15 (#1, #2, #6, #7, #8, #9, #12, #15, #17, #18, #20, #21, #22, #24, #25).
+**Blockers still open:** #1 OpenAPI contract (Architect, pending), #2 audit read IAM (Architect, pending), #3 build convention (Architect, partly: bucket done, convention pending), #4 step specs (BA, partly: PO fields done, CAPA/NCMR 2–6 and SQ 3/4/6 wait on DP-02). None of the four is fully resolved.
+
+## Developer actions
+No application code will be written until Vishwas gives the go-ahead. Once he does, the developer will:
+1. Scaffold `src/functions/{records-api,reports-api,ddb-export}` plus shared packages, with esbuild ESM bundles and zips uploaded as `<sha>/<function>.zip` to the bootstrap artifact bucket (after Architect commits #3).
+2. Generate TypeScript types and request validation from `openapi.yaml` (after #1), and make the error envelope, pagination cursors, `Idempotency-Key` → `ClientRequestToken`, and `version`/`If-Match` locking shared middleware.
+3. Middleware chain: origin-secret check (SSM, cached), workspace resolution, controlled-data gate (whole-word, case-insensitive, CFR range patterns per BR-44 v1.4; 400/422; marker id only), domain validation and SoD, then `TransactWriteItems` record + conditional audit put.
+4. **Emit the `GateBlocks` metric:** EMF `SentinelQA/ControlledDataBlocked` with dimension `Env=<env>` on every 422 gate block, matching `50-observability.yaml:75-89` exactly (infra M-3). Plus structured logs that never include request bodies.
+5. Soft delete (`deletedAt`) on every Domain entity and filtered out on every query; no `DeleteItem` calls.
+6. Write entity dates into the shared sparse `dueAt` GSI attribute on every create/update (after #6 lands in `20-data.yaml`).
+7. Timeline endpoint reading AuditLog via `Query` (after #2's IAM change).
+8. Load the BR-31 illustrative seed fixtures (allowed in all envs incl. prod), labelled "ILLUSTRATIVE — SAMPLE RECORDS".
+9. Read BR-47 thresholds from SSM with `PLACEHOLDER` values; nothing hard-coded.
+10. IAM-negative integration tests (audit update/delete denied, Domain delete denied) and gate tests per QA §3.
