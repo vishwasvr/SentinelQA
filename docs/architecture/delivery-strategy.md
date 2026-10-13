@@ -50,7 +50,7 @@ Agents open PRs; Vishwas (or a designated reviewer) approves the merge. Branch p
 | Env | Account | Variables (not secrets) | Required reviewer | Deployment branches/tags |
 |---|---|---|---|---|
 | dev | shared 723940054516 | `AWS_ACCOUNT_ID`, `AWS_DEPLOY_ROLE_ARN` (dev 00 output), `AWS_REGION=us-east-1` | none | `main` |
-| stage | shared 723940054516 | same three, stage values | **Developer** (DECIDED, decision 3; not Vishwas) | `main` and tags `v*` |
+| stage | shared 723940054516 | same three, stage values | **Developer signs off** (decision 3). **OPEN:** the Developer is an agent, not a GitHub user, so it can't be a required reviewer. Vishwas chooses: (a) the Developer posts a written sign-off and Vishwas presses approve (preferred by Developer), (b) a named human GitHub account is the reviewer, or (c) no required reviewer, with the dev checks as the only gate | `main` and tags `v*` |
 | prod | new prod account (O-03) | same three, prod account values | **Vishwas**, no self-review bypass | tags `v*` (and `main`) only |
 
 No AWS secrets anywhere; OIDC only. Note: first-deploy §5 names the role variable `AWS_DEPLOY_ROLE_ARN`; prod-account-split §4 uses `AWS_DEPLOY_ROLE_ARN`. Proposal: standardise on `AWS_DEPLOY_ROLE_ARN` and update first-deploy §5 when the workflows are written. Check that no dev/stage variable carries the prod account ID.
