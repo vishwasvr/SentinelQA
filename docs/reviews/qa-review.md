@@ -326,3 +326,24 @@ Only build-time or pre-go-live items remain open:
 | OI-4: tune PLACEHOLDER weights, bands and due days (§5a gate) | minor | Vishwas → BusinessAnalyst / InfraDeploy | pre-go-live |
 | OI-5: verify FAI Form 2 fields | minor | Vishwas → BusinessAnalyst / Architect | pre-go-live |
 | OI-7 / O-03: separate prod account | — | InfraDeploy (Vishwas approval) | pre-go-live |
+
+---
+
+## QA-45 verify — 2026-10-13 (3:00 PM CT) against local HEAD 696f839
+
+Ancestry: 696f839 **is** HEAD (`git merge-base --is-ancestor` passes). The commit changes `iac/templates/20-data.yaml` (+31) and `iac/ci-and-data-guards.md`.
+
+| Claim | Result | Evidence |
+|---|---|---|
+| IsProd condition | ✔ | `20-data.yaml:14` `IsProd: !Equals [!Ref EnvName, prod]` |
+| SeedRunsLogGroup, prod only | ✔ | `:114-122`: `Condition: IsProd` (:116), `DeletionPolicy`/`UpdateReplacePolicy: Retain` (:117-118), name `/sentinelqa/prod/seed-runs` (:120), `RetentionInDays: 2557` (:121, a valid CloudWatch value), `env` tag |
+| SeedRunsWritePolicy: write only, scoped | ✔ | `:123-135`: `AWS::IAM::ManagedPolicy`, `Condition: IsProd` (:125), only `logs:CreateLogStream` and `logs:PutLogEvents` (:134), resource `arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/sentinelqa/prod/seed-runs:log-stream:*` (:135). No read, delete or retention actions. |
+| Exports, prod only | ✔ | `:149-156`: `SeedRunsLogGroupName` and `SeedRunsWritePolicyArn`, each `Condition: IsProd` and exported as `SentinelQA-${EnvName}-…` |
+| Doc consistency | ✔ | `ci-and-data-guards.md:63` names `SeedRunsLogGroup`, `SentinelQA-prod-seed-runs-write`, prod only, 7-year retention, the same two actions, and the permission-set attachment at account split (O-03). It matches the template. |
+| cfn-lint | **Not run** | `cfn-lint` isn't installed on the box. I didn't install it (static check "if installed" only). |
+
+Notes (non-blocking):
+- **QA-46 (minor, InfraDeploy):** The resource is the stream ARN only (`…:log-stream:*`). IAM matching for `CreateLogStream` is usually written against `log-group:<name>:*`, which covers both the group and its streams. If the operator gets AccessDenied in the first prod seed run, widen the resource to `…log-group:/sentinelqa/prod/seed-runs:*` (still scoped to this group). Verify at the first prod seed run and run cfn-lint in CI (QA-32).
+- Identity Center permission sets reference customer-managed policies by name, and the policy must exist in the prod account. This is consistent with the attach-at-account-split plan (O-03).
+
+**QA-45: Resolved.** Final sign-off stands. Open items are unchanged (QA-32, QA-36, OI-4, OI-5, OI-7), plus QA-46 to check at build time.
