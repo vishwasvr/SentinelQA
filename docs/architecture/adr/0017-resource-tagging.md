@@ -5,7 +5,7 @@
 - Deciders: Vishwas (owner), Architect, InfraDeploy
 
 ## Context
-Owner (Vishwas) requirement: every AWS resource must be tagged with at least `Project=SentinelQA` and `Environment=<dev|stage|prod>`, plus supporting tags. A repo audit (Appendix A) shows tagging is sparse and inconsistent: only 9 resources across the 8 CloudFormation templates declare `Tags`, using lowercase `env` (and `app` on the OIDC provider); no template sets `Project`; no stack-level tags are passed because the repo has no deploy workflow yet (only `.github/workflows/ci.yml`). The live read-only audit of deployed dev/stage stacks could not be completed (CLI session expired, see Appendix B) and must be re-run before implementation.
+Owner (Vishwas) requirement: every AWS resource must be tagged with at least `Project=SentinelQA` and `Environment=<dev|stage|prod>`, plus supporting tags. A repo audit (Appendix A) shows tagging is sparse and inconsistent: only 9 resources across the 8 CloudFormation templates declare `Tags`, using lowercase `env` (and `app` on the OIDC provider); no template sets `Project`; no stack-level tags are passed because the repo has no deploy workflow yet (only `.github/workflows/ci.yml`). The live read-only audit of deployed dev/stage stacks could not be completed (CLI session expired, see Appendix B); per Chief of Staff the template audit suffices for now (live audit optional, read-only, before rollout).
 
 ## Decision
 Tag standard (keys are PascalCase, case-sensitive):
@@ -13,7 +13,7 @@ Tag standard (keys are PascalCase, case-sensitive):
 | Key | Required | Value |
 |---|---|---|
 | `Project` | Yes | `SentinelQA` |
-| `Environment` | Yes | `dev` \| `stage` \| `prod` (from `EnvName`) |
+| `Environment` | Yes | `dev` \| `stage` \| `prod` \| `shared` (account-wide) (from `EnvName`) |
 | `ManagedBy` | Yes | `CloudFormation` |
 | `Repo` | Yes | `vishwasvr/SentinelQA` |
 
