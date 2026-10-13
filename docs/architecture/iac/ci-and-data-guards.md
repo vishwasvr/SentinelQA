@@ -47,9 +47,12 @@ Current: `25-backup.yaml` sets `NoncurrentVersionExpiration: NoncurrentDays: 30`
 
 Normal exports are write-once (each window has a unique prefix), so a noncurrent version only appears if an export object is overwritten or deleted. That's exactly the tampering case ADR-0006 relies on the export to detect. With 30 days, the original is gone after a month.
 
-**Recommendation:** set `NoncurrentDays` equal to `RetentionDays` (2557, 7 years). Noncurrent versions only exist after an overwrite or delete, so the cost is close to zero. Pair it with the O-12 bucket-policy deny on `s3:DeleteObject*` and `s3:PutLifecycleConfiguration` for every principal except a break-glass role.
+**Decided (Vishwas, 2026-10-13, relayed by Chief of Staff):** `NoncurrentDays` = `RetentionDays` (2557), plus the O-12 delete-deny bucket policy. Both are now in `25-backup.yaml`:
 
-Alternatives: (a) keep 30 days (cheapest, weakens tamper evidence); (b) 365 days (a middle ground). Needs Vishwas's decision with O-12. The template is unchanged until then.
+- `NoncurrentVersionExpiration: NoncurrentDays: !Ref RetentionDays`.
+- Bucket policy `DenyDeleteExceptBreakGlass` denies `s3:DeleteObject`, `s3:DeleteObjectVersion`, `s3:PutBucketVersioning` (so versioning can't be suspended) and `s3:DeleteBucket` to every principal except the role named by `BreakGlassRoleName` (default `SentinelQA-prod-breakglass`). That role isn't created by any stack. An admin creates it only when it's needed, with Vishwas's approval.
+- S3 lifecycle expiry still works, because bucket policies don't apply to lifecycle actions.
+- Not denied: `s3:PutLifecycleConfiguration` and `s3:PutBucketPolicy`, because CloudFormation (cfn-exec) needs both to update this stack. Residual risk: an account admin could edit the policy and then delete. Detection for that depends on CloudTrail (M-8). This replaces my earlier recommendation to also deny `PutLifecycleConfiguration`.
 
 ## 3. QA-34 — Guard against real data in dev/stage (BR-45)
 

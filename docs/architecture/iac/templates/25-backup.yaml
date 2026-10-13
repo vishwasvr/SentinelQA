@@ -14,6 +14,10 @@ Parameters:
   RetentionDays:
     Type: Number
     Default: 2557                 # 7 years (D-03 as amended, O-08)
+  BreakGlassRoleName:
+    Type: String
+    Default: SentinelQA-prod-breakglass
+    Description: O-12. The only principal allowed to delete export objects or versions. Created by an admin outside this stack, and only when needed.
 Resources:
   ExportBucket:
     Type: AWS::S3::Bucket
@@ -31,7 +35,7 @@ Resources:
             Status: Enabled
             Transitions: [{ StorageClass: GLACIER, TransitionInDays: 1 }]
             ExpirationInDays: !Ref RetentionDays
-            NoncurrentVersionExpiration: { NoncurrentDays: 30 }
+            NoncurrentVersionExpiration: { NoncurrentDays: !Ref RetentionDays }   # QA-33/O-12 decided: keep for the full retention period
             AbortIncompleteMultipartUpload: { DaysAfterInitiation: 7 }
       Tags: [{ Key: env, Value: !Ref EnvName }]
   ExportBucketPolicy:
@@ -47,6 +51,13 @@ Resources:
             Action: s3:*
             Resource: [!GetAtt ExportBucket.Arn, !Sub '${ExportBucket.Arn}/*']
             Condition: { Bool: { 'aws:SecureTransport': 'false' } }
+          - Sid: DenyDeleteExceptBreakGlass       # O-12 decided (Vishwas 2026-10-13)
+            Effect: Deny
+            Principal: '*'
+            Action: [s3:DeleteObject, s3:DeleteObjectVersion, s3:PutBucketVersioning, s3:DeleteBucket]
+            Resource: [!GetAtt ExportBucket.Arn, !Sub '${ExportBucket.Arn}/*']
+            Condition:
+              ArnNotLike: { 'aws:PrincipalArn': !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${BreakGlassRoleName}' }
   ExportFnRole:
     Type: AWS::IAM::Role
     Properties:
