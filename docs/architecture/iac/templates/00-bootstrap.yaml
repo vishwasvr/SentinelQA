@@ -1,5 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: SentinelQA SKELETON - GitHub OIDC deploy role per env (ADR-0012). Not deployed.
+Description: >-
+  SentinelQA SKELETON - per-env bootstrap (ADR-0012): GitHub OIDC deploy role, CloudFormation execution
+  role (B-1), app-role permissions boundary, Lambda artifact bucket (B-2). Stack name SentinelQA-<env>-Bootstrap.
+  The OIDC provider is one per account and is NOT created here. Deploy this stack with admin/operator
+  credentials only; the deploy role is denied any action on it. Not deployed.
 Parameters:
   EnvName:
     Type: String
@@ -10,7 +14,227 @@ Parameters:
   OidcProviderArn:
     Type: String
     Description: Existing token.actions.githubusercontent.com provider ARN (one per account)
+  ArtifactNoncurrentDays:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    Description: Days after which noncurrent artifact object versions expire
+Conditions:
+  IsProd: !Equals [!Ref EnvName, prod]
 Resources:
+  # ---------------------------------------------------------------- B-2 artifact bucket
+  # Key convention (agreed with Developer): <commit-sha>/<function>.zip
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub sentinelqa-${EnvName}-artifacts-${AWS::AccountId}
+      VersioningConfiguration: { Status: Enabled }
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions
+            Status: Enabled
+            NoncurrentVersionExpiration: { NoncurrentDays: !Ref ArtifactNoncurrentDays }
+            AbortIncompleteMultipartUpload: { DaysAfterInitiation: 7 }
+      Tags:
+        - { Key: env, Value: !Ref EnvName }
+
+  ArtifactBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: [!GetAtt ArtifactBucket.Arn, !Sub '${ArtifactBucket.Arn}/*']
+            Condition: { Bool: { 'aws:SecureTransport': 'false' } }
+
+  # ---------------------------------------------------------------- B-1 permissions boundary
+  # Every IAM role created by stacks 10..50 MUST set PermissionsBoundary to this policy;
+  # the execution role cannot create/modify a role without it.
+  AppRoleBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub SentinelQA-${EnvName}-app-boundary
+      Description: Permissions boundary for SentinelQA app roles (Lambda, Scheduler, export) in one env
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowAppServicesInEnv
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:Query
+              - dynamodb:BatchGetItem
+              - dynamodb:ConditionCheckItem
+              - dynamodb:ExportTableToPointInTime
+              - dynamodb:DescribeContinuousBackups
+              - dynamodb:DescribeExport
+            Resource:
+              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/SentinelQA-${EnvName}-*
+          - Sid: AllowExportBucketAndLambdaInvoke
+            Effect: Allow
+            Action: [s3:PutObject, s3:AbortMultipartUpload, s3:PutObjectAcl, s3:GetObject, s3:ListBucket, lambda:InvokeFunction]
+            Resource:
+              - !Sub arn:${AWS::Partition}:s3:::sentinelqa-${EnvName}-*
+              - !Sub arn:${AWS::Partition}:s3:::sentinelqa-${EnvName}-*/*
+              - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:SentinelQA-${EnvName}-*
+          - Sid: AllowSsmEnvParams
+            Effect: Allow
+            Action: [ssm:GetParameter, ssm:GetParameters, ssm:PutParameter]
+            Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*
+          - Sid: AllowTelemetry
+            Effect: Allow
+            Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents, cloudwatch:PutMetricData, xray:PutTraceSegments, xray:PutTelemetryRecords]
+            Resource: '*'
+          - Sid: DenyDataDestruction
+            Effect: Deny
+            Action: [dynamodb:DeleteTable, dynamodb:DeleteItem, dynamodb:BatchWriteItem]
+            Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/SentinelQA-${EnvName}-*
+          - Sid: DenyIamAndOrg
+            Effect: Deny
+            Action: ['iam:*', 'organizations:*', 'sts:AssumeRole']
+            Resource: '*'
+
+  # ---------------------------------------------------------------- B-1 CFN execution role
+  CfnExecRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub SentinelQA-${EnvName}-cfn-exec
+      Description: Assumed by CloudFormation (--role-arn) for SentinelQA-<env>-* stacks 10..50
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudformation.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals: { 'aws:SourceAccount': !Ref AWS::AccountId }
+              ArnLike: { 'aws:SourceArn': !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/SentinelQA-${EnvName}-*/*' }
+      Policies:
+        - PolicyName: env-scoped-provisioning
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # IAM: app roles only, must carry the boundary
+              - Sid: IamCreateRolesWithBoundary
+                Effect: Allow
+                Action: [iam:CreateRole, iam:PutRolePolicy, iam:AttachRolePolicy, iam:PutRolePermissionsBoundary]
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/SentinelQA-${EnvName}-*
+                Condition:
+                  StringEquals: { 'iam:PermissionsBoundary': !Ref AppRoleBoundary }
+              - Sid: IamManageAppRoles
+                Effect: Allow
+                Action: [iam:GetRole, iam:GetRolePolicy, iam:DeleteRole, iam:DeleteRolePolicy, iam:DetachRolePolicy, iam:UpdateRole, iam:UpdateAssumeRolePolicy, iam:TagRole, iam:UntagRole, iam:ListRolePolicies, iam:ListAttachedRolePolicies]
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/SentinelQA-${EnvName}-*
+              - Sid: IamPassAppRoles
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/SentinelQA-${EnvName}-*
+                Condition:
+                  StringEquals: { 'iam:PassedToService': [lambda.amazonaws.com, scheduler.amazonaws.com] }
+              - Sid: DenyBootstrapIdentities
+                Effect: Deny
+                NotAction: [iam:GetRole, iam:GetPolicy, iam:GetPolicyVersion]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/SentinelQA-${EnvName}-deploy
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/SentinelQA-${EnvName}-cfn-exec
+                  - !Ref AppRoleBoundary
+              - Sid: DenyBoundaryRemoval
+                Effect: Deny
+                Action: iam:DeleteRolePermissionsBoundary
+                Resource: '*'
+              - Sid: DenyBootstrapStack
+                Effect: Deny
+                Action: 'cloudformation:*'
+                Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/SentinelQA-${EnvName}-Bootstrap/*
+              - Sid: DynamoDB
+                Effect: Allow
+                Action: [dynamodb:CreateTable, dynamodb:UpdateTable, dynamodb:DescribeTable, dynamodb:DescribeTimeToLive, dynamodb:UpdateTimeToLive, dynamodb:DescribeContinuousBackups, dynamodb:UpdateContinuousBackups, dynamodb:TagResource, dynamodb:UntagResource, dynamodb:ListTagsOfResource, dynamodb:DescribeContributorInsights, dynamodb:DescribeKinesisStreamingDestination]
+                Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/SentinelQA-${EnvName}-*
+              - Sid: DynamoDBDeleteNonProdOnly
+                Effect: !If [IsProd, Deny, Allow]
+                Action: dynamodb:DeleteTable
+                Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/SentinelQA-${EnvName}-*
+              - Sid: Lambda
+                Effect: Allow
+                Action: [lambda:CreateFunction, lambda:UpdateFunctionCode, lambda:UpdateFunctionConfiguration, lambda:DeleteFunction, lambda:GetFunction, lambda:GetFunctionConfiguration, lambda:AddPermission, lambda:RemovePermission, lambda:TagResource, lambda:UntagResource, lambda:ListTags, lambda:PutFunctionConcurrency, lambda:DeleteFunctionConcurrency]
+                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:SentinelQA-${EnvName}-*
+              - Sid: ArtifactRead
+                Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion]
+                Resource: !Sub '${ArtifactBucket.Arn}/*'
+              - Sid: ApiGatewayV2
+                Effect: Allow
+                Action: [apigateway:GET, apigateway:POST, apigateway:PUT, apigateway:PATCH, apigateway:DELETE]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis
+                  - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/*
+                  - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/*
+              - Sid: S3EnvBuckets
+                Effect: Allow
+                Action: [s3:CreateBucket, s3:DeleteBucket, s3:PutBucketPolicy, s3:GetBucketPolicy, s3:DeleteBucketPolicy, s3:PutBucketVersioning, s3:GetBucketVersioning, s3:PutEncryptionConfiguration, s3:GetEncryptionConfiguration, s3:PutBucketPublicAccessBlock, s3:GetBucketPublicAccessBlock, s3:PutLifecycleConfiguration, s3:GetLifecycleConfiguration, s3:PutBucketOwnershipControls, s3:GetBucketOwnershipControls, s3:PutBucketTagging, s3:GetBucketTagging, s3:GetBucketLocation, s3:ListBucket]
+                Resource: !Sub arn:${AWS::Partition}:s3:::sentinelqa-${EnvName}-*
+              - Sid: DenyArtifactBucketConfig  # bucket is owned by Bootstrap
+                Effect: Deny
+                Action: [s3:DeleteBucket, s3:PutBucketPolicy, s3:DeleteBucketPolicy, s3:PutBucketVersioning, s3:PutLifecycleConfiguration, s3:PutEncryptionConfiguration, s3:PutBucketPublicAccessBlock]
+                Resource: !GetAtt ArtifactBucket.Arn
+              - Sid: CloudFront  # distributions/OAC have no name-scoped ARNs at create time
+                Effect: Allow
+                Action: [cloudfront:CreateDistribution, cloudfront:UpdateDistribution, cloudfront:DeleteDistribution, cloudfront:GetDistribution, cloudfront:GetDistributionConfig, cloudfront:TagResource, cloudfront:UntagResource, cloudfront:ListTagsForResource, cloudfront:CreateOriginAccessControl, cloudfront:UpdateOriginAccessControl, cloudfront:DeleteOriginAccessControl, cloudfront:GetOriginAccessControl, cloudfront:GetOriginAccessControlConfig, cloudfront:ListOriginAccessControls]
+                Resource: '*'
+              - Sid: Sns
+                Effect: Allow
+                Action: [sns:CreateTopic, sns:DeleteTopic, sns:GetTopicAttributes, sns:SetTopicAttributes, sns:Subscribe, sns:Unsubscribe, sns:GetSubscriptionAttributes, sns:ListSubscriptionsByTopic, sns:TagResource, sns:UntagResource, sns:ListTagsForResource]
+                Resource: !Sub arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:SentinelQA-${EnvName}-*
+              - Sid: CloudWatchAlarms
+                Effect: Allow
+                Action: [cloudwatch:PutMetricAlarm, cloudwatch:DeleteAlarms, cloudwatch:DescribeAlarms, cloudwatch:TagResource, cloudwatch:UntagResource, cloudwatch:ListTagsForResource]
+                Resource: !Sub arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:SentinelQA-${EnvName}-*
+              - Sid: Logs
+                Effect: Allow
+                Action: [logs:CreateLogGroup, logs:DeleteLogGroup, logs:PutRetentionPolicy, logs:DeleteRetentionPolicy, logs:TagResource, logs:UntagResource, logs:ListTagsForResource, logs:TagLogGroup, logs:CreateLogDelivery, logs:GetLogDelivery, logs:UpdateLogDelivery, logs:DeleteLogDelivery, logs:ListLogDeliveries, logs:PutResourcePolicy, logs:DescribeResourcePolicies]
+                Resource: '*'   # log group names are /aws/lambda/SentinelQA-<env>-* and /aws/apigateway/...; LogDelivery APIs need '*'
+              - Sid: LogsDescribe
+                Effect: Allow
+                Action: logs:DescribeLogGroups
+                Resource: '*'
+              - Sid: Scheduler
+                Effect: Allow
+                Action: [scheduler:CreateSchedule, scheduler:UpdateSchedule, scheduler:DeleteSchedule, scheduler:GetSchedule, scheduler:TagResource, scheduler:UntagResource, scheduler:ListTagsForResource]
+                Resource: !Sub arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/*/SentinelQA-${EnvName}-*
+              - Sid: Ssm
+                Effect: Allow
+                Action: [ssm:PutParameter, ssm:DeleteParameter, ssm:GetParameter, ssm:GetParameters, ssm:AddTagsToResource, ssm:RemoveTagsFromResource, ssm:ListTagsForResource]
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*
+              - Sid: SsmDescribe
+                Effect: Allow
+                Action: ssm:DescribeParameters
+                Resource: '*'
+              - Sid: CfnExports
+                Effect: Allow
+                Action: [cloudformation:ListExports, cloudformation:ListImports]
+                Resource: '*'
+
+  # ---------------------------------------------------------------- GitHub OIDC deploy role
   DeployRole:
     Type: AWS::IAM::Role
     Properties:
@@ -30,13 +254,52 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Effect: Allow
-                Action: [cloudformation:CreateChangeSet, cloudformation:DescribeChangeSet, cloudformation:ExecuteChangeSet, cloudformation:DescribeStacks, cloudformation:DescribeStackEvents, cloudformation:GetTemplate]
+              - Sid: ChangeSetsOnEnvStacks
+                Effect: Allow
+                Action: [cloudformation:CreateChangeSet, cloudformation:DescribeChangeSet, cloudformation:ExecuteChangeSet, cloudformation:DeleteChangeSet, cloudformation:ListChangeSets, cloudformation:DescribeStacks, cloudformation:DescribeStackEvents, cloudformation:DescribeStackResources, cloudformation:GetTemplate, cloudformation:GetTemplateSummary]
                 Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/SentinelQA-${EnvName}-*/*
-              - Effect: Allow
+              - Sid: CfnGlobalReads
+                Effect: Allow
+                Action: [cloudformation:ValidateTemplate, cloudformation:ListStacks, cloudformation:ListExports]
+                Resource: '*'
+              - Sid: RequireExecRoleOnChangeSets
+                Effect: Deny
+                Action: [cloudformation:CreateChangeSet, cloudformation:CreateStack, cloudformation:UpdateStack]
+                Resource: '*'
+                Condition:
+                  StringNotEquals: { 'cloudformation:RoleArn': !GetAtt CfnExecRole.Arn }
+              - Sid: DenyBootstrapStack
+                Effect: Deny
+                Action: 'cloudformation:*'
+                Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/SentinelQA-${EnvName}-Bootstrap/*
+              - Sid: PassExecRoleOnly
+                Effect: Allow
                 Action: iam:PassRole
-                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/SentinelQA-${EnvName}-*
-              # TODO: resource-scoped permissions CloudFormation needs for each stack (or a CFN service role)
+                Resource: !GetAtt CfnExecRole.Arn
+                Condition:
+                  StringEquals: { 'iam:PassedToService': cloudformation.amazonaws.com }
+              - Sid: DenySelfModifyAndPass
+                Effect: Deny
+                Action: [iam:PassRole, 'iam:Put*', 'iam:Attach*', 'iam:Detach*', 'iam:Delete*', 'iam:Update*', 'iam:Tag*', 'iam:Untag*', iam:CreatePolicyVersion, iam:SetDefaultPolicyVersion]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/SentinelQA-${EnvName}-deploy
+                  - !Ref AppRoleBoundary
+              - Sid: ArtifactUpload  # keys: <commit-sha>/<function>.zip
+                Effect: Allow
+                Action: [s3:PutObject, s3:GetObject]
+                Resource: !Sub '${ArtifactBucket.Arn}/*'
 Outputs:
   DeployRoleArn:
     Value: !GetAtt DeployRole.Arn
+  CfnExecRoleArn:
+    Description: Pass as --role-arn on every SentinelQA-<env>-* change set (10..50)
+    Value: !GetAtt CfnExecRole.Arn
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-CfnExecRoleArn' }
+  AppRoleBoundaryArn:
+    Description: Required PermissionsBoundary for every IAM role in stacks 10..50
+    Value: !Ref AppRoleBoundary
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-AppRoleBoundaryArn' }
+  ArtifactBucketName:
+    Description: Lambda artifacts, keys <commit-sha>/<function>.zip (consumed by 30-api, 25-backup)
+    Value: !Ref ArtifactBucket
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-ArtifactBucketName' }
