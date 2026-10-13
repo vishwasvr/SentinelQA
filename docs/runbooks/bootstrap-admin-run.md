@@ -5,7 +5,7 @@ Status: Draft. Agents never execute this. Vishwas runs it himself with **admin c
 | | |
 |---|---|
 | Account / region | `723940054516` / `us-east-1` |
-| Stacks | `SentinelQA-Account-OIDC` (once per account), then `SentinelQA-dev-Bootstrap` (stage/prod later) |
+| Stacks | `SentinelQA-Account-OIDC` (once per account), then `SentinelQA-dev-Bootstrap` (stage/prod deferred until needed, Vishwas 2026-10-13) |
 | Templates | `docs/architecture/iac/templates/00-account-oidc.yaml`, `00-bootstrap.yaml` |
 | Params | `docs/architecture/iac/params/account.json`, `params/<env>.json` key `00-bootstrap` |
 

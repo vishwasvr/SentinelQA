@@ -14,8 +14,8 @@
   "30-api": {
     "RecordsApiKey": "PIPELINE_SUPPLIED:<commit-sha>/records-api.zip",
     "ReportsApiKey": "PIPELINE_SUPPLIED:<commit-sha>/reports-api.zip",
-    "ThrottleRate": 20,
-    "ThrottleBurst": 40
+    "ThrottleRate": 10,
+    "ThrottleBurst": 20
   },
   "40-web": {
     "WebACLArn": ""
