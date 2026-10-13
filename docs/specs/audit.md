@@ -39,7 +39,7 @@ All 7 calls from the PR #7 description, accepted by Architect and BusinessAnalys
 1. `appendAudit.ts` exports `appendAudit`, `ulid` and types besides `buildAuditPut` (spec said "and nothing else"). **(this module)**
 2. DP-03 separators: both joined (`I.T.A.R` -> `itar`) and spaced (`export-controlled` -> `export controlled`) readings are screened.
 3. Whole-word `EAR` also blocks the plain word "ear"; the BRD only excludes "year".
-4. `isSample` must be the boolean `true`; the string `"true"` is rejected; prod stores `false` when absent or false.
+4. A non-boolean `isSample` (e.g. the string `"true"`) is rejected in dev/stage (422 `non_sample_data_forbidden`) and ignored in prod (stored as `false`). The prod handling is a design choice (ambiguity call), not required by BR-49, which defines only: boolean `true` in prod -> 422 `sample_flag_forbidden_in_prod`, missing -> `false`, changing the flag -> 422 `sample_flag_immutable`.
 5. A "malformed" origin secret is a value under 16 characters (no schema given).
 6. The "15 C.F.R. 734" case already passes in `test_marker_patterns.py`; that file was not edited.
 7. A failed refresh that falls back to the last good value is still logged and counted as a ConfigError.

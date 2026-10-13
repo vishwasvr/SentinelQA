@@ -19,7 +19,7 @@ One loader for every `/sentinelqa/<env>/<name>` SSM parameter: validates, caches
 ### Parameters and validation
 | Name | Rule |
 |---|---|
-| `edge/origin-verify` | trimmed length >= 16 |
+| `edge/origin-verify` | trimmed length >= 16. Operational guidance: origin-verify secrets should be at least 32 random characters (guidance, not a validation rule). |
 | `controlled-data/markers` | comma list, no empty entries |
 | `controlled-data/cfr-ranges` | non-empty JSON array of `{title, partFrom, partTo}` positive integers, `partFrom <= partTo` |
 | `supplier-risk/weights` | weights non-negative numbers summing to 1 ±0.001; bands non-empty, `min` strictly ascending |
@@ -48,11 +48,11 @@ All 7 calls from the PR #7 description, accepted by Architect and BusinessAnalys
 1. `appendAudit.ts` exports `appendAudit`, `ulid` and types besides `buildAuditPut` (spec said "and nothing else").
 2. DP-03 separators: both joined (`I.T.A.R` -> `itar`) and spaced (`export-controlled` -> `export controlled`) readings are screened.
 3. Whole-word `EAR` also blocks the plain word "ear"; the BRD only excludes "year".
-4. `isSample` must be the boolean `true`; the string `"true"` is rejected; prod stores `false` when absent or false.
-5. A "malformed" origin secret is a value under 16 characters (no schema given). **(this module)**
+4. A non-boolean `isSample` (e.g. the string `"true"`) is rejected in dev/stage (422 `non_sample_data_forbidden`) and ignored in prod (stored as `false`). The prod handling is a design choice (ambiguity call), not required by BR-49, which defines only: boolean `true` in prod -> 422 `sample_flag_forbidden_in_prod`, missing -> `false`, changing the flag -> 422 `sample_flag_immutable`.
+5. A "malformed" origin secret is a value under 16 characters (no schema given). **(this module)** Operational guidance: origin-verify secrets should be at least 32 random characters (guidance, not a validation rule).
 6. The "15 C.F.R. 734" case already passes in `test_marker_patterns.py`; that file was not edited.
 7. A failed refresh that falls back to the last good value is still logged and counted as a ConfigError. **(this module)**
 
 ## Known limitations
-- Last good value has no maximum age; a long SSM outage keeps serving the old value.
+- In v1 the last good value has **no maximum age**: a long SSM outage keeps serving the old value. Such an outage is detected through the `ConfigErrors` alarm (every failed refresh is logged and emits the `ConfigErrors` metric, call 7), not by the loader expiring the value.
 - No AWS calls in tests; SSM is mocked.
