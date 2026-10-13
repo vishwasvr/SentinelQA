@@ -62,3 +62,23 @@
   - a bare PutItem must be denied.
   
   If the transactional write gets denied, remove only that Deny. The conditional put, the lint rule and the other Denies still apply.
+
+## 5. OQ decisions (2026-10-13, Vishwas; Architect `6a8f805`, `968695f`)
+Docs only. These tests get written once building opens.
+- **OQ-15 Assign training:** `POST /api/quality-records/{id}/training` and `POST /api/po-checks/{id}/training`.
+  - Each writes the training item (with the source record's ID and type) and its audit entry in one transaction. If the transaction fails, neither item is written.
+  - An unknown source record returns 404, and nothing is written.
+  - No training is created automatically by any other route. A regression test checks this.
+- **OQ-23 Issue SCAR:** `POST /api/quality-records/{id}/scar`.
+  - This only works on NCMR and CAPA records. Any other record type returns 422.
+  - The SCAR links both the source record and the supplier. The SCAR and its audit entry go in one transaction.
+- **OQ-14 supplier warning:** `supplierId` on a PO is optional. `supplierApprovalWarning` is true only when the linked supplier has no Active qualification on the ASL.
+  - Tests cover:
+    - no supplier linked, which gives no warning,
+    - a supplier with an Active qualification, which gives no warning,
+    - a supplier with no Active qualification, which gives a warning.
+  - The warning is worked out when the PO is read and is never stored.
+  - A PO is never blocked from saving because of the warning.
+- **OQ-10, 18, 21 and 22, and /compare:** these are browser-app only, with no API tests.
+  - The UI tests check that the Records page shows sample records with a label, and that the print view has the header and the 'Uncontrolled when printed' footer.
+  - They also check that the Industry filter is hidden and that /compare row 1 says 'Not in this build'.
