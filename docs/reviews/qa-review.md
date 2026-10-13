@@ -255,3 +255,44 @@ No blockers. Non-blocking items carried forward:
 | QA-39: US-04 expected values for non-AI rows; recount the rows | minor | BusinessAnalyst |
 | QA-40: status code for an `isSample` change attempt | minor | Architect |
 | QA-37: seed loader prod refusal vs BR-31; stale §3.3 | minor | InfraDeploy |
+
+---
+
+## FINAL re-check — 2026-10-13 (2:54 PM CT) against local HEAD d8e733f (BRD v1.7.1)
+
+Scope: the diff e49f685..d8e733f (20 commits, 13 files, docs/specs only). Line numbers are for files at d8e733f. Nothing was built or run, and nothing touched AWS.
+
+### Open items from the 783b93d check
+| Item | Status | Evidence |
+|---|---|---|
+| QA-32 (CI workflows) | **Partial** (accepted) | Still no `.github/workflows`. A merge gate has been added: `ci.yml`/`deploy.yml` "must exist and pass on a PR before the first application-code merge" (`iac/ci-and-data-guards.md:75`). Acceptable for a docs/spec sign-off. |
+| QA-36 (EnclosingOperation Deny) | **Resolved as spec**, to be executed | `first-deploy.md:89-94` §5b defines the pass criteria (transactional create 2xx with the audit event present; bare PutItem → `AccessDeniedException`), the fallback (remove only that Deny), and "don't promote to stage until both pass". Mirrored in `docs/specs/audit-write-path.md:54`ff §4. |
+| QA-37 (seed vs BR-31, stale §3.3) | **Resolved** | `ci-and-data-guards.md:61` now says the seed is the only path for prod sample data, with prod approval. §3.3 is closed (`:71`). Overview §4.4 (`architecture-overview.md:109`) has the seed write to DynamoDB through the audit write module. BR-31 is updated. |
+| QA-38 (prod `isSample=true`) | **Resolved** | BR-49 is decided (BRD:332): prod returns 422 `sample_flag_forbidden_in_prod`, nothing written. US-43 AC (BRD:463-470). openapi agrees (`openapi.yaml:2164`, `:2951`). OI-6 is decided (BRD:668). |
+| QA-39 (US-04 oracle) | **Resolved** | A 10-row table with the expected cell for every row (BRD:355-371). Rows 1/8 decided in v1.7, GUESS marks removed. |
+| QA-40 (`isSample` change code) | **Resolved** | 422 `sample_flag_immutable` in all envs; re-sending the same value is a no-op (BRD:332, :466-467; `openapi.yaml:2163`). |
+| OI-4 (PLACEHOLDER tuning) | **Open by design** (pre-go-live gate) | BRD:672. Prod gate `first-deploy.md` §5a. |
+| OI-5 (Form 2 fields) | **Open by design** (pre-go-live) | BRD:667. |
+
+### New content checked
+BR-50..56 and US-44..50 (BRD:333-339, :472-492) are testable as written: concrete UI states, HTTP codes, and the "no automatic creation" regression. Developer tests for them are already listed (`audit-write-path.md` §5, §6). No blockers. New findings:
+
+| ID | Finding | Ref | Sev | Owner |
+|---|---|---|---|---|
+| QA-41 | The Problem `code` enum (`openapi.yaml:2111-2122`) doesn't include the codes the spec now requires: `non_sample_data_forbidden`, `sample_flag_forbidden_in_prod`, `sample_flag_immutable` (BR-49, US-43), `item_too_large`/413 (overview §4.3), `config_unavailable`/503 (overview §4.2). The last two don't appear in openapi at all. Contract tests (ci-and-data-guards §1.2 stage 5, "the 413/422/429/503 codes") would fail, or the handlers would break the schema. | openapi, BR-49, overview §4.2/4.3 | major | Architect |
+| QA-42 | The Issue SCAR 422s (source is a SCAR; source is Closed; BR-53, US-47, `openapi.yaml:243`) and the Assign-training-on-SCAR 422 (US-46) have no specific error code. Tests can only assert the 422 status, not the reason. Suggest `stage_conflict`/`validation_failed` or a new code. | BR-52/53, US-46/47 | minor | Architect |
+| QA-43 | dev/stage require `isSample=true` on every API create (BR-49), but US-43 says the UI has no sample option. So the SPA must set the flag silently in dev/stage, otherwise UI E2E tests in dev/stage can't create records. How the SPA knows its env isn't specified. | BR-49, US-43 (BRD:470) | minor | Architect |
+| QA-44 | The seed writes directly to DynamoDB with the operator session (overview §4.4). That bypasses the BR-44 gate and the records-api IAM Denies. Fixture lint covers markers (`ci-and-data-guards.md:63`), and the audit module is reused. Recommend the seed also call the same gate function so BR-44 holds for every persisted free text, and that a prod seed run is logged in the run log. | BR-44, BR-46, overview §4.4 | minor | Developer / InfraDeploy |
+
+### Verdict: **SIGN-OFF on d8e733f / BRD v1.7.1** (QA)
+No blockers. Remaining non-blocking items:
+| Item | Sev | Owner |
+|---|---|---|
+| QA-41: add the missing error codes and the 413/503 responses to openapi | major | Architect |
+| QA-32: create and pass `ci.yml`/`deploy.yml` before the first application-code merge | major | InfraDeploy |
+| QA-36: run §5b in the first dev smoke test; don't promote until it passes | major | InfraDeploy / Developer |
+| OI-4: tune PLACEHOLDER values before prod approval (§5a) | minor | Vishwas → BusinessAnalyst / InfraDeploy |
+| OI-5: verify FAI Form 2 fields before go-live | minor | Vishwas → BusinessAnalyst / Architect |
+| QA-42: specific codes for the Issue SCAR / Assign training 422s | minor | Architect |
+| QA-43: how the SPA sets `isSample` in dev/stage | minor | Architect |
+| QA-44: seed path runs the BR-44 gate; log prod seed runs | minor | Developer / InfraDeploy |
