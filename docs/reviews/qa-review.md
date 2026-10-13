@@ -211,3 +211,47 @@ No blockers remain. Carried forward, all non-blocking:
 | QA-33: export bucket `NoncurrentDays: 30` (with O-12) | minor | InfraDeploy |
 | QA-34: guard (or checklist) against loading real data into dev/stage | minor | InfraDeploy |
 | OQ-08 (FAI Form 2) is still open, and so are /compare content and fixture publication (BRD:612). No test oracle until decided | minor | BusinessAnalyst |
+
+---
+
+## Re-check — 2026-10-13 (2:36 PM CT) against local main 783b93d (BRD v1.6)
+
+Scope: the diff 9edeba2..783b93d (12 files, docs/specs only; 13 commits 5376764..783b93d). Line numbers are for files at 783b93d. Nothing was built or run, and nothing touched AWS.
+
+### Carried-forward items
+| Item | Status | Evidence |
+|---|---|---|
+| QA-26 (400 KB item limit) | **Resolved** | overview §4.3 (`architecture-overview.md:98`ff) stores only the changed fields as a gzip diff, caps each item at 350 KB, returns 413 `item_too_large` with nothing written, and defines boundary tests at 349 and 351 KB. ADR-0006 has an addendum ("Addendum 2026-10-13: item size"). CI runs the tests (`iac/ci-and-data-guards.md:21`). |
+| QA-28 (audit overwrite) | **Resolved as spec; one verification pending** | Single write path and tests (`docs/specs/audit-write-path.md:3`, `:29-33`: an overwrite gets `TransactionCanceledException`/`ConditionalCheckFailed`, and a lint rule blocks other writers). IAM now also denies PartiQL writes (`30-api.yaml:67`) and any audit PutItem outside `TransactWriteItems` (`30-api.yaml:74`). **Risk (QA-36):** that new Deny is marked "UNVERIFIED until #26 dev smoke" (spec:23). It uses `StringNotEquals`, which also matches when the key is absent, so if `dynamodb:EnclosingOperation` isn't populated for transactional puts, the Deny blocks **every** audit write and therefore every record write. The first dev smoke test must cover it. |
+| QA-29 (prod-only backup paths) | **Resolved** | Runbook `first-deploy.md:67-85` §6 checks PITR ENABLED, the schedules, the bucket, a baseline FULL_EXPORT that must reach COMPLETED with `itemCount>0`, the verify invoke with the health metric, the alarms, and the first incremental run. `deploy.yml` invokes it for prod (`ci-and-data-guards.md:35`). Accepted in place of a strict-profile pre-prod. |
+| QA-31 (SSM caching/failure) | **Resolved** | overview §4.2 (`architecture-overview.md:86`ff): 5-minute cache with last-good kept on refresh failure. Missing or malformed values fail closed: 403 for the origin secret, 503 `config_unavailable` for markers and thresholds, no silent defaults. Schema checks, the `ConfigErrors` metric and unit-test hooks are defined; the tests are listed in `audit-write-path.md:41`. |
+| QA-32 (CI test stage) | **Partially resolved** (design only) | `ci-and-data-guards.md:5-42` designs `ci.yml` (lint, unit, contract, gate coverage over every `x-free-text` route, integration on DynamoDB Local) and `deploy.yml` smoke tests. **No `.github/workflows` exists**, and that's deliberate (`:3`, `:42`): files get created when building opens. Not blocking for a docs sign-off; the workflow files are still needed before the first code merge. |
+| QA-33 (noncurrent expiry) | **Resolved** | `25-backup.yaml:38` sets `NoncurrentDays: !Ref RetentionDays` (2557), and `:54` adds the `DenyDeleteExceptBreakGlass` bucket policy. Overview §14 marks O-12 decided. |
+| QA-34 (real-data guard) | **Resolved**, minor inconsistencies | Guards: seed-only loader, a 422 `non_sample_data_forbidden` on dev/stage creates without `isSample=true`, CI fixture lint, no prod→non-prod copy path, and a procedural scan (`ci-and-data-guards.md:59-68`; openapi:23; BR-49 at BRD:332; US-43 at BRD:441). **QA-37 (minor):** `ci-and-data-guards.md:61` says the loader "refuses to run when `EnvName` = `prod`", but BR-31 allows labelled sample data in prod via the same seed command (overview §5.2). Also, §3.3 (`:70-72`) is stale, because openapi already has the 422 code. |
+| QA-01 follow-up (PLACEHOLDER tuning) | **Resolved as a tracked gate** | OI-4 in BRD:624 names the owners (values Vishwas, record BA, set InfraDeploy). The prod gate is `first-deploy.md:57-63` §5a: a read-only SSM and `rg` check that nothing says PLACEHOLDER before prod approval. The values themselves are still pending, as intended. |
+| OQ-08 (FAI Form 2) | **Resolved (decided)**, fields unverified | BR-48 (BRD:331), US-42 (BRD:405), openapi `form2` with `x-guess`/`x-free-text` fields (c6bf9e2). The ACs can be tested against the GUESS fields. OI-5 requires verifying the fields before go-live. |
+
+### New or ambiguous criteria introduced by v1.6
+| ID | Finding | Ref | Sev | Owner |
+|---|---|---|---|---|
+| QA-36 | The `EnclosingOperation` Deny on audit PutItem isn't verified and fails closed (see QA-28). Needs an explicit pass criterion in the #26 dev smoke: a transactional audit put succeeds, and a bare PutItem is denied. | `30-api.yaml:74`; audit-write-path.md:23 | major | InfraDeploy / Developer |
+| QA-38 | US-43's last AC (prod with `isSample=true` on create) is **PENDING** (BRD:446, OI-6 at BRD:623), so it has no expected result. The openapi schema already says the value is "ignored and stored as false" and its info block says "Prod ignores the flag" (openapi:23), which turns a pending item into a de-facto decision and the two docs disagree. Only the prod behaviour is untestable; dev/stage are fine. | BR-49, US-43, OI-6 | major | BusinessAnalyst (decision via Vishwas) / Architect (align openapi) |
+| QA-39 | US-04: the rows are listed and AI-deferred rows read "Not in this build", but the expected cell value for the other rows (trial access, deployment model, industry focus, traceability, human-in-the-loop, AS9100D depth) is left "to be confirmed … by the implementer" (BRD:353). There's no oracle for those cells. The 10-vs-9 row count is also flagged for a recount. | US-04 | minor | BusinessAnalyst |
+| QA-40 | US-43 says an `isSample` change "is rejected" but gives no status or error code (409? 422 `validation_failed`?). | BRD:441-446 | minor | Architect |
+| QA-37 | Seed loader vs BR-31 prod sample data, and stale §3.3 (see QA-34 above). | ci-and-data-guards.md:61, :70 | minor | InfraDeploy |
+| — | BRD §12 "Still open OQs" (BRD:~507) keeps the v1.2 list ahead of the v1.5/v1.6 updates. That's readable but cluttered. Not a defect. | BRD §12 | — | — |
+
+BR-48/US-42 are testable as written: grid columns, the 422 gate, lock after preparer signs, soft delete with audit. Nothing new is a blocker. QA-36 and QA-38 affect only the first dev smoke test and the prod build of BR-49, and both are tracked.
+
+### Verdict: **SIGN-OFF on 783b93d / BRD v1.6** (QA)
+No blockers. Non-blocking items carried forward:
+| Item | Sev | Owner |
+|---|---|---|
+| QA-36: verify the `EnclosingOperation` Deny in the first dev smoke test (transactional put passes, bare put denied); otherwise every write is blocked | major | InfraDeploy / Developer |
+| QA-38: decide prod `isSample=true` handling (OI-6) and align openapi:23 with the schema description | major | BusinessAnalyst (Vishwas) / Architect |
+| QA-32: create `.github/workflows/ci.yml` and `deploy.yml` per the design before the first code merge | major | InfraDeploy |
+| OI-4 (QA-01): tune PLACEHOLDER weights, bands and due days before prod approval (§5a gate) | minor | Vishwas → BusinessAnalyst / InfraDeploy |
+| OI-5 (OQ-08): verify FAI Form 2 fields before go-live | minor | Vishwas → BusinessAnalyst / Architect |
+| QA-39: US-04 expected values for non-AI rows; recount the rows | minor | BusinessAnalyst |
+| QA-40: status code for an `isSample` change attempt | minor | Architect |
+| QA-37: seed loader prod refusal vs BR-31; stale §3.3 | minor | InfraDeploy |
