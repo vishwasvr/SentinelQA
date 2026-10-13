@@ -1,0 +1,12 @@
+{
+  "_comment": "Coverage gate policy (delivery-strategy.md §3b, DECIDED by Vishwas 2026-10-13). Read by scripts/ci/coverage-gate.mjs.",
+  "overall": { "lines": 90, "branches": 90 },
+  "maxDropPoints": 1,
+  "safetyCritical": [
+    { "name": "controlled-data gate matcher", "paths": ["src/shared/gate/"] },
+    { "name": "buildAuditPut (audit write path)", "paths": ["src/shared/audit/"] },
+    { "name": "isSample checks", "paths": ["src/shared/sample/"] },
+    { "name": "config loader", "paths": ["src/shared/config/"] }
+  ],
+  "safetyCriticalMin": { "lines": 100, "branches": 100 }
+}
