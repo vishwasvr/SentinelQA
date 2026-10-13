@@ -5,7 +5,7 @@
 - Deciders: Vishwas (owner), Architect, InfraDeploy
 
 ## Context
-Owner requirement: every AWS resource must be tagged with at least `Project=SentinelQA` and `Environment=<dev|stage|prod>`, plus supporting tags for ownership and cost. A repo audit (Appendix A) shows tagging is sparse and inconsistent: only 9 resources across the 8 CloudFormation templates declare `Tags`, using lowercase `env` (and `app` on the OIDC provider); no template sets `Project`; no stack-level tags are passed because the repo has no deploy workflow yet (only `.github/workflows/ci.yml`). The live read-only audit of deployed dev/stage stacks could not be completed (CLI session expired, see Appendix B) and must be re-run before implementation.
+Owner (Vishwas) requirement: every AWS resource must be tagged with at least `Project=SentinelQA` and `Environment=<dev|stage|prod>`, plus supporting tags. A repo audit (Appendix A) shows tagging is sparse and inconsistent: only 9 resources across the 8 CloudFormation templates declare `Tags`, using lowercase `env` (and `app` on the OIDC provider); no template sets `Project`; no stack-level tags are passed because the repo has no deploy workflow yet (only `.github/workflows/ci.yml`). The live read-only audit of deployed dev/stage stacks could not be completed (CLI session expired, see Appendix B) and must be re-run before implementation.
 
 ## Decision
 Tag standard (keys are PascalCase, case-sensitive):
@@ -16,13 +16,11 @@ Tag standard (keys are PascalCase, case-sensitive):
 | `Environment` | Yes | `dev` \| `stage` \| `prod` (from `EnvName`) |
 | `ManagedBy` | Yes | `CloudFormation` |
 | `Repo` | Yes | `vishwasvr/SentinelQA` |
-| `Owner` | Recommended | TBD by Vishwas (role/team name, never a personal email) |
-| `CostCenter` | Recommended | TBD by Vishwas |
 
 The legacy `env` / `app` keys are replaced by `Environment` / `Project` (kept temporarily during migration only if something depends on them).
 
 Enforcement:
-1. **Stack-level tags** via `aws cloudformation deploy --tags Project=SentinelQA Environment=<env> ManagedBy=CloudFormation Repo=vishwasvr/SentinelQA [Owner=.. CostCenter=..]` in the deploy workflow. CloudFormation propagates stack tags to most supported resources.
+1. **Stack-level tags** via `aws cloudformation deploy --tags Project=SentinelQA Environment=<env> ManagedBy=CloudFormation Repo=vishwasvr/SentinelQA` in the deploy workflow. CloudFormation propagates stack tags to most supported resources.
 2. **Explicit `Tags`** in templates on resources where propagation is unreliable or the resource is created outside the stack's tag scope (S3 buckets, DynamoDB tables, log groups, SSM parameters, SNS topics, CloudFront distributions, Scheduler schedules have no tags — see below).
 3. **Explicit log groups** (`AWS::Logs::LogGroup` with `Tags` and retention) for every Lambda, so no implicit, untagged log groups are created by Lambda at first invoke.
 4. **CI check** in `ci.yml`: a cfn-guard rule (or cfn-lint custom rule / script) that fails when a taggable resource lacks `Project`/`Environment` (or relies on stack tags not present in the deploy command), and that greps the deploy workflow for the required `--tags` keys.
@@ -70,3 +68,8 @@ Resources that cannot carry tags (no-op for this standard): `AWS::S3::BucketPoli
 
 ## Appendix B: Live audit (dev, stage)
 Not completed: on 2026-10-13 the AWS CLI session for account 723940054516 had expired (`aws login` required), so `describe-stacks`, `list-stack-resources` and `resourcegroupstaggingapi get-resources` could not run. Based on templates, deployed resources are expected to carry at most `env` (plus any stack-level tags applied manually). Re-run read-only before implementation and fill this table.
+
+## Decisions (Vishwas, 2026-10-13)
+- Exactly 4 required tags: `Project`, `Environment`, `ManagedBy`, `Repo`.
+- Account-wide resources (e.g. OIDC provider) use `Environment=shared`.
+- No `Owner` tag and no `CostCenter` tag (costs are not tracked that way; per-env/per-project cost views come from `Project` + `Environment` as cost-allocation tags).
