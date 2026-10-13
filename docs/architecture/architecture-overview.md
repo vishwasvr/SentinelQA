@@ -31,7 +31,7 @@
 | Calibration, Training, Document Control, Approval Roles | Full CRUD and rules per BRD | — |
 | QMS Champion | Ratings, mean score, top gaps (deterministic, BR-41) | "Ask the agent … gap-closure plan" |
 | Dashboard | Needs-attention aggregation (BR-42) | — |
-| Ask the agent, /demo, /try-your-document, Agent reliability | — (hidden or static "coming later") | Entire modules, AgentTask table, reliability alarms (BR-29/30/43) |
+| Ask the agent, /demo, /try-your-document, Agent reliability | — (/demo and /try-your-document static pages per DP-18; agent hidden) | Entire modules, AgentTask table, reliability alarms (BR-29/30/43) |
 
 ## 3. Services
 | Layer | Service | Purpose |
@@ -138,7 +138,7 @@ Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (te
 - **Prod:** records and audit events kept **≥ 7 years**. No TTL, `DeletionProtectionEnabled`, `DeletionPolicy/UpdateReplacePolicy: Retain`, PITR on (35 days, also required for exports).
 - **Dev/stage:** synthetic or labelled sample data only ("ILLUSTRATIVE — SAMPLE RECORDS"), never real customer records (BR-45, BR-31 v1.4). Full table resets only via the InfraDeploy [reset runbook](../runbooks/nonprod-table-reset.md). No retention obligation, no PITR, no backup. Real customer records must never be loaded there.
 - **Long-term backup (O-01, decided):** a monthly job (EventBridge Scheduler, day 2) runs a Lambda that issues DynamoDB **incremental exports** for the previous month. Each export window is ≤ 24 h (an API limit), so a month is about 30 windows per table, all inside the 35-day PITR window. Exports land in S3 (SSE-S3, versioned), move to Glacier Flexible Retrieval after 1 day, and expire after 2,557 days (≈ 7 y). A one-time full export is the baseline. Not WORM, consistent with D-05.
-- CloudWatch Logs retention: proposed 90 days (logs contain no record content). O-02.
+- CloudWatch Logs retention: 30 days in prod, 7 days in dev/stage (logs contain no record content). O-02 decided 2026-10-13.
 
 ## 9. Cost drivers
 Detailed estimate with sources, split by prod and non-prod: **[cost-estimate.md](cost-estimate.md)**. At 20 users, year 1 (v0.5): prod ≈ $3.09, non-prod ≈ $2.63, combined ≈ $5.72 without free tier (≈ $0.60 / $0.06 / $0.66 with always-free). Year 7 combined ≈ $7.91 / $1.54.
@@ -146,12 +146,12 @@ Detailed estimate with sources, split by prod and non-prod: **[cost-estimate.md]
 Near zero at pilot volume: Lambda, API GW, DynamoDB on-demand, S3/CloudFront. Fixed: CloudWatch alarm metrics (12 total: 10 prod + 1 per lean env; 2 over the 10 free), 4 EMF custom metrics (within 10 free), CI minutes. No KMS key fees (O-09). DynamoDB storage grows linearly over 7 years (small). Bedrock and WAF costs are gone for now.
 
 ## 10. Environments
-Profiles per [ADR-0013](adr/0013-environment-profiles.md): `EnvProfile=lean` for dev/stage (synthetic or labelled sample data only, never real customer records; **admin full-table resets allowed**, via the [reset runbook](../runbooks/nonprod-table-reset.md), per BR-46 v1.2.2 / C-1; item-level audit update/delete still denied; AWS owned keys, no PITR/backup, 7-day logs, 1 alarm) and `EnvProfile=strict` for prod (AWS managed key, PITR, deletion protection, 7-year retention, 90-day logs, 7 alarms (10 alarm metrics) incl. export-errors and backup-health, monthly incremental export backup with a daily verify).
+Profiles per [ADR-0013](adr/0013-environment-profiles.md): `EnvProfile=lean` for dev/stage (synthetic or labelled sample data only, never real customer records; **admin full-table resets allowed**, via the [reset runbook](../runbooks/nonprod-table-reset.md), per BR-46 v1.2.2 / C-1; item-level audit update/delete still denied; AWS owned keys, no PITR/backup, 7-day logs, 1 alarm) and `EnvProfile=strict` for prod (AWS managed key, PITR, deletion protection, 7-year retention, 30-day logs, 7 alarms (10 alarm metrics) incl. export-errors and backup-health, monthly incremental export backup with a daily verify).
 
 dev / stage / prod as stack sets in **one AWS account, us-east-1**. Stack names `SentinelQA-<env>-<Stack>`, parameters per env file (`iac/params/<env>.json`). GitHub Actions: lint → create change set → manual approval (stage/prod) → execute.
 
 ## 11. Assumptions
-A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as PII. A-04 single workspace. A-06 free-text payloads ≤ 32 KB. A-07 English, US users. A-10 (new) the AI-dependent public pages (/demo, /try-your-document) are hidden or static in this build.
+A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as PII. A-04 single workspace. A-06 free-text payloads ≤ 32 KB. A-07 English, US users. A-10 the AI-dependent public pages (/demo, /try-your-document) stay static pages in this build (DP-18, decided 2026-10-13). "Simulate second reviewer" is removed from the build (DP-05, decided 2026-10-13); SoD checks use real distinct reviewers only.
 
 ## 12. Decisions (resolved 2026-10-13)
 | ID | Decision | Resolved value | ADR |
@@ -178,10 +178,10 @@ A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as 
 - ~~O-08~~ **Resolved:** 7-year retention in prod only; dev/stage synthetic only.
 - ~~O-09~~ **Resolved:** AWS managed keys, no CMKs anywhere.
 - ~~O-01~~ **Resolved:** monthly job running daily-window incremental DynamoDB exports to S3 Glacier, 7-year lifecycle (`25-backup`).
-- **O-02** CloudWatch Logs retention (90 days proposed).
+- ~~O-02~~ **Resolved (Vishwas, 2026-10-13):** CloudWatch Logs retention 30 days prod, 7 days dev/stage.
 - **O-03** Single-account blast radius. Revisit before production customer data.
 - **O-04** Tuned values for D-07 (the PLACEHOLDER defaults ship, DP-16). Marker list decided in BRD v1.4, CFR ranges per v1.4.1 (ff3fd01) (incl. ITAR, EAR, CUI, `22 CFR 120-130`, `15 CFR 730-774`; whole-word, case-insensitive). CFR ranges are stored as structured ranges and checked in code (dev #27, §4); exact range rules pending Vishwas sign-off. Normalisation, evasion and exempt fields are still pending (DP-03).
-- **O-05** Without WAF (D-11), public endpoints rely on API Gateway throttling. **PROPOSED (pending Vishwas approval):** HTTP API stage default route throttle **rate 20 req/s, burst 40**, the values already set as `ThrottleRate`/`ThrottleBurst` defaults in `30-api.yaml` (`DefaultRouteSettings`). Sizing: ~20 users in year 1; even all 20 active at once at ~1 req/s is 20 req/s, so normal use stays well under the cap while a scripted direct hit is capped (excess gets 429). No template change needed; per-route overrides only if real traffic shows a need.
+- ~~O-05~~ **Resolved (Vishwas, 2026-10-13):** without WAF (D-11), public endpoints rely on API Gateway throttling: HTTP API stage default route **rate 10 req/s, burst 20** (`ThrottleRate`/`ThrottleBurst` defaults in `30-api.yaml`; params files must match). Excess gets 429. Per-route overrides only if real traffic shows a need.
 - **O-06** Whether hidden AI modules show a "coming later" state or are removed from navigation (UX).
 - **O-13** Decisions pending in BRD v1.4.2 §13.3 (commit 2374e7e; DP-01..DP-20, DP-20 = CAPA/NCMR overdue rule). DPs that change the API contract: DP-01, DP-02, DP-03, DP-06, DP-07, DP-08, DP-10, DP-11, DP-12. Fields that depend on them are `x-tbd` in the OpenAPI spec.
 - **O-07** BRD OQs still open (aligned with BRD v1.4 §12; OQ-10 partially answered by BR-31): OQ-03, 06, 07, 08, 09, 10, 14, 15, 17, 18, 21, 22, 23. OQ-05 is deferred with AI. OQ-13 is **closed** (attestation logged on audit events, §4 step 4 / ADR-0005). OQ-01/02/04 are resolved (BR-47 / BR-45).

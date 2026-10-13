@@ -3,7 +3,7 @@ Status: **skeleton only, never deployed.** Tool: [ADR-0010](../adr/0010-iac-clou
 Single AWS account, us-east-1. Environments are separated by stack name `SentinelQA-<env>-<stack>` and the `EnvName` parameter (D-08).
 
 ## Profiles
-`EnvProfile` parameter (`lean` for dev/stage, `strict` for prod; [ADR-0013](../adr/0013-environment-profiles.md)). Condition `IsStrict` controls: SSE (strict = AWS managed key `aws/dynamodb`, lean = AWS owned key), PITR, deletion protection (20), log retention 7/90 d, X-Ray (30), extra alarms (50). **No customer-managed KMS keys anywhere (O-09).** `25-backup` is deployed for prod only. Set in [params/](params/).
+`EnvProfile` parameter (`lean` for dev/stage, `strict` for prod; [ADR-0013](../adr/0013-environment-profiles.md)). Condition `IsStrict` controls: SSE (strict = AWS managed key `aws/dynamodb`, lean = AWS owned key), PITR, deletion protection (20), log retention 7/30 d (O-02), X-Ray (30), extra alarms (50). **No customer-managed KMS keys anywhere (O-09).** `25-backup` is deployed for prod only. Set in [params/](params/).
 
 ## Templates (deploy order: 00 → 10 → 20 → 30 → 40 → 50, then 25 for prod only)
 Import graph: 25←{00,10,20}, 30←{00,20}, 40←30, 50←{10,30}. No cycles. Delete in reverse order.

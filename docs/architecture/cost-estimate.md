@@ -45,7 +45,7 @@ Same as v0.2 (U-1 … U-17), restated by environment:
 | U-6 | Lambda | arm64, 512 MB, 150 ms | same |
 | U-7/8 | DynamoDB | 20% writes × 12 WRU. 10 RRU per request | same ratios |
 | U-10 | Storage growth | ≈ 0.67 GB/yr (audit-dominated) → **≈ 4.7 GB at year 7**, retained 7 y (O-08) | ≈ 0.13 GB/yr. Synthetic, not retained (may be purged) |
-| U-11 | Log retention | 90 days | **7 days** |
+| U-11 | Log retention | 30 days (O-02) | **7 days** |
 | U-12 | Alarms | **6** (incl. export errors) | **1 per env = 2** (total 8 ≤ 10 free) |
 | U-13 | KMS | **No CMK** (O-09). AWS managed `aws/dynamodb`, ≈ 0.3 KMS requests per API call | **none** (AWS owned keys) |
 | PITR / backup | | PITR on + monthly job of daily incremental exports (2 tables) → Glacier, 7 y | **none** |
@@ -174,7 +174,7 @@ Savings are per month, 20 users, versus the v0.2 design (3 CMKs, PITR everywhere
 | S-5 | **Fewer prod alarm metrics** (10 → 8, e.g. Domain SystemErrors on TransactWriteItems only) | $0.20 without free tier, $0.20 with free tier | Less coverage (drop the audit-errors and gate-blocks alarms) | Not recommended | D-10 unaffected |
 | S-6 | O-01: **S3 incremental export** vs AWS Backup monthly | vs A: **≈ $19.70 at year 7**. vs B (annual): ≈ $1.60 | Restore = import into a new table (slower, $0.15/GB). Glacier minimums and retrieval fees. Not WORM | **Adopted (O-01)**: monthly job, daily-window incremental exports | Consistent with D-05. Restore runbook deferred to pre-go-live (O-10) |
 | S-7 | **DynamoDB Standard-IA** for prod AuditLog | No free tier: ≈ $0.66 at year 7 (4.4 GB × $0.15) minus ≈ $0.03 extra requests. **With the 25 GB always-free: negative** (the free storage applies to Standard) | IA request prices are ~25% higher. IA PITR price unverified | **Not now**. Revisit if table storage exceeds 25 GB (≈ 90+ users at year 7) | No |
-| S-8 | Prod log retention 90 → 30 days | < $0.01 | Shorter forensic window | Not worth it | O-02 |
+| S-8 | Prod log retention 90 → 30 days | < $0.01 | Shorter forensic window | **Adopted** (Vishwas, 2026-10-13) | O-02 |
 | S-9 | arm64 GitHub runners / skip CI on docs-only changes | ≈ $0.40 / up to $1+ (only if beyond included minutes) | Minor | Adopt opportunistically | D-12 unaffected |
 | S-10 | Merge dev + stage into one non-prod env | ≈ $0.10 (one alarm) | Loses the rehearsal stage before prod | Not recommended | Changes the environments in overview §10 |
 | S-11 | CloudFront flat-rate **Free plan** | ≈ $0 (pay-as-you-go is already free under the 1 TB/10M always-free) | Not available to Free-plan accounts | Not needed | No |

@@ -32,7 +32,7 @@
 | F-13 | info | ADR-0001/0002/0003/0004/0005 options tables | Mention CDK/Bedrock/AgentTask/Guardrails as historical options | Fine. Each is marked Superseded/Deferred. | No action |
 | F-14 | info | Pre-go-live checklist §14 | O-10/O-11/O-12 and the one-time full export are deferred | Keep them | No action |
 
-Consistency confirmed: single account, us-east-1, CloudFormation only, AI deferred (`/api/ai/*` seam only), WAF deferred, no CMKs (AWS-managed in prod, AWS-owned in dev/stage), 7-year retention for prod only, PITR + monthly orchestration of daily incremental exports for prod, 6 prod alarms + 1 per lean env (8 total), 90-day/7-day log retention, `EnvProfile` lean/strict in params.
+Consistency confirmed: single account, us-east-1, CloudFormation only, AI deferred (`/api/ai/*` seam only), WAF deferred, no CMKs (AWS-managed in prod, AWS-owned in dev/stage), 7-year retention for prod only, PITR + monthly orchestration of daily incremental exports for prod, 6 prod alarms + 1 per lean env (8 total), 30-day/7-day log retention (O-02), `EnvProfile` lean/strict in params.
 
 ## Traceability summary
 | BRD item | Design element |
@@ -87,7 +87,7 @@ All other in-scope stories and BRs map to an element. No requirement was changed
 - (v0.5) BR-31, US-41, BR-47 and the BR-44 matching rule were decided 2026-10-13. Still open: DP-01..DP-19 except those resolved in v1.4 (DP-15 resolved; DP-03 and DP-16 partially). Also whether KPIs count `isSample` items (OQ-10).
 1. **F-03 / BR-31:** should prod show illustrative sample records, or should they appear only in dev/stage?
 2. **F-10:** is client-side ⌘K search OK at pilot scale?
-3. Still open from before: O-05 throttle values, BRD OQs listed in O-07, pre-go-live checklist items O-10..O-12.
+3. Still open from before: BRD OQs listed in O-07, pre-go-live checklist items O-10..O-12.
 
 ## Resolution: Developer review #26–#29 (2026-10-13)
 | Finding | Status | Resolution |

@@ -25,7 +25,7 @@ CloudFormation parameter `EnvProfile` (`lean` for dev/stage, `strict` for prod) 
 | Retention (D-03 amended, O-08) | **not applied: synthetic data only** | 7 years for records and audit |
 | Audit immutability (D-05, BR-46) | append-only + IAM deny on items; **admin full-table resets allowed** (C-1) | strictly append-only; deletion protection + Retain |
 | Controlled-data gate (D-14) | on | on |
-| Log retention | 7 days | 90 days (O-02) |
+| Log retention | 7 days | 30 days (O-02, decided 2026-10-13) |
 | X-Ray | off (PassThrough) | Active |
 | Alarms (D-10, email) | 1 (records-api errors) | 6 (Lambda errors, API 5xx, Domain system errors, AuditLog user errors, gate blocks, export errors) |
 | Throttling / auth seam / WAF slot | unchanged | unchanged |

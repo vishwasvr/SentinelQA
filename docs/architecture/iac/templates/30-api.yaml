@@ -19,10 +19,10 @@ Parameters:
     Description: <commit-sha>/reports-api.zip, supplied by the pipeline (ADR-0014)
   ThrottleRate:
     Type: Number
-    Default: 20          # TODO O-05
+    Default: 10          # O-05 decided 2026-10-13
   ThrottleBurst:
     Type: Number
-    Default: 40
+    Default: 20
 Conditions:
   IsStrict: !Equals [!Ref EnvProfile, strict]
 Resources:
@@ -154,12 +154,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/SentinelQA-${EnvName}-records-api
-      RetentionInDays: !If [IsStrict, 90, 7]   # O-02; lean 7 days
+      RetentionInDays: !If [IsStrict, 30, 7]   # O-02 decided: prod 30 days; lean 7 days
   ReportsLogs:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/SentinelQA-${EnvName}-reports-api
-      RetentionInDays: !If [IsStrict, 90, 7]
+      RetentionInDays: !If [IsStrict, 30, 7]
   HttpApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
