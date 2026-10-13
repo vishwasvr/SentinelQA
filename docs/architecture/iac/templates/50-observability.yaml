@@ -1,9 +1,16 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: SentinelQA SKELETON - CloudWatch alarms to SNS email (D-10). Agent/AI alarms (BR-30) deferred with AI. Not deployed.
+Description: SentinelQA SKELETON - CloudWatch alarms to SNS email (D-10). lean = 1 alarm, strict = 5 (all within the 10 free alarms). Agent/AI alarms (BR-30) deferred with AI. Not deployed.
 Parameters:
   EnvName:
     Type: String
     AllowedValues: [dev, stage, prod]
+  EnvProfile:
+    Type: String
+    AllowedValues: [lean, strict]
+    Default: lean
+    Description: lean = non-prod (dev/stage), strict = prod (ADR-0013)
+Conditions:
+  IsStrict: !Equals [!Ref EnvProfile, strict]
 Resources:
   RecordsErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -19,4 +26,64 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
       AlarmActions: [{ 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }]
-  # TODO: API 5xx, throttles, DynamoDB SystemErrors, gate-block count (custom metric), Budgets
+  # strict-only alarms (TODO: export ApiId / table names from 30/20 and reference them)
+  ApiServerErrors:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsStrict
+    Properties:
+      AlarmName: !Sub SentinelQA-${EnvName}-ApiServerErrors
+      Namespace: AWS/ApiGateway
+      MetricName: 5xx
+      Dimensions: [{ Name: ApiId, Value: TODO-ApiId }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [{ 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }]
+  DomainSystemErrors:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsStrict
+    Properties:
+      AlarmName: !Sub SentinelQA-${EnvName}-DomainSystemErrors
+      Namespace: AWS/DynamoDB
+      MetricName: SystemErrors
+      Dimensions: [{ Name: TableName, Value: !Sub 'SentinelQA-${EnvName}-Domain' }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [{ 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }]
+  AuditUserErrors:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsStrict
+    Properties:
+      AlarmName: !Sub SentinelQA-${EnvName}-AuditUserErrors
+      Namespace: AWS/DynamoDB
+      MetricName: UserErrors
+      Dimensions: [{ Name: TableName, Value: !Sub 'SentinelQA-${EnvName}-AuditLog' }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [{ 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }]
+  GateBlocks:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsStrict
+    Properties:
+      AlarmName: !Sub SentinelQA-${EnvName}-GateBlocks
+      Namespace: SentinelQA
+      MetricName: ControlledDataBlocked
+      Dimensions: [{ Name: Env, Value: !Ref EnvName }]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [{ 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }]

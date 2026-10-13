@@ -4,6 +4,11 @@ Parameters:
   EnvName:
     Type: String
     AllowedValues: [dev, stage, prod]
+  EnvProfile:
+    Type: String
+    AllowedValues: [lean, strict]
+    Default: lean
+    Description: lean = non-prod (dev/stage), strict = prod (ADR-0013)
   ArtifactBucket:
     Type: String
   RecordsApiKey:
@@ -16,6 +21,8 @@ Parameters:
   ThrottleBurst:
     Type: Number
     Default: 40
+Conditions:
+  IsStrict: !Equals [!Ref EnvProfile, strict]
 Resources:
   RecordsApiRole:
     Type: AWS::IAM::Role
@@ -47,9 +54,12 @@ Resources:
               - Effect: Allow
                 Action: [ssm:GetParameter, ssm:GetParameters, ssm:GetParametersByPath]
                 Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*'
-              - Effect: Allow
-                Action: [kms:Decrypt, kms:GenerateDataKey]
-                Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+              - !If
+                - IsStrict
+                - Effect: Allow
+                  Action: [kms:Decrypt, kms:GenerateDataKey]
+                  Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+                - !Ref AWS::NoValue
   ReportsApiRole:
     Type: AWS::IAM::Role
     Properties:
@@ -71,9 +81,12 @@ Resources:
               - Effect: Allow
                 Action: [ssm:GetParameter, ssm:GetParameters]
                 Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*'
-              - Effect: Allow
-                Action: kms:Decrypt
-                Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+              - !If
+                - IsStrict
+                - Effect: Allow
+                  Action: kms:Decrypt
+                  Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+                - !Ref AWS::NoValue
   RecordsApiFn:
     Type: AWS::Lambda::Function
     Properties:
@@ -91,7 +104,7 @@ Resources:
           DOMAIN_TABLE: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableName' }
           AUDIT_TABLE: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableName' }
           CONTROLLED_GATE_MODE: block       # D-14
-      TracingConfig: { Mode: Active }
+      TracingConfig: { Mode: !If [IsStrict, Active, PassThrough] }
   ReportsApiFn:
     Type: AWS::Lambda::Function
     Properties:
@@ -109,12 +122,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/SentinelQA-${EnvName}-records-api
-      RetentionInDays: 90            # O-02
+      RetentionInDays: !If [IsStrict, 90, 7]   # O-02; lean 7 days
   ReportsLogs:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/SentinelQA-${EnvName}-reports-api
-      RetentionInDays: 90
+      RetentionInDays: !If [IsStrict, 90, 7]
   HttpApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:

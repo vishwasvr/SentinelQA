@@ -2,6 +2,9 @@
 Status: **skeleton only, never deployed.** Tool: [ADR-0010](../adr/0010-iac-cloudformation.md) (supersedes the CDK choice in ADR-0001).
 Single AWS account, us-east-1. Environments are separated by stack name `SentinelQA-<env>-<stack>` and the `EnvName` parameter (D-08).
 
+## Profiles
+`EnvProfile` parameter (`lean` for dev/stage, `strict` for prod; [ADR-0013](../adr/0013-environment-profiles.md)). Condition `IsStrict` controls: KMS CMK (10), SSE/PITR/deletion protection (20), KMS IAM statements, log retention 7/90 d, X-Ray (30), extra alarms (50). Set in [params/](params/).
+
 ## Templates (deploy order)
 | # | Template | Stack name | Resources | Notes |
 |---|---|---|---|---|
@@ -15,7 +18,7 @@ Single AWS account, us-east-1. Environments are separated by stack name `Sentine
 Cross-stack wiring uses exports named `SentinelQA-<env>-<Name>`. Parameter values per env: [params/](params/) (placeholders).
 
 ## Validation performed
-- `cfn-lint` 1.57.2 (offline): **all 6 templates pass with no errors or warnings** (2026-10-13).
+- `cfn-lint` 1.57.2 (offline): **all 6 templates pass with no errors or warnings** (2026-10-13, rerun after adding EnvProfile).
 - `aws cloudformation validate-template`: **not run**, the AWS CLI session had expired. It would be read-only.
 
 ## Deploy flow (documented, not executed)

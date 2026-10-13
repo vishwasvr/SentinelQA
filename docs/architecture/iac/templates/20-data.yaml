@@ -4,22 +4,29 @@ Parameters:
   EnvName:
     Type: String
     AllowedValues: [dev, stage, prod]
+  EnvProfile:
+    Type: String
+    AllowedValues: [lean, strict]
+    Default: lean
+    Description: lean = non-prod (dev/stage), strict = prod (ADR-0013)
 Conditions:
-  IsDev: !Equals [!Ref EnvName, dev]
+  IsStrict: !Equals [!Ref EnvProfile, strict]
 Resources:
   DomainTable:
     Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain          # D-03: 7-year retention. Dev may delete manually
+    DeletionPolicy: Retain          # D-03: 7-year retention (strict). Lean stacks: synthetic data, delete table manually if needed
     UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub SentinelQA-${EnvName}-Domain
       BillingMode: PAY_PER_REQUEST
-      DeletionProtectionEnabled: !If [IsDev, false, true]
-      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true }
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-        KMSMasterKeyId: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+      DeletionProtectionEnabled: !If [IsStrict, true, false]
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: !If [IsStrict, true, false] }   # lean: no PITR
+      SSESpecification: !If
+        - IsStrict
+        - SSEEnabled: true
+          SSEType: KMS
+          KMSMasterKeyId: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+        - SSEEnabled: false        # lean: encrypted at rest with AWS owned key (DynamoDB default)
       AttributeDefinitions:
         - { AttributeName: PK, AttributeType: S }
         - { AttributeName: SK, AttributeType: S }
@@ -45,12 +52,14 @@ Resources:
     Properties:
       TableName: !Sub SentinelQA-${EnvName}-AuditLog
       BillingMode: PAY_PER_REQUEST
-      DeletionProtectionEnabled: !If [IsDev, false, true]
-      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true }
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-        KMSMasterKeyId: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+      DeletionProtectionEnabled: !If [IsStrict, true, false]
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: !If [IsStrict, true, false] }   # lean: no PITR
+      SSESpecification: !If
+        - IsStrict
+        - SSEEnabled: true
+          SSEType: KMS
+          KMSMasterKeyId: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+        - SSEEnabled: false        # lean: encrypted at rest with AWS owned key (DynamoDB default)
       AttributeDefinitions:
         - { AttributeName: PK, AttributeType: S }   # WS#<ws>#ENT#<entityId>
         - { AttributeName: SK, AttributeType: S }   # <ts>#<ulid>
