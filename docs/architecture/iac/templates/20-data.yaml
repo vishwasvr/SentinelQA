@@ -11,6 +11,7 @@ Parameters:
     Description: lean = non-prod (dev/stage), strict = prod (ADR-0013)
 Conditions:
   IsStrict: !Equals [!Ref EnvProfile, strict]
+  IsProd: !Equals [!Ref EnvName, prod]
 Resources:
   DomainTable:
     Type: AWS::DynamoDB::Table
@@ -31,6 +32,8 @@ Resources:
         - { AttributeName: GSI1SK, AttributeType: S }
         - { AttributeName: GSI2PK, AttributeType: S }
         - { AttributeName: dueAt, AttributeType: S }      # generic sparse due attribute (overview §5.1)
+        - { AttributeName: GSI3PK, AttributeType: S }
+        - { AttributeName: needByAt, AttributeType: S }   # CAPA/NCMR need-by date (BR-15), separate from dueAt (dev #29)
       KeySchema:
         - { AttributeName: PK, KeyType: HASH }    # WS#<workspaceId> (tenancy seam)
         - { AttributeName: SK, KeyType: RANGE }
@@ -38,8 +41,11 @@ Resources:
         - IndexName: GSI1               # sparse review queue: GSI1PK=WS#<ws>#REVIEWQ only while awaiting review; GSI1SK=<severityRank>#<openedAt> (BR-14)
           KeySchema: [{ AttributeName: GSI1PK, KeyType: HASH }, { AttributeName: GSI1SK, KeyType: RANGE }]
           Projection: { ProjectionType: ALL }
-        - IndexName: GSI2               # sparse due index: GSI2PK=WS#<ws>#DUE#<entityType>, dueAt copied from the entity's own date (BR-15, BR-18, BR-25, training)
+        - IndexName: GSI2               # sparse due index: GSI2PK=WS#<ws>#DUE#<entityType>, dueAt copied from the entity's own due date (quality record dueDate, BR-18, BR-25, training)
           KeySchema: [{ AttributeName: GSI2PK, KeyType: HASH }, { AttributeName: dueAt, KeyType: RANGE }]
+          Projection: { ProjectionType: ALL }
+        - IndexName: GSI3               # sparse need-by index: GSI3PK=WS#<ws>#NEEDBY, needByAt=open CAPA/NCMR needByDate (BR-15 "Threatens delivery")
+          KeySchema: [{ AttributeName: GSI3PK, KeyType: HASH }, { AttributeName: needByAt, KeyType: RANGE }]
           Projection: { ProjectionType: ALL }
       Tags: [{ Key: env, Value: !Ref EnvName }]
   AuditLogTable:
@@ -69,7 +75,7 @@ Resources:
       Name: !Sub /sentinelqa/${EnvName}/supplier-risk/weights
       Type: String
       Description: PLACEHOLDER BR-47 defaults (DP-16). Vishwas tunes later. Not validated values
-      Value: '{"status":"PLACEHOLDER","weights":{"openScars":0.25,"onTimePct":0.25,"criticality":0.25,"certFreshness":0.25},"bands":"PLACEHOLDER"}'
+      Value: '{"placeholder":true,"weights":{"openScars":0.25,"onTimePct":0.25,"criticality":0.25,"certFreshness":0.25},"bands":[{"name":"At risk","min":0},{"name":"Watch","min":60},{"name":"Approved","min":80}]}'   # DP-16 schema (decided); values PLACEHOLDER; weights sum to 1 within 0.001
   DueSoonParam:
     Type: AWS::SSM::Parameter
     Properties:
@@ -77,13 +83,58 @@ Resources:
       Type: String
       Description: PLACEHOLDER BR-47 due-soon thresholds in days (DP-16). Vishwas tunes later
       Value: '{"status":"PLACEHOLDER","calibration":30,"training":30,"supplierReeval":30}'
+  CapaDefaultDueDaysParam:   # DP-20 (decided 2026-10-13): CAPA/NCMR dueDate = open date + N days; N configurable, ships as PLACEHOLDER
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /sentinelqa/${EnvName}/capa-ncmr/default-due-days
+      Type: String
+      Description: PLACEHOLDER N for CAPA/NCMR default dueDate (open date + N days, DP-20). Vishwas tunes later
+      Value: '{"status":"PLACEHOLDER","days":30}'
+  WorkspaceTimezoneParam:    # DP-12 (decided 2026-10-13)
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /sentinelqa/${EnvName}/workspace/timezone
+      Type: String
+      Description: Workspace timezone for day counts, IDs and trends (DP-12)
+      Value: America/New_York
   ControlledMarkersParam:
     Type: AWS::SSM::Parameter
     Properties:
       Name: !Sub /sentinelqa/${EnvName}/controlled-data/markers
       Type: StringList
-      Description: BR-44 / D-14 block list. Matching is whole-word and case-insensitive (BRD v1.4). Marker id = list position
-      Value: 'ITAR,EAR,EAR99,ECCN,CUI,NOFORN,Distribution Statement,export controlled,22 CFR 120-130,15 CFR 730-774'
+      Description: BR-44 / D-14 KEYWORD markers. Literal, matched whole-word and case-insensitive (BRD v1.4). Marker id = K<list position>
+      Value: 'ITAR,EAR,EAR99,ECCN,CUI,NOFORN,Distribution Statement,export controlled'
+  ControlledCfrRangesParam:   # dev #27: CFR ranges as structured data, not literals (BR-44 reading; signed off DP-03, 2026-10-13)
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /sentinelqa/${EnvName}/controlled-data/cfr-ranges
+      Type: String
+      Description: BR-44 / D-14 CFR range markers. Gate finds citations (title, CFR, optional Part or section sign, part, optional .section) and checks the part in code. Marker id = R<list position>
+      Value: '[{"title":22,"partFrom":120,"partTo":130},{"title":15,"partFrom":730,"partTo":774}]'
+  SeedRunsLogGroup:   # QA-45 / Guard 1 (QA-44): prod seed run records, kept like the audit data
+    Type: AWS::Logs::LogGroup
+    Condition: IsProd
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /sentinelqa/prod/seed-runs
+      RetentionInDays: 2557   # 7 years, matches AuditLog retention
+      Tags: [{ Key: env, Value: !Ref EnvName }]
+  SeedRunsWritePolicy:   # QA-45: attached to the prod seed operator's Identity Center permission set (aws login). Write only, this log group only.
+    Type: AWS::IAM::ManagedPolicy
+    Condition: IsProd
+    Properties:
+      ManagedPolicyName: SentinelQA-prod-seed-runs-write
+      Description: Lets the prod seed operator write run records to /sentinelqa/prod/seed-runs only. No read, delete or retention change.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: WriteSeedRunRecords
+            Effect: Allow
+            Action: [logs:CreateLogStream, logs:PutLogEvents]
+            Resource:   # QA-46: CreateLogStream authorizes on the log-group ARN (:*), PutLogEvents on the stream ARN; both stay inside this one group
+              - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/sentinelqa/prod/seed-runs:*'
+              - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/sentinelqa/prod/seed-runs:log-stream:*'
 Outputs:
   DomainTableArn:
     Value: !GetAtt DomainTable.Arn
@@ -97,3 +148,11 @@ Outputs:
   AuditLogTableName:
     Value: !Ref AuditLogTable
     Export: { Name: !Sub 'SentinelQA-${EnvName}-AuditLogTableName' }
+  SeedRunsLogGroupName:
+    Condition: IsProd
+    Value: !Ref SeedRunsLogGroup
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-SeedRunsLogGroupName' }
+  SeedRunsWritePolicyArn:
+    Condition: IsProd
+    Value: !Ref SeedRunsWritePolicy
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-SeedRunsWritePolicyArn' }

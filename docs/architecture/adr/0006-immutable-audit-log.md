@@ -30,3 +30,7 @@ Append-only is **application behaviour**: the app only adds events (conditional 
 - Domain `DeleteItem`/`BatchWriteItem` are denied in **every** environment, as on AuditLog. Removals and undo are soft deletes or reversals plus a new audit event.
 - records-api has read-only `GetItem`/`Query` on AuditLog for the timeline. Update/Delete/BatchWrite stay explicitly denied.
 - Dev/stage full-table resets are an operator action: [docs/runbooks/nonprod-table-reset.md](../../runbooks/nonprod-table-reset.md) (InfraDeploy). Never in prod. Re-seed the labelled sample set afterwards (overview §5.2).
+
+
+## Addendum 2026-10-13: item size (QA-26)
+The snapshot holds only the fields this event changed, as `{before, after}` pairs, and is stored gzip-compressed in `snapshotGz`. The Domain item and the compressed audit item are each capped at 350 KB. Anything over the cap gets 413 `item_too_large`, and the transaction makes sure nothing is written. Nothing is ever truncated or moved elsewhere. See overview §4.3.

@@ -12,3 +12,6 @@ No stored AWS keys. The org/repo name must be supplied (open).
 
 ## Environment facts (2026-10-13, Vishwas)
 Account **723940054516**, us-east-1, repo **vishwasvr/SentinelQA**, GitHub environments `dev`, `stage`, `prod` (prod has a required manual-approval reviewer). The alarm email is set per env in `params/*.json`, which InfraDeploy owns. The pipeline builds per [ADR-0014](0014-build-packaging.md) and reads the origin-verify secret for `40-web` per [ADR-0015](0015-origin-verify-header.md).
+
+## Addendum (2026-10-13, O-03)
+The GitHub `prod` environment will point at the separate prod account (its own account ID, OIDC role ARN and region variables). dev/stage are unchanged.

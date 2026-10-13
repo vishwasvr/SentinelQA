@@ -3,7 +3,7 @@ Status: **skeleton only, never deployed.** Tool: [ADR-0010](../adr/0010-iac-clou
 Single AWS account, us-east-1. Environments are separated by stack name `SentinelQA-<env>-<stack>` and the `EnvName` parameter (D-08).
 
 ## Profiles
-`EnvProfile` parameter (`lean` for dev/stage, `strict` for prod; [ADR-0013](../adr/0013-environment-profiles.md)). Condition `IsStrict` controls: SSE (strict = AWS managed key `aws/dynamodb`, lean = AWS owned key), PITR, deletion protection (20), log retention 7/90 d, X-Ray (30), extra alarms (50). **No customer-managed KMS keys anywhere (O-09).** `25-backup` is deployed for prod only. Set in [params/](params/).
+`EnvProfile` parameter (`lean` for dev/stage, `strict` for prod; [ADR-0013](../adr/0013-environment-profiles.md)). Condition `IsStrict` controls: SSE (strict = AWS managed key `aws/dynamodb`, lean = AWS owned key), PITR, deletion protection (20), log retention 7/30 d (O-02), X-Ray (30), extra alarms (50). **No customer-managed KMS keys anywhere (O-09).** `25-backup` is deployed for prod only. Set in [params/](params/).
 
 ## Templates (deploy order: 00 → 10 → 20 → 30 → 40 → 50, then 25 for prod only)
 Import graph: 25←{00,10,20}, 30←{00,20}, 40←30, 50←{10,30}. No cycles. Delete in reverse order.
@@ -12,7 +12,7 @@ Import graph: 25←{00,10,20}, 30←{00,20}, 40←30, 50←{10,30}. No cycles. D
 |---|---|---|---|---|
 | 00 | [00-bootstrap.yaml](templates/00-bootstrap.yaml) (**InfraDeploy**) | `SentinelQA-<env>-Bootstrap` | OIDC deploy role, CFN execution role, app-role permissions boundary, artifact bucket | Exports `AppRoleBoundaryArn`, `ArtifactBucketName`, `CfnExecRoleArn` |
 | 10 | [10-security.yaml](templates/10-security.yaml) | `SentinelQA-<env>-Security` | SNS email topic (`alias/aws/sns`) | `AlarmEmail` AllowedPattern. CloudTrail/Budgets TODO (account-level) |
-| 20 | [20-data.yaml](templates/20-data.yaml) | `SentinelQA-<env>-Data` | `Domain` (sparse GSI1 review queue, sparse GSI2 on `dueAt`), `AuditLog`. Prod: PITR, `aws/dynamodb`, deletion protection, Retain, no TTL. SSM: PLACEHOLDER BR-47 defaults, marker list (whole-word, case-insensitive) | No stream / Object Lock (D-05) |
+| 20 | [20-data.yaml](templates/20-data.yaml) | `SentinelQA-<env>-Data` | `Domain` (sparse GSI1 review queue, sparse GSI2 on `dueAt`, sparse GSI3 on `needByAt`), `AuditLog`. Prod: PITR, `aws/dynamodb`, deletion protection, Retain, no TTL. SSM: PLACEHOLDER BR-47 defaults, keyword markers (whole-word, case-insensitive) + structured CFR ranges `cfr-ranges` | No stream / Object Lock (D-05) |
 | 30 | [30-api.yaml](templates/30-api.yaml) | `SentinelQA-<env>-Api` | HTTP API with **67 explicit routes generated from [../api/openapi.yaml](../api/openapi.yaml)** by [tools/gen-routes.py](tools/gen-routes.py), `records-api`/`reports-api` (nodejs24.x, arm64, code at `<sha>/<fn>.zip`), boundary-scoped roles (AuditLog put + read, explicit Update/Delete deny on both tables), log groups 7/90 d | No `/api/ai/*`, no `/api/search`, no catch-all |
 | 40 | [40-web.yaml](templates/40-web.yaml) | `SentinelQA-<env>-Web` | S3 + OAC, CloudFront (`/api/*` → API with `X-Origin-Verify`, ADR-0015) | `OriginVerifySecret` NoEcho, supplied by the pipeline. WAF slot empty |
 | 50 | [50-observability.yaml](templates/50-observability.yaml) | `SentinelQA-<env>-Observability` | Lean: records-api errors. Strict: + API 5xx, Domain/AuditLog SystemErrors (per-operation metric math), gate blocks (EMF `SentinelQA`/`ControlledDataBlocked`/`Env`) | |
