@@ -92,3 +92,32 @@ Docs only. These tests get written once building opens.
   - The button opens a form with supplier and title, and the new SCAR shows as a linked record.
   - The API test checks that `POST /api/quality-records/{id}/scar` on a Closed source record returns 422, with no SCAR and no audit entry written.
 - **O-03 separate prod account:** this needs no spec change. The tests don't depend on which account they run in, and the per-environment config still comes from SSM.
+
+## 7. QA-41 to QA-44 (2026-10-13; Architect `06820a8`, InfraDeploy `3cb4c6a`/`9e5fbd1`)
+- **QA-41/42 error codes:** the tests check each error code exactly as listed in openapi:
+  - 413 `item_too_large`
+  - 503 `config_unavailable`
+  - 422 `non_sample_data_forbidden`, `sample_flag_forbidden_in_prod` and `sample_flag_immutable`
+  - 422 `scar_source_invalid`, for a SCAR or Closed source record (this replaces the generic 422 in §5 and §6)
+  - 422 `training_source_invalid`, for a SCAR source record
+
+  A contract test checks every documented response against the openapi schema.
+- **QA-43 browser app:**
+  - There's no UI control for the sample flag.
+  - In dev and stage, a build-config flag makes the API client add `isSample: true` to every create.
+  - The prod build never sends the field.
+  - Tests:
+    - a dev build's create request body includes `isSample: true`,
+    - a prod build's request body has no `isSample` key,
+    - the UI shows no sample control in any environment.
+- **QA-44 seed (mirrors Guard 1):**
+  - `scripts/seed` runs every free-text fixture field through the same controlled-data gate function the API uses, with that environment's marker lists, before any write.
+  - If anything matches, the run stops with nothing written. The log shows only the file, record id and marker id, never the matched text.
+  - No environment skips the check.
+  - In prod, a run without an approval reference is refused before any write.
+  - Each prod run writes one record to the CloudWatch Logs group `/sentinelqa/prod/seed-runs`. It holds who ran it, the commit, the fixtures, the counts, the approval reference, the times and the outcome. It never holds record bodies or credentials.
+  - Tests:
+    - a fixture containing a marker is stopped with zero writes,
+    - the log contains no matched text,
+    - a prod run without an approval reference is refused,
+    - the run-record fields are checked against the list above.
