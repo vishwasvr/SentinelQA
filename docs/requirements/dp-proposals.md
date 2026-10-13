@@ -200,3 +200,58 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 - **Evidence:** OQ-25, BR-14, BR-42; screenshots 08, 09, 34, 35; overview §5 (GSI2); Architect finding #29 (DEV-29).
 - **Developer review note:** depends on `dueDate` being set at step 1 (see DP-02 note); otherwise Containment and Investigation records are never overdue. **GUESS**. Setting it at step 1 needs a new field (create form has no due date): (a) a `dueDate` field on the create form or (b) default open date + N days, N configurable; choice and N are **GUESS** (see DP-02).
 - **Confidence:** Inferred (no CAPA/NCMR overdue display observed; rule extends BR-42). Changes the BR-42 seed count only if seeded records are past due.
+
+---
+
+## Open items for Vishwas (2026-10-13)
+**Status: PROPOSED — needs Vishwas's decision.** These are the items left open after BRD v1.5 (§13.7 note): the two parts of DP-05 the decision did not cover, OQ-08, and the placeholder tuning owner. Evidence: BRD §4.2, US-04, §13.4, §4.10, OQ-08; screenshot [02](screenshots/02-compare.png); architecture-overview §5.2 (seed); [first-deploy runbook](../runbooks/first-deploy.md) §5.
+
+### OI-1 — /compare table content (DP-05 leftover, US-04)
+**Observed** ([02](screenshots/02-compare.png), BRD §4.2): heading "How Sentinel QA compares", an "Honest disclosure" banner (claims reflect vendors' public pages "as of 2026"), a "Plays with your existing QMS" note, and a matrix of **10 dimensions** (clause-level citation, AS9100D depth, AI-hypothesis flagging, agent-first architecture, traceability across modules, human-in-the-loop, trial access, deployment model, primary industry focus, reliability transparency) × Sentinel QA, Greenlight Guru, MasterControl, Qualityze, OpenRegulatory, QT9 QMS, with Yes / Partial / No / Not verified or short text. A footnote explains the QT9 and Mitti entries. *Evidence gap:* the BRD (US-04 seed check, §4.2) says 9 criteria × 7 products; screenshot 02 shows 10 rows and 6 product columns (no Mitti column visible, it may be cut off to the right). The count should be re-checked before any verbatim copy.
+
+**Build fact:** several Sentinel QA "Yes" cells describe capabilities that are **deferred** in this build (AI-hypothesis flagging, agent-first drafting, reliability transparency: BRD §12 #1, BR-29/30/43). Copied verbatim, they would overstate the build.
+
+| Option | What it is | Trade-offs | Scope / tests |
+|---|---|---|---|
+| **(a) Verbatim static copy** | Reproduce the observed matrix and footnotes as static content | Fastest route to the observed page; but restates third-party claims we can't re-verify, and the AI rows say "Yes" for deferred features | Static page only; one snapshot test against the table; content needs a re-check of the 9×7 vs 10×6 count and an owner for keeping vendor claims current |
+| **(b) Reduced Sentinel-only feature table (recommended)** | Keep the observed dimension names, show only the Sentinel QA column, with deferred AI rows labelled "Not in this build"; drop competitor columns | No third-party claims to maintain; truthful about the build. Loses the competitive framing | Static page; test checks the dimension list and that deferred rows show "Not in this build"; US-04 seed check (9×7) is retired |
+| (c) Drop the table | Remove /compare (or the matrix) from the build | Least work and no claims risk; leaves a gap in the evaluator journey (§3 journey 1, P6) | Remove US-04 and nav link; no tests |
+
+**Recommendation:** (b). Confidence: Inferred (from the observed page and the AI deferral). The "Not in this build" wording is a **GUESS**.
+
+### OI-2 — Seed/sample fixture publication (DP-05 leftover, §13.4)
+**Observed / decided:** sample data is allowed in every env, labelled (BR-31, v1.4); the seed set `seed/sample-v<n>.json` is loaded by a one-off seed command through the normal write path, `isSample=true`, soft-delete only (architecture-overview §5.2). Seed checks (US-04, US-08, US-28, US-31) hold only against that set (§13.4).
+
+| Option | What it is | Trade-offs | Scope / tests |
+|---|---|---|---|
+| **(a) Ship internally only (recommended)** | Seed file lives in the repo and is loaded by the seed command into dev, stage and (labelled) prod; not offered as a download | Matches the existing design; no extra public surface | No new scope; seed checks run against seeded envs as today |
+| (b) Also publish as a downloadable static file | Same file, plus a public download link | Lets prospects inspect sample data; adds a public artefact to keep in sync and a new page/link (new UI, not observed) | Small new scope (static asset + link); add a test that the download matches the seed version |
+| (c) Don't ship fixtures | No seed set in any env | Removes the labelled-sample feature Vishwas allowed (BR-31) | Seed checks (US-04/08/28/31) become untestable and are retired; empty-state screens only |
+
+**Recommendation:** (a). Confidence: Inferred (follows from BR-31 and §5.2; nothing observed suggests a public download).
+
+### OI-3 — OQ-08 FAI Form 2 (never observed)
+**Observed:** Form 1 and Form 3 only; "Form 2 was not observed" (BRD §4.10, OQ-08).
+
+| Option | What it is | Trade-offs | Scope / tests |
+|---|---|---|---|
+| **(a) Leave out of the MVP (recommended)** | No Form 2 in the build; keep OQ-08 open | Nothing invented; an AS9102 package is incomplete without Form 2 | No new scope; add an AC that the FAI record shows only Form 1 and Form 3 |
+| (b) Build from the Form 1/3 pattern | Form 2 as a grid like Form 3, with fields **GUESS** (from AS9102 general knowledge, not observed: materials/special processes/functional tests with spec, supplier, cert ref) | Closer to a full AS9102 package; every field and rule would be a **GUESS** | New entity, API routes (contract change), grid UI, gate on free text, tests: roughly a Form 3-sized slice |
+| (c) Defer until observed | Capture Form 2 from the live site (needs sign-in or an AI-free path) before deciding | Grounded spec later; delays the decision | No scope now |
+
+**Recommendation:** (a). Confidence: Observed (absence); the option (b) field list is **GUESS**.
+
+### OI-4 — Placeholder tuning is a pre-go-live item
+**Confirmed:** the PLACEHOLDER values ship in config and must be tuned before prod go-live:
+- supplier risk weights (SSM `supplier-risk/weights`, BR-47);
+- DP-16 band cut-offs (At risk < 60, Watch 60–79, Approved ≥ 80; same parameter);
+- due-soon thresholds (SSM `due-soon-days`, BR-18, BR-25, training);
+- CAPA/NCMR default due days, PLACEHOLDER 30 (SSM `capa-ncmr/default-due-days`, DP-20).
+
+| Role | Owner |
+|---|---|
+| Values | Vishwas |
+| Records them in the BRD and updates the SSM parameter spec | BA |
+| Sets the parameters in prod | InfraDeploy |
+
+**Trigger:** before the prod deploy approval (Vishwas is the required prod reviewer, first-deploy §5). Proposed gate in the [first-deploy runbook](../runbooks/first-deploy.md): "Prod: confirm no SSM parameter is still labelled PLACEHOLDER" — that runbook is InfraDeploy's; the gate is **not yet added** there.

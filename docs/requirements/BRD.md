@@ -529,7 +529,7 @@ Transitions: forward one stage at a time, no skipping; only backward move QM Rev
 | DP-02 | **Decided** — see §13.7. Was: Field specs for CAPA/NCMR steps 2–6 and SQ steps 3/4/6; stage transition rules (backward moves, skipping, who closes, disposition before Closed, SQ re-evaluation cycle) | DEV-04, QA-14, BA-08 |
 | DP-03 | **Decided** — see §13.7. Was: **Partially resolved v1.4 / v1.4.1** (matching = whole-word, case-insensitive; marker list incl. ITAR, EAR, CUI, 22 CFR 120-130, 15 CFR 730-774; BR-44). *v1.4.1:* CFR markers interpreted as ranges (any citation with part number in 22 CFR 120–130 or 15 CFR 730–774 is a hit, incl. subsections and Part/§ forms; case-insensitive; BA interpretation of Vishwas 2026-10-13; **sign-off pending**). Implementation may store ranges as structured data (`title`, `partFrom`, `partTo`) per DEV #27. Still pending: DP-03 sign-off on CFR range interpretation, normalisation/evasion cases, screened fields vs exempt IDs/names, attestation on writes without free text, 422 user message and input retention, whether the marker id is shown | DEV-13, DEV-27, QA-03, QA-04, QA-20 |
 | DP-04 | **Decided** — see §13.7. Was: Field-level limits (lengths, allowed characters) incl. reviewer name and PO-check fields | QA-16, DEV-04 |
-| DP-05 | **Decided** — see §13.7. Was: **Decided v1.4.3 (Vishwas):** "Simulate second reviewer" is **removed** from the build (BR-33, §4.10, US-35, OQ-03 marked). Not covered by the decision and still open: /compare table content and the "Simulate second reviewer" control in the build (keep or remove); published seed fixtures (v1.4: sample data allowed in all envs, BR-31) | DEV-11 |
+| DP-05 | **Decided** — see §13.7. Was: **Decided v1.4.3 (Vishwas):** "Simulate second reviewer" is **removed** from the build (BR-33, §4.10, US-35, OQ-03 marked). Not covered by the decision and still open: /compare table content; published seed fixtures (v1.4: sample data allowed in all envs, BR-31) | DEV-11 |
 | DP-06 | **Decided** — see §13.7. Was: QMS maturity bands other than Defined, rounding of the mean, results with < 8 answers | QA-08, DEV-11 |
 | DP-07 | **Decided** — see §13.7. Was: Training recurrence interval, "Not started" / start-by rule | DEV-22, QA-24 |
 | DP-08 | **Decided** — see §13.7. Was: Segregation of duties: definition of "independent" approver and "author"; hard block vs warning; name comparison (case/whitespace/initials) | DEV-15, QA-07, QA-25 |
@@ -594,6 +594,14 @@ Vishwas approved [dp-proposals.md](dp-proposals.md) as recommended (Developer re
 | DP-20 | `dueDate` defaults to open date + N days, N configurable (SSM `capa-ncmr/default-due-days`, PLACEHOLDER 30); no new form field. A CAPA/NCMR not Closed with `dueDate` < today is Overdue **from step 1**: Overdue badge in Records and review queue, counted in Needs attention and the attention total, overdue split on the Awaiting review tile. No Due soon state. Query via GSI2 `dueAt`. | [dp-proposals §DP-20](dp-proposals.md#dp-20--capancmr-overdue-rule-oq-25) |
 
 *Note:* the DP-05 decision covered only "Simulate second reviewer". The /compare table content (US-04) and seed-fixture publication (§13.4) were not decided and remain open. OQ-08 (FAI Form 2) remains open.
+
+**Open items and placeholder tracking (2026-10-13; options in [dp-proposals §Open items for Vishwas](dp-proposals.md#open-items-for-vishwas-2026-10-13))**
+| Item | Status | Owner | Trigger |
+|---|---|---|---|
+| OI-1 /compare table content (DP-05 leftover, US-04) | Open — options proposed; BA recommends a Sentinel-only feature table | Vishwas | Before US-04 build |
+| OI-2 Seed fixture publication (DP-05 leftover, §13.4) | Open — options proposed; BA recommends internal seeding only | Vishwas | Before seed set v1 |
+| OI-3 OQ-08 FAI Form 2 | Open — options proposed; BA recommends leaving it out of the MVP | Vishwas | Before FAI build |
+| OI-4 PLACEHOLDER tuning: risk weights and DP-16 bands (`supplier-risk/weights`), due-soon thresholds (`due-soon-days`), CAPA/NCMR default due days 30 (`capa-ncmr/default-due-days`) | **Pre-go-live** | Values: Vishwas; record in BRD and SSM param spec: BA; set in prod: InfraDeploy | Before the prod deploy approval; gate to add to the first-deploy runbook (InfraDeploy) |
 
 ## 14. Changelog
 | Version | Date | Summary |
