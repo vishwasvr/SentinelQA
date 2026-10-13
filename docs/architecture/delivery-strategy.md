@@ -81,7 +81,8 @@ No AWS secrets anywhere; OIDC only. Note: first-deploy §5 names the role variab
 
 ### 3b. Unit-test coverage gate (DECIDED by Vishwas, option C, 2026-10-13)
 The `unit-coverage` job runs in `ci.yml` on every PR and on `main`. It must pass before deploy.yml can deploy to dev.
-- **Overall:** at least **90% line and 90% branch coverage** across the app code (handlers and shared libraries). Generated code (the openapi types), test files and seed fixtures don't count.
+- **Overall:** at least **90% line and 90% branch coverage** across the app code.
+- **Scope (PROPOSED by Developer, pending Vishwas's confirmation):** measure app code only (handlers and shared libraries). Generated OpenAPI types, IaC, test files and seed fixtures don't count.
 - **Open question for Vishwas, not yet applied:** should two parts of the option B proposal carry over to C? One is a 100% floor for the safety-critical modules (the controlled-data gate matcher, `buildAuditPut`, the `isSample` checks and the config loader). The other is failing any PR that lowers overall coverage by more than 1 percentage point. Until he answers, only the 90% overall gate applies.
 - Any change is recorded here and in ci-and-data-guards §1.2.
 
