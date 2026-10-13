@@ -132,7 +132,9 @@ Resources:
           - Sid: WriteSeedRunRecords
             Effect: Allow
             Action: [logs:CreateLogStream, logs:PutLogEvents]
-            Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/sentinelqa/prod/seed-runs:log-stream:*'
+            Resource:   # QA-46: CreateLogStream authorizes on the log-group ARN (:*), PutLogEvents on the stream ARN; both stay inside this one group
+              - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/sentinelqa/prod/seed-runs:*'
+              - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/sentinelqa/prod/seed-runs:log-stream:*'
 Outputs:
   DomainTableArn:
     Value: !GetAtt DomainTable.Arn
