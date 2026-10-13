@@ -204,9 +204,9 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 ---
 
 ## Open items for Vishwas (2026-10-13)
-**Status: PROPOSED — needs Vishwas's decision.** These are the items left open after BRD v1.5 (§13.7 note): the two parts of DP-05 the decision did not cover, OQ-08, and the placeholder tuning owner. Evidence: BRD §4.2, US-04, §13.4, §4.10, OQ-08; screenshot [02](screenshots/02-compare.png); architecture-overview §5.2 (seed); [first-deploy runbook](../runbooks/first-deploy.md) §5.
+**Status: DECIDED by Vishwas 2026-10-13 (relayed by Chief of Staff): OI-1 (b), OI-2 (a), OI-3 (b); OI-4 confirmed, gate in first-deploy §5a (36a674b). Folded into BRD v1.6.** These were the items left open after BRD v1.5 (§13.7 note): the two parts of DP-05 the decision did not cover, OQ-08, and the placeholder tuning owner. Evidence: BRD §4.2, US-04, §13.4, §4.10, OQ-08; screenshot [02](screenshots/02-compare.png); architecture-overview §5.2 (seed); [first-deploy runbook](../runbooks/first-deploy.md) §5.
 
-### OI-1 — /compare table content (DP-05 leftover, US-04)
+### OI-1 — /compare table content (DP-05 leftover, US-04) — DECIDED: (b)
 **Observed** ([02](screenshots/02-compare.png), BRD §4.2): heading "How Sentinel QA compares", an "Honest disclosure" banner (claims reflect vendors' public pages "as of 2026"), a "Plays with your existing QMS" note, and a matrix of **10 dimensions** (clause-level citation, AS9100D depth, AI-hypothesis flagging, agent-first architecture, traceability across modules, human-in-the-loop, trial access, deployment model, primary industry focus, reliability transparency) × Sentinel QA, Greenlight Guru, MasterControl, Qualityze, OpenRegulatory, QT9 QMS, with Yes / Partial / No / Not verified or short text. A footnote explains the QT9 and Mitti entries. *Evidence gap:* the BRD (US-04 seed check, §4.2) says 9 criteria × 7 products; screenshot 02 shows 10 rows and 6 product columns (no Mitti column visible, it may be cut off to the right). The count should be re-checked before any verbatim copy.
 
 **Build fact:** several Sentinel QA "Yes" cells describe capabilities that are **deferred** in this build (AI-hypothesis flagging, agent-first drafting, reliability transparency: BRD §12 #1, BR-29/30/43). Copied verbatim, they would overstate the build.
@@ -219,7 +219,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 
 **Recommendation:** (b). Confidence: Inferred (from the observed page and the AI deferral). The "Not in this build" wording is a **GUESS**.
 
-### OI-2 — Seed/sample fixture publication (DP-05 leftover, §13.4)
+### OI-2 — Seed/sample fixture publication (DP-05 leftover, §13.4) — DECIDED: (a)
 **Observed / decided:** sample data is allowed in every env, labelled (BR-31, v1.4); the seed set `seed/sample-v<n>.json` is loaded by a one-off seed command through the normal write path, `isSample=true`, soft-delete only (architecture-overview §5.2). Seed checks (US-04, US-08, US-28, US-31) hold only against that set (§13.4).
 
 | Option | What it is | Trade-offs | Scope / tests |
@@ -230,7 +230,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 
 **Recommendation:** (a). Confidence: Inferred (follows from BR-31 and §5.2; nothing observed suggests a public download).
 
-### OI-3 — OQ-08 FAI Form 2 (never observed)
+### OI-3 — OQ-08 FAI Form 2 (never observed) — DECIDED: (b), all fields GUESS (BRD BR-48, US-42; openapi c6bf9e2); fields to verify pre-go-live
 **Observed:** Form 1 and Form 3 only; "Form 2 was not observed" (BRD §4.10, OQ-08).
 
 | Option | What it is | Trade-offs | Scope / tests |
@@ -241,7 +241,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 
 **Recommendation:** (a). Confidence: Observed (absence); the option (b) field list is **GUESS**.
 
-### OI-4 — Placeholder tuning is a pre-go-live item
+### OI-4 — Placeholder tuning is a pre-go-live item — DECIDED (confirmed)
 **Confirmed:** the PLACEHOLDER values ship in config and must be tuned before prod go-live:
 - supplier risk weights (SSM `supplier-risk/weights`, BR-47);
 - DP-16 band cut-offs (At risk < 60, Watch 60–79, Approved ≥ 80; same parameter);
@@ -254,4 +254,4 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 | Records them in the BRD and updates the SSM parameter spec | BA |
 | Sets the parameters in prod | InfraDeploy |
 
-**Trigger:** before the prod deploy approval (Vishwas is the required prod reviewer, first-deploy §5). Proposed gate in the [first-deploy runbook](../runbooks/first-deploy.md): "Prod: confirm no SSM parameter is still labelled PLACEHOLDER" — that runbook is InfraDeploy's; the gate is **not yet added** there.
+**Trigger:** before the prod deploy approval (Vishwas is the required prod reviewer, first-deploy §5). Proposed gate in the [first-deploy runbook](../runbooks/first-deploy.md): "Prod: confirm no SSM parameter is still labelled PLACEHOLDER" — that runbook is InfraDeploy's; the gate was added as first-deploy §5a (36a674b).
