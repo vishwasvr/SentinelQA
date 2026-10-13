@@ -23,7 +23,7 @@ schemas={
    'version':ro(s('integer',description='Optimistic-concurrency counter, returned as ETag "W/\\"<version>\\""')),
    'createdAt':ro(TS),'updatedAt':ro(TS),
    'deletedAt':ro({**TS,'description':'Soft delete (BRD §13.1). Removed items are excluded from lists, counts and pickers.'}),
-   'isSample':s('boolean',description='BR-31: true for the illustrative seed set (labelled "ILLUSTRATIVE — SAMPLE RECORDS"). Allowed in every env. Client-settable on create only (immutable after). dev/stage: required true on create, else 422 non_sample_data_forbidden (BR-45, QA-34). prod: PENDING Vishwas (BR-49). Architect recommends 422 sample_flag_forbidden_in_prod (nothing persisted); alternative is silently storing false. Either way only the seed loader creates sample records in prod.'),
+   'isSample':s('boolean',description='BR-31: true for the illustrative seed set (labelled "ILLUSTRATIVE — SAMPLE RECORDS"). Allowed in every env. Client-settable on create only (immutable after). dev/stage: required true on create, else 422 non_sample_data_forbidden (BR-45, QA-34). prod: DECIDED 2026-10-13 (BR-49): a create with isSample=true returns 422 sample_flag_forbidden_in_prod, nothing persisted, no audit event. The UI offers no sample option; prod sample data comes only from the seed command.'),
    'draft':ro(s('object',description='Reserved AI seam (BRD §12 #1). Always null in this build.',nullable=True)),
    'aiAssisted':ro(s('boolean',const=False))}),
  'WriteCommon':s('object',required=['actorName'],properties={
@@ -110,7 +110,7 @@ params={
 }
 def prob(st,desc): return {'description':desc,'content':{'application/problem+json':{'schema':R('Problem')}}}
 resp={'BadRequest':prob(400,'Validation error or gate:attestation_required (BR-44)'),
- 'Unprocessable':prob(422,'gate:controlled_marker (BR-44). Nothing persisted, no audit event. Message names the marker id; input is kept client-side only (DP-03). Also, dev/stage only: non_sample_data_forbidden (BR-45, QA-34): a create without isSample=true is rejected; nothing persisted, no audit event. Enabled by the env profile (ADR-0013); prod ignores it.'),
+ 'Unprocessable':prob(422,'gate:controlled_marker (BR-44). Nothing persisted, no audit event. Message names the marker id; input is kept client-side only (DP-03). Also prod only: sample_flag_forbidden_in_prod (BR-49), isSample=true on create; nothing persisted. Also, dev/stage only: non_sample_data_forbidden (BR-45, QA-34): a create without isSample=true is rejected; nothing persisted, no audit event. Enabled by the env profile (ADR-0013); prod ignores it.'),
  'NotFound':prob(404,'Not found (or soft-deleted)'),'Conflict':prob(409,'stage_conflict, sod_violation or idempotency_conflict'),
  'PreconditionFailed':prob(412,'version_conflict'),'PreconditionRequired':prob(428,'If-Match missing'),
  'Forbidden':prob(403,'forbidden_origin: request did not come through CloudFront (ADR-0015)'),'TooMany':prob(429,'rate_limited (API Gateway throttle)')}
