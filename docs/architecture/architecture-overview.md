@@ -79,6 +79,8 @@ Applies to every Lambda (`records-api`, `reports-api`, backup functions). Code i
 | `workspaceId` | only if present (tenancy seam, ADR-0008) |
 | `entityId` | optional record id (opaque id, not field values) |
 
+Powertools Logger default keys (`service`, `cold_start`, `function_arn`, `xray_trace_id`, `sampling_rate`) are also allowed; they carry no PII or record data.
+
 - No PII and no body in any field. Stack traces only at `ERROR`, with messages that do not echo input. Metrics stay EMF (§4 step 2).
 
 ## 5. Data model (BRD §6)
