@@ -49,6 +49,7 @@ aws cloudformation deploy --stack-name SentinelQA-$ENV-Bootstrap --template-file
 Use `Environment=shared` for account-wide stacks (`SentinelQA-Account-OIDC`). 00-bootstrap and 00-account-oidc also declare the four tags explicitly on every taggable resource (the bucket, both roles, the OIDC provider); `AWS::IAM::ManagedPolicy` (app boundary) has no `Tags` property in CloudFormation. The legacy `app`/`env` keys are removed. Already-deployed stacks keep their old `app`/`env` tags until a Vishwas-approved redeploy, which is a tag-only update with no replacement.
 
 ## Deploy flow (documented, not executed)
+Implemented in [`.github/workflows/deploy.yml`](../../../.github/workflows/deploy.yml) (dev/stage; prod TODO) via [`scripts/ci/deploy-env.sh`](../../../scripts/ci/deploy-env.sh). AlarmEmail is passed through `env:` as `"$ALARM_EMAIL"`, not a `${{ }}` expression in the script.
 GitHub Actions (OIDC) → `cfn-lint` + `gen-routes.py` drift check → esbuild bundle and upload `<sha>/<fn>.zip` ([ADR-0014](../adr/0014-build-packaging.md)) → `create-change-set` (CFN execution role) → manual approval (prod reviewer) → `execute-change-set`. No deploy has been performed from this repo.
 
 ## Deferred / removed vs v0.1

@@ -63,7 +63,7 @@ No AWS secrets anywhere; OIDC only. Note: first-deploy §5 names the role variab
 
 ## 3. Continuous testing and promotion
 - **ci.yml (every PR and every push to main):** cfn-lint on all templates; openapi regenerated from `gen_openapi.py`, with a diff check that fails if it is stale; unit tests; contract tests against openapi; secret scan; controlled-data guard checks (ci-and-data-guards.md). These are the required checks for §2.
-- **deploy.yml:** build once, then change set, then execute (ADR-0012), using one artifact for all envs:
+- **deploy.yml** ([`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml), with [`scripts/ci/deploy-env.sh`](../../scripts/ci/deploy-env.sh); dev and stage implemented, prod is a TODO until O-03):** build once, then change set, then execute (ADR-0012), using one artifact for all envs:
   1. Merge to main: the Developer's unit tests and the **unit-test coverage gate** (§3b) must pass, then **dev** deploys automatically and the smoke tests run. A coverage failure blocks the dev deploy.
   2. **stage:** the same artifact. Stage has **no required reviewer** (option (c)). It's promoted once the Developer's dev check passes (smoke test plus QA-36). There is no Vishwas approval for stage. After the deploy, Tester runs the acceptance and regression tests.
   3. **prod:** the same artifact from a release tag, gated by required reviewer Vishwas plus a green stage run, then post-deploy smoke tests. Rollback is on failure (§4).
