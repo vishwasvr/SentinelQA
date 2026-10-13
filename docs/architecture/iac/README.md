@@ -33,7 +33,7 @@ Import graph: 25←{00,10,20}, 30←{00,20}, 40←30, 50←{10,30}. No cycles. D
 - Change sets for prod use `RollbackConfiguration` with the API 5xx and records-errors alarms as triggers.
 
 ## Validation performed
-- `cfn-lint` 1.57.2 (offline): **all 7 templates pass with no errors or warnings** (2026-10-13, v0.5 rerun).
+- `cfn-lint` 1.57.2 (offline): **all 8 templates (incl. InfraDeploy 00-account-oidc) pass with no errors or warnings** (2026-10-13, v0.5 rerun).
 - OpenAPI spec validates with `openapi-spec-validator` (3.1).
 - `aws cloudformation validate-template`: not run (no session; it would be read-only).
 
