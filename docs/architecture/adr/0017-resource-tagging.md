@@ -1,6 +1,6 @@
 # ADR-0017: Mandatory resource tagging standard
 
-- Status: Proposed
+- Status: Accepted (Vishwas, 2026-10-13)
 - Date: 2026-10-13
 - Deciders: Vishwas (owner), Architect, InfraDeploy
 
