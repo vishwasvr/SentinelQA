@@ -41,7 +41,7 @@ CREATE=$(jq -r '.["00-account-oidc"].CreateOidcProvider' docs/architecture/iac/p
 aws cloudformation deploy --stack-name SentinelQA-Account-OIDC \
   --template-file $T/00-account-oidc.yaml \
   --parameter-overrides CreateOidcProvider=$CREATE \
-  --tags app=SentinelQA \
+  --tags Project=SentinelQA Environment=shared ManagedBy=CloudFormation Repo=vishwasvr/SentinelQA \
   --no-execute-changeset
 # copy the change set ARN printed, then:
 aws cloudformation describe-change-set --change-set-name <CHANGE_SET_ARN> \
@@ -64,7 +64,7 @@ aws cloudformation deploy --stack-name SentinelQA-$ENV-Bootstrap \
   --template-file $T/00-bootstrap.yaml \
   --parameter-overrides $OVR \
   --capabilities CAPABILITY_NAMED_IAM \
-  --tags app=SentinelQA env=$ENV \
+  --tags Project=SentinelQA Environment="$ENV" ManagedBy=CloudFormation Repo=vishwasvr/SentinelQA \
   --no-execute-changeset
 aws cloudformation describe-change-set --change-set-name <CHANGE_SET_ARN> \
   --query "Changes[].ResourceChange.{Action:Action,Type:ResourceType,Id:LogicalResourceId}" --output table

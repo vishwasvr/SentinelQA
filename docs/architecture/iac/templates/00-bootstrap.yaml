@@ -55,7 +55,10 @@ Resources:
             NoncurrentVersionExpiration: { NoncurrentDays: !Ref ArtifactNoncurrentDays }
             AbortIncompleteMultipartUpload: { DaysAfterInitiation: 7 }
       Tags:
-        - { Key: env, Value: !Ref EnvName }
+        - { Key: Project, Value: SentinelQA }
+        - { Key: Environment, Value: !Ref EnvName }
+        - { Key: ManagedBy, Value: CloudFormation }
+        - { Key: Repo, Value: vishwasvr/SentinelQA }
 
   ArtifactBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -74,6 +77,7 @@ Resources:
   # ---------------------------------------------------------------- B-1 permissions boundary
   # Every IAM role created by stacks 10..50 MUST set PermissionsBoundary to this policy;
   # the execution role cannot create/modify a role without it.
+  # AWS::IAM::ManagedPolicy has no Tags property in CloudFormation (ADR-0017); covered by stack-level --tags only.
   AppRoleBoundary:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -136,6 +140,11 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub SentinelQA-${EnvName}-cfn-exec
+      Tags:
+        - { Key: Project, Value: SentinelQA }
+        - { Key: Environment, Value: !Ref EnvName }
+        - { Key: ManagedBy, Value: CloudFormation }
+        - { Key: Repo, Value: vishwasvr/SentinelQA }
       Description: Assumed by CloudFormation (--role-arn) for SentinelQA-<env>-* stacks 10..50
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -256,6 +265,11 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub SentinelQA-${EnvName}-deploy
+      Tags:
+        - { Key: Project, Value: SentinelQA }
+        - { Key: Environment, Value: !Ref EnvName }
+        - { Key: ManagedBy, Value: CloudFormation }
+        - { Key: Repo, Value: vishwasvr/SentinelQA }
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:

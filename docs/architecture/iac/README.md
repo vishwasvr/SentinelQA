@@ -37,6 +37,17 @@ Import graph: 25←{00,10,20}, 30←{00,20}, 40←30, 50←{10,30}. No cycles. D
 - OpenAPI spec validates with `openapi-spec-validator` (3.1).
 - `aws cloudformation validate-template`: not run (no session; it would be read-only).
 
+## Resource tagging (ADR-0017)
+Every `aws cloudformation deploy` passes stack-level tags, for example:
+
+```bash
+aws cloudformation deploy --stack-name SentinelQA-$ENV-Bootstrap --template-file templates/00-bootstrap.yaml \
+  --parameter-overrides EnvName=$ENV GitHubRepo=vishwasvr/SentinelQA --capabilities CAPABILITY_NAMED_IAM \
+  --tags Project=SentinelQA Environment="$ENV" ManagedBy=CloudFormation Repo=vishwasvr/SentinelQA --no-execute-changeset
+```
+
+Use `Environment=shared` for account-wide stacks (`SentinelQA-Account-OIDC`). 00-bootstrap and 00-account-oidc also declare the four tags explicitly on every taggable resource (the bucket, both roles, the OIDC provider); `AWS::IAM::ManagedPolicy` (app boundary) has no `Tags` property in CloudFormation. The legacy `app`/`env` keys are removed. Already-deployed stacks keep their old `app`/`env` tags until a Vishwas-approved redeploy, which is a tag-only update with no replacement.
+
 ## Deploy flow (documented, not executed)
 GitHub Actions (OIDC) → `cfn-lint` + `gen-routes.py` drift check → esbuild bundle and upload `<sha>/<fn>.zip` ([ADR-0014](../adr/0014-build-packaging.md)) → `create-change-set` (CFN execution role) → manual approval (prod reviewer) → `execute-change-set`. No deploy has been performed from this repo.
 
