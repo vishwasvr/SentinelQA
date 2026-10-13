@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { validateParams, crossCheck } from '../../scripts/ci/params-schema.mjs';
 
 const load = (f: string) => JSON.parse(readFileSync(`docs/architecture/iac/params/${f}`, 'utf8'));
+// Built at runtime so no literal address is committed.
+const at = (local: string, domain: string) => [local, domain].join('@');
 const clone = <T>(x: T): T => structuredClone(x);
 
 describe('params-schema', () => {
@@ -82,6 +84,18 @@ describe('params-schema', () => {
   ])('rejects any email-looking value (%s)', (_l, mut) => {
     const d = clone(load('dev.json')); mut(d);
     expect(validateParams('dev.json', d).join()).toMatch(/looks like an email/);
+  });
+  it.each([
+    ['a top-level key', (d: ReturnType<typeof load>) => { d[at('ops', 'example.com')] = 'x'; }],
+    ['a nested _ key', (d: ReturnType<typeof load>) => { d._meta[at('_First.Last+tag', 'sub.example.co.uk')] = true; }],
+    ['a stack key', (d: ReturnType<typeof load>) => { d['10-security'] = { [at('x', 'y.io')]: 'TODO' }; }],
+  ])('rejects any email-looking key (%s)', (_l, mut) => {
+    const d = clone(load('dev.json')); mut(d);
+    expect(validateParams('dev.json', d).join()).toMatch(/key ".*" looks like an email/);
+  });
+  it('rejects email-looking keys in account.json too', () => {
+    const a = clone(load('account.json')); a[at('me', 'example.com')] = 'owner';
+    expect(validateParams('account.json', a).join()).toMatch(/looks like an email/);
   });
   it('rejects email-looking values in account.json too', () => {
     const a = clone(load('account.json')); a._owner = 'me@example.com';

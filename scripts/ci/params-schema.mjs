@@ -13,7 +13,7 @@ const PROFILE = { dev: 'lean', stage: 'lean', prod: 'strict' }; // ADR-0013
 // Secrets never live in params (ADR-0015, delivery-strategy §2a): reject secret-looking keys.
 const SECRET_KEY = /(secret|password|passwd|token|privatekey|accesskey)/i;
 // Personal data never lives in params: AlarmEmail comes from the GitHub env var vars.ALARM_EMAIL at deploy time,
-// and no value (notes included) may look like an email address.
+// and no key or value (notes included) may look like an email address.
 const FORBIDDEN_KEY = /^alarmemail$/i;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 
@@ -34,6 +34,7 @@ export function validateParams(name, data) {
   const fmt = (e) => `${name}: ${e.instancePath || '/'} ${e.message}${e.params?.allowedValue !== undefined ? ` (${JSON.stringify(e.params.allowedValue)})` : ''}`;
   for (const k of keys(data)) if (!k.startsWith('_') && SECRET_KEY.test(k)) errs.push(`${name}: key "${k}" looks like a secret; secrets must come from SSM/OIDC, not params`);
   for (const k of keys(data)) if (FORBIDDEN_KEY.test(k)) errs.push(`${name}: key "${k}" is forbidden; AlarmEmail comes from the GitHub environment variable vars.ALARM_EMAIL at deploy time`);
+  for (const k of keys(data)) if (EMAIL.test(k)) errs.push(`${name}: key "${k}" looks like an email address; emails must not be committed to params (use vars.ALARM_EMAIL)`);
   for (const [p, v] of values(data)) if (EMAIL.test(v)) errs.push(`${name}: ${p} looks like an email address; emails must not be committed to params (use vars.ALARM_EMAIL)`);
   if (name === 'account.json') {
     if (!acctSchema(data)) errs.push(...acctSchema.errors.map(fmt));

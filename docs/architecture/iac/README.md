@@ -45,9 +45,23 @@ Removed: customer-managed KMS keys (O-09), CDK skeleton, Bedrock/Guardrails, Age
 
 ## AlarmEmail contract (deploy time)
 
-`AlarmEmail` (10-security) is **not** stored in `params/*.json`; the params validator (`npm run params-schema`, `ci/params.schema.json` + `scripts/ci/params-schema.mjs`) rejects an `AlarmEmail` key and any value that looks like an email address.
+`AlarmEmail` (10-security) is **not** stored in `params/*.json`; the params validator (`npm run params-schema`, `ci/params.schema.json` + `scripts/ci/params-schema.mjs`) rejects an `AlarmEmail` key and any key or value that looks like an email address.
 
 - Each GitHub environment (`dev`, `stage`, `prod`) has an environment **variable** `ALARM_EMAIL` (not a secret; set by Chief of Staff after Vishwas approves).
-- The deploy job runs with `environment: <env>` and passes it as a parameter override, e.g. `--parameter-overrides EnvName=<env> AlarmEmail=${{ vars.ALARM_EMAIL }}` (or `ParameterKey=AlarmEmail,ParameterValue=${{ vars.ALARM_EMAIL }}`). The job fails if the variable is empty.
+- The deploy job runs with `environment: <env>` and passes the variable through `env:` (never `${{ }}` inline in `run:`), failing fast if it is empty:
+
+  ```yaml
+  - name: Require ALARM_EMAIL
+    env:
+      ALARM_EMAIL: ${{ vars.ALARM_EMAIL }}
+    run: '[ -n "$ALARM_EMAIL" ] || { echo "::error::ALARM_EMAIL not set"; exit 1; }'
+  - name: Deploy 10-security
+    env:
+      ALARM_EMAIL: ${{ vars.ALARM_EMAIL }}
+    run: |
+      aws cloudformation deploy --stack-name "SentinelQA-$ENV_NAME-Security" \
+        --template-file docs/architecture/iac/templates/10-security.yaml \
+        --parameter-overrides EnvName="$ENV_NAME" AlarmEmail="$ALARM_EMAIL"
+  ```
 - The template keeps `AlarmEmail` as a required parameter with an `AllowedPattern` and **no default**.
 - Manual (admin) runs read it with `gh variable get ALARM_EMAIL --env <env> --repo vishwasvr/SentinelQA`.
