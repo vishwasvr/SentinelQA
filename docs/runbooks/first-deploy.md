@@ -83,3 +83,12 @@ Run after 25-backup is first deployed in prod, and again after any change to 25-
 10. Restore drill: no restore is done in prod. Doing one needs a short-lived env with prod settings (QA-29 alternative), which needs its own approval.
 
 Record the date, the export ARNs, the step results, and who approved each **[WRITE]** step in the run log in `docs/runbooks/bootstrap-admin-run.md`.
+
+## 5b. Dev smoke pass criteria: audit transaction-only Deny (QA-36)
+
+This is part of the first dev smoke test (#26), which needs its own approval. It checks the `dynamodb:EnclosingOperation` Deny in `30-api.yaml` (audit table).
+
+1. [WRITE] Create one sample record through the API (one `TransactWriteItems` call holding the record and its audit put). **Pass:** 2xx, and the audit event exists.
+2. [WRITE] A test-only call that sends a bare `PutItem` to the audit table, made with the API role's session. **Pass:** `AccessDeniedException`, and nothing is written.
+
+If step 1 is denied, stop. Remove only that Deny statement (following Architect's fallback, so the lint rule and the conditional put still apply), get approval and redeploy, then re-run. Don't promote to stage until both steps pass.

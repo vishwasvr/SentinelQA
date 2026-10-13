@@ -68,6 +68,8 @@ Normal exports are write-once (each window has a unique prefix), so a noncurrent
 
 The `nonprod-table-reset.md` and `first-deploy.md` checklists add: "Confirm that only repo fixtures were loaded (`isSample=true` on 100% of items)," checked with a read-only scan count before sign-off.
 
-### 3.3 Open item
+### 3.3 Status (closed)
 
-Guard 2 adds a rule to the API (a new 422 code in non-prod). Architect should add it to `openapi.yaml` when building opens. That's a spec change only, and nothing changes now.
+Guard 2's 422 `non_sample_data_forbidden` is in `openapi.yaml` (`31aef26`). The prod 422 `sample_flag_forbidden_in_prod` (BR-49, `30a1d00`) and the 422 `sample_flag_immutable` on PATCH (`28e42a1`) are also there. Nothing is open (QA-34, QA-37).
+
+**Gate (QA-32):** `ci.yml` and `deploy.yml` must exist and pass on a PR before the first application-code merge to `main`. They are built to §1 and §2 when building opens.
