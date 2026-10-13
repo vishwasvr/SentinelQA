@@ -260,3 +260,9 @@ Basis: committed HEAD `ff3b1ef`, verified from a `git archive HEAD` export, so u
 - #29 Resolved for the index (GSI2 dueAt = CAPA/NCMR dueDate; sparse GSI3 needByAt for BR-15). No CAPA/NCMR overdue logic until DP-20 / OQ-25.
 - cfn-lint not installed on this box at re-check; relying on Architect's clean lint report.
 - #24 Resolved (`6c61696`, overview §4.1): never-log list plus one-line JSON field schema. Implementation note: Powertools Logger adds its own default keys (service, cold_start, function_arn, xray_trace_id, sampling_rate); the logger must be configured to drop or rename them, or §4.1 should allow them, so "these fields only" holds.
+
+## Vishwas decisions folded in (2026-10-13, via Chief of Staff; Architect 0824da5, InfraDeploy ce6b0c6)
+- DP-05: "Simulate second reviewer" is removed from the build. #11 no longer depends on DP-05 for it; drop it from Phase 6 E2E scope and fixtures. Estimate unchanged within range (it was a small slice of Phase 4/6).
+- DP-18: /demo and /try-your-document stay static pages, so there's no API work for them.
+- O-02: CloudWatch logs are kept 30 days in prod and 7 days in dev/stage. O-05: throttle is 10 req/s with a burst of 20, and anything over gets a 429. The SPA should back off and retry on 429.
+- The prod GitHub environment reviewer is Vishwas. Stage and prod bootstrap are deferred until needed.
