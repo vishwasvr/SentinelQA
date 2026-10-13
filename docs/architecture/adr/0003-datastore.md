@@ -17,7 +17,7 @@ Access patterns are documented in the overview §4. Relational migration is poss
 ## Resolution (2026-10-13)
 Server-side persistence in DynamoDB accepted, replacing browser-only demo storage. Records and audit events are retained **7 years**: no TTL, deletion protection, Retain policies. Long-term backup beyond PITR (35 d) is an open item (O-01).
 
-## Amendment (2026-10-13, O-08 / O-01 / O-09)
+## Amendment (2026-10-13, O-08 / O-01 / O-09; BRD v1.2 BR-45)
 - **Retention:** the 7-year retention applies to **prod only**. Dev/stage contain synthetic data only (no retention, no PITR, no backup). D-03 is amended accordingly.
 - **Backup:** prod keeps PITR (required for exports). A monthly EventBridge Scheduler job runs a Lambda that issues daily-window (≤ 24 h) **incremental exports** of both tables to an S3 bucket (SSE-S3), which transitions to Glacier Flexible Retrieval and expires after 7 years. A one-time full export is the baseline. Template `25-backup.yaml`.
 - **Encryption:** prod tables use the AWS managed key `aws/dynamodb`, non-prod the AWS owned key. No customer-managed KMS keys. The `AgentTask` table is deferred with AI.

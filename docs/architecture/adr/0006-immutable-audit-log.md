@@ -18,5 +18,5 @@ Corrections are new events, never edits. Object Lock retention cannot be shorten
 ## Resolution (2026-10-13)
 DynamoDB append-only (conditional put) + IAM explicit deny on Update/Delete/BatchWrite. **No S3 Object Lock / WORM archive**: the archive option and the `audit-archiver` stream consumer are removed. The optional `prevHash` field is kept as a cheap tamper signal. Residual risk: an account admin could alter the table. Accepted for now.
 
-## Note (2026-10-13)
+## Note (2026-10-13; BRD v1.2 BR-46 codifies this ADR. See overview §15 C-1 on non-prod table resets)
 The O-01 backup (incremental exports to a versioned S3 bucket, 7-year lifecycle) gives an **independent copy** of audit events. It is not WORM (no Object Lock, per D-05), but it makes silent tampering in the table detectable against exported history. Bucket deletion hardening (O-12) is deferred to the pre-go-live checklist (overview §14). With no CMK (O-09), "crypto-shred by disabling the key" is not available. That is acceptable, because retention, not destruction, is the requirement.

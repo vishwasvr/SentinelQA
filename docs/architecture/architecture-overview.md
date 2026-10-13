@@ -3,7 +3,7 @@
 | Item | Value |
 |---|---|
 | Status | **v0.4: D-01..D-14 (D-03 amended by O-08) + environment profiles ([ADR-0013](adr/0013-environment-profiles.md), accepted). O-01/O-08/O-09 resolved 2026-10-13.** Nothing deployed and no AWS resources created |
-| Basis | [BRD v1.1](../requirements/BRD.md) (approved), screenshots 01–58, reliability CSV |
+| Basis | [BRD v1.2](../requirements/BRD.md) (commit 7c017d3; current file v1.2.1, e9e88b5), incl. new rules BR-44..BR-47; screenshots 01–58, reliability CSV |
 | Diagrams | [diagrams.md](diagrams.md) · Decisions: [adr/](adr/) · IaC: [iac/README.md](iac/README.md) (CloudFormation) · Cost: [cost-estimate.md](cost-estimate.md) |
 
 > Scope: only BRD-observed behavior. **AI features are deferred (D-01)**. The current build has no model provider. An `ai` seam is reserved (§6). Auth, logins and multi-tenancy are out of scope, with seams kept ([ADR-0008](adr/0008-auth-and-tenancy-ready-seams.md)). Roadmap items are not designed.
@@ -12,12 +12,12 @@
 | Driver | BRD | Consequence |
 |---|---|---|
 | Human is reviewer of record | BR-09 | Records carry named reviewer/approver fields. All state changes are human-initiated |
-| Controlled-data gate | BR-04/05, US-15 | Kept server-side on every free-text write (attestation + keyword block, [ADR-0005](adr/0005-controlled-data-gate-enforcement.md)) |
-| Server-side persistence, 7-year retention **in prod** | D-03 as amended by O-08 (overrides demo browser-only, OQ-04) | DynamoDB with no TTL on records/audit, deletion protection, RETAIN policies |
+| Controlled-data gate | BR-04/05, **BR-44**, US-02, US-15 | Kept server-side on every free-text write (attestation + keyword block, [ADR-0005](adr/0005-controlled-data-gate-enforcement.md)) |
+| Server-side persistence, 7-year retention **in prod** | **BR-45**; D-03 as amended by O-08 (overrides demo browser-only, OQ-04) | DynamoDB with no TTL on records/audit, deletion protection, RETAIN policies |
 | No file storage | BR-07 | References only ([ADR-0007](adr/0007-references-only-no-file-storage.md)) |
-| Immutable audit trail | BR-08, BR-36 | Append-only DynamoDB + IAM explicit deny (D-05). No WORM archive |
+| Immutable audit trail | BR-08, BR-36, **BR-46** | Append-only DynamoDB + IAM explicit deny (D-05). No WORM archive |
 | Segregation of duties by named person | BR-10/20/33/35/37 | Domain-logic checks. Advisory until auth exists |
-| Configurable thresholds | D-07, OQ-01/02 | SSM parameters, values TBD |
+| Configurable thresholds | **BR-47** (BR-16/18/25, training); D-07, OQ-01/02 | SSM parameters, values TBD |
 
 ## 2. In scope for the current build vs deferred
 | Module (BRD §4) | Current build | Deferred (AI, D-01) |
@@ -49,7 +49,7 @@
 
 ## 4. Data flow (current build)
 1. The SPA calls e.g. `POST /api/quality-records` with `{ ..., controlledDataAttestation: true, actorName }`.
-2. `records-api` middleware: resolve workspace (`aerospace`), then **controlled-data gate** on endpoints that accept free text. A missing attestation → 400. A marker hit → 422 (block, D-14). Neither the text nor the matched substring is logged. Only the marker id is logged.
+2. `records-api` middleware: resolve workspace (`aerospace`), then **controlled-data gate (BR-44)** on endpoints that accept free text. A missing attestation → 400. A marker hit → 422 (block, D-14). Neither the text nor the matched substring is logged. Only the marker id is logged.
 3. Domain validation (BR-17/22/23/26/35/37, SoD).
 4. `TransactWriteItems`: the record put/update plus an `AuditLog` put (`attribute_not_exists`) holding actor, event, from/to stage, snapshot and `controlledDataAttested`.
 5. Reads compute derived status (calibration BR-25, training, re-eval buckets) from dates and SSM thresholds.
@@ -144,3 +144,15 @@ Complete before the prod go-live. Items deferred by Vishwas on 2026-10-13.
 - [ ] **O-11** — *Deferred to pre-go-live (2026-10-13)* S3 lifecycle does not transition objects smaller than 128 KB by default (behaviour **unverified** in this review). Small export files may stay in S3 Standard. The cost impact is cents, but confirm.
 - [ ] **O-12** — *Deferred to pre-go-live (2026-10-13)* Export bucket deletion protection: versioning only (no Object Lock per D-05). Decide whether to add a bucket-policy deny on `s3:DeleteObject*` for all principals except a break-glass role.
 - [ ] **Go-live step: one-time FULL export** of the prod `Domain` and `AuditLog` tables (`ExportType=FULL_EXPORT`, PITR on) to the `25-backup` export bucket. This is the baseline for the monthly incremental exports, ≈ $0.10/GB of table size, ≈ $0 at go-live. Record the export time as the initial watermark (`/sentinelqa/prod/backup/last-export-to`).
+
+## 15. BRD v1.2 traceability (BR-44..BR-47)
+| BR | Design element | Status |
+|---|---|---|
+| BR-44 gate on all free-text saves (400 / 422, marker id only logged, `controlledDataAttested` on audit event) | §4 data flow, [ADR-0005](adr/0005-controlled-data-gate-enforcement.md), `CONTROLLED_GATE_MODE: block`, SSM marker list | Consistent. Marker values pending (O-04) |
+| BR-45 server-side persistence; prod ≥ 7 y; dev/stage synthetic only | §8, [ADR-0003](adr/0003-datastore.md), [ADR-0013](adr/0013-environment-profiles.md), 20-data Retain/no TTL, 25-backup | Consistent |
+| BR-46 audit log append-only, IAM deny, corrections as new events, no WORM | §7 IAM, [ADR-0006](adr/0006-immutable-audit-log.md), 30-api deny statements (all profiles) | Consistent. **Clarification flagged (C-1)** |
+| BR-47 weights/bands and due-soon thresholds configurable (SSM) | §3 Config, 20-data SSM params (`supplier-risk/weights`, `due-soon-days` incl. training) | Consistent. Values pending (O-04) |
+
+**C-1 (minor tension, needs Vishwas):** BR-46 says the audit log is append-only "in every environment", but the lean profile allows dev/stage tables to be **purged** (synthetic data, no deletion protection; overview §8, cost-estimate). Item-level update/delete is denied in all profiles, so there's no conflict at the API level. Dropping or recreating a whole non-prod table is an admin action outside the app. Proposed reading: BR-46 governs application behaviour; non-prod table resets are allowed. Confirm or amend.
+
+**C-2 (label mismatch, no design impact):** BRD v1.2.1 cites "architecture O-07" for logging the attestation. In this overview O-07 is the list of unresolved BRD OQs, which notes OQ-13 "(we log attestation)". The behaviour is specified in BR-44 / §4 step 4. Suggest the BRD cite §4 / ADR-0005 instead.
