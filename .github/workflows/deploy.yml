@@ -166,8 +166,15 @@ jobs:
           ALARM_EMAIL: ${{ vars.ALARM_EMAIL }}
         run: bash scripts/ci/deploy-env.sh
       - name: Dev smoke test + QA-36 (Developer-provided; required before stage sign-off)
+        # Smoke goes through CloudFront, which adds X-Origin-Verify itself (ADR-0015), so
+        # SMOKE_ORIGIN_VERIFY is deliberately not set: the secret stays out of this step.
         run: |
           if node -e 'process.exit(require("./package.json").scripts?.["smoke:deployed"] ? 0 : 1)'; then
+            DOMAIN=$(aws cloudformation describe-stacks --region us-east-1 --stack-name SentinelQA-dev-Web \
+              --query "Stacks[0].Outputs[?OutputKey=='DistributionDomain'].OutputValue" --output text)
+            if [ -z "$DOMAIN" ] || [ "$DOMAIN" = "None" ]; then echo "::error::SentinelQA-dev-Web has no DistributionDomain output"; exit 1; fi
+            export SMOKE_BASE_URL="https://${DOMAIN}"
+            echo "Smoke target: ${SMOKE_BASE_URL}"
             npm ci && DEPLOY_ENV=dev npm run smoke:deployed
           else
             echo "::warning::No 'smoke:deployed' script yet. Run the smoke test + QA-36 (first-deploy §5b) manually before committing releases/<sha>/dev-signoff.md."
