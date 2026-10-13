@@ -59,6 +59,39 @@ describe('params-schema', () => {
     expect(validateParams('dev.json', d).length).toBeGreaterThan(0);
     expect(validateParams('qa.json', {}).length).toBe(1);
   });
+  it('rejects AlarmEmail in params (sourced from vars.ALARM_EMAIL)', () => {
+    for (const env of ['dev', 'stage', 'prod']) {
+      const d = clone(load(`${env}.json`)); d['10-security'] = { AlarmEmail: 'ops@example.com' };
+      const out = validateParams(`${env}.json`, d).join();
+      expect(out).toMatch(/AlarmEmail/);
+      expect(out).toMatch(/ALARM_EMAIL/);
+    }
+  });
+  it('rejects an AlarmEmail key even with a non-email value or different case', () => {
+    const d = clone(load('dev.json')); d['10-security'] = { alarmemail: 'TODO' };
+    expect(validateParams('dev.json', d).join()).toMatch(/forbidden/);
+  });
+  it('accepts an empty 10-security block', () => {
+    const d = clone(load('stage.json')); d['10-security'] = {};
+    expect(validateParams('stage.json', d)).toEqual([]);
+  });
+  it.each([
+    ['a note', (d: ReturnType<typeof load>) => { d._contact_note = 'ping someone@example.org'; }],
+    ['_meta note', (d: ReturnType<typeof load>) => { d._meta._note = 'owner: First.Last+tag@sub.example.co.uk'; }],
+    ['a stack value', (d: ReturnType<typeof load>) => { d['40-web'].WebACLArn = 'x@y.io'; }],
+  ])('rejects any email-looking value (%s)', (_l, mut) => {
+    const d = clone(load('dev.json')); mut(d);
+    expect(validateParams('dev.json', d).join()).toMatch(/looks like an email/);
+  });
+  it('rejects email-looking values in account.json too', () => {
+    const a = clone(load('account.json')); a._owner = 'me@example.com';
+    expect(validateParams('account.json', a).join()).toMatch(/looks like an email/);
+  });
+  it('committed params contain no email addresses', () => {
+    for (const f of ['dev.json', 'stage.json', 'prod.json', 'account.json']) {
+      expect(readFileSync(`docs/architecture/iac/params/${f}`, 'utf8')).not.toMatch(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
+    }
+  });
   it('cross-check: dev/stage share an account; flags prod sharing it', () => {
     const env = { dev: load('dev.json'), stage: load('stage.json'), prod: load('prod.json') };
     expect(crossCheck(env)).toEqual({ errs: [], prodSharesAccount: true });

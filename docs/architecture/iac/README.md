@@ -11,7 +11,7 @@ Import graph: 25←{00,10,20}, 30←{00,20}, 40←30, 50←{10,30}. No cycles. D
 | # | Template | Stack name | Resources | Notes |
 |---|---|---|---|---|
 | 00 | [00-bootstrap.yaml](templates/00-bootstrap.yaml) (**InfraDeploy**) | `SentinelQA-<env>-Bootstrap` | OIDC deploy role, CFN execution role, app-role permissions boundary, artifact bucket | Exports `AppRoleBoundaryArn`, `ArtifactBucketName`, `CfnExecRoleArn` |
-| 10 | [10-security.yaml](templates/10-security.yaml) | `SentinelQA-<env>-Security` | SNS email topic (`alias/aws/sns`) | `AlarmEmail` AllowedPattern. CloudTrail/Budgets TODO (account-level) |
+| 10 | [10-security.yaml](templates/10-security.yaml) | `SentinelQA-<env>-Security` | SNS email topic (`alias/aws/sns`) | `AlarmEmail` AllowedPattern, no default; supplied from `vars.ALARM_EMAIL` (see below). CloudTrail/Budgets TODO (account-level) |
 | 20 | [20-data.yaml](templates/20-data.yaml) | `SentinelQA-<env>-Data` | `Domain` (sparse GSI1 review queue, sparse GSI2 on `dueAt`, sparse GSI3 on `needByAt`), `AuditLog`. Prod: PITR, `aws/dynamodb`, deletion protection, Retain, no TTL. SSM: PLACEHOLDER BR-47 defaults, keyword markers (whole-word, case-insensitive) + structured CFR ranges `cfr-ranges` | No stream / Object Lock (D-05) |
 | 30 | [30-api.yaml](templates/30-api.yaml) | `SentinelQA-<env>-Api` | HTTP API with **67 explicit routes generated from [../api/openapi.yaml](../api/openapi.yaml)** by [tools/gen-routes.py](tools/gen-routes.py), `records-api`/`reports-api` (nodejs24.x, arm64, code at `<sha>/<fn>.zip`), boundary-scoped roles (AuditLog put + read, explicit Update/Delete deny on both tables), log groups 7/90 d | No `/api/ai/*`, no `/api/search`, no catch-all |
 | 40 | [40-web.yaml](templates/40-web.yaml) | `SentinelQA-<env>-Web` | S3 + OAC, CloudFront (`/api/*` → API with `X-Origin-Verify`, ADR-0015) | `OriginVerifySecret` NoEcho, supplied by the pipeline. WAF slot empty |
@@ -42,3 +42,12 @@ GitHub Actions (OIDC) → `cfn-lint` + `gen-routes.py` drift check → esbuild b
 
 ## Deferred / removed vs v0.1
 Removed: customer-managed KMS keys (O-09), CDK skeleton, Bedrock/Guardrails, AgentTask table, `ai-gateway`, `audit-archiver`, S3 Object Lock, WAF.
+
+## AlarmEmail contract (deploy time)
+
+`AlarmEmail` (10-security) is **not** stored in `params/*.json`; the params validator (`npm run params-schema`, `ci/params.schema.json` + `scripts/ci/params-schema.mjs`) rejects an `AlarmEmail` key and any value that looks like an email address.
+
+- Each GitHub environment (`dev`, `stage`, `prod`) has an environment **variable** `ALARM_EMAIL` (not a secret; set by Chief of Staff after Vishwas approves).
+- The deploy job runs with `environment: <env>` and passes it as a parameter override, e.g. `--parameter-overrides EnvName=<env> AlarmEmail=${{ vars.ALARM_EMAIL }}` (or `ParameterKey=AlarmEmail,ParameterValue=${{ vars.ALARM_EMAIL }}`). The job fails if the variable is empty.
+- The template keeps `AlarmEmail` as a required parameter with an `AllowedPattern` and **no default**.
+- Manual (admin) runs read it with `gh variable get ALARM_EMAIL --env <env> --repo vishwasvr/SentinelQA`.

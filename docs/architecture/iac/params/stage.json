@@ -8,9 +8,6 @@
     "GitHubRepo": "vishwasvr/SentinelQA",
     "OidcProviderArn": "arn:aws:iam::723940054516:oidc-provider/token.actions.githubusercontent.com"
   },
-  "10-security": {
-    "AlarmEmail": "vishwas.learn@yahoo.com"
-  },
   "30-api": {
     "RecordsApiKey": "PIPELINE_SUPPLIED:<commit-sha>/records-api.zip",
     "ReportsApiKey": "PIPELINE_SUPPLIED:<commit-sha>/reports-api.zip",
@@ -20,6 +17,7 @@
   "40-web": {
     "WebACLArn": ""
   },
+  "_alarm_email_note": "10-security AlarmEmail is NOT stored here: the deploy job (environment: stage) passes AlarmEmail from the GitHub environment variable vars.ALARM_EMAIL.",
   "_oidc_note": "OidcProviderArn existence is UNVERIFIED. One provider per account; it is created outside per-env stacks, only after explicit approval (see docs/runbooks/first-deploy.md).",
   "_code_keys_note": "Lambda S3 keys are supplied by the pipeline at deploy time as <commit-sha>/<function>.zip; never hard-coded here.",
   "_origin_verify_note": "40-web OriginVerifySecret is NOT stored here: the pipeline reads SSM SecureString /sentinelqa/stage/edge/origin-verify and passes it as a NoEcho override (ADR-0015).",

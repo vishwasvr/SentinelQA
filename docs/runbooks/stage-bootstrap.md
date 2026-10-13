@@ -85,10 +85,12 @@ EXEC=$(aws cloudformation list-exports --profile sentinelqa-admin --query "Expor
 ```
 
 ## 4. `SentinelQA-stage-Security` (10-security)
+> `SentinelQA-stage-Security` is **already deployed** and keeps its current subscription. Do **not** redeploy it without Vishwas's explicit approval. `AlarmEmail` is no longer in params: it comes from the `stage` GitHub environment variable `ALARM_EMAIL` (iac README, AlarmEmail contract).
+
 Creates SNS topic `SentinelQA-stage-alarms` (+ email subscription). Export `SentinelQA-stage-AlarmTopicArn`.
 ```bash
 aws cloudformation deploy --profile sentinelqa-admin --stack-name SentinelQA-stage-Security --template-file $T/10-security.yaml \
-  --parameter-overrides EnvName=stage AlarmEmail="$(jq -r '.["10-security"].AlarmEmail' $P)" \
+  --parameter-overrides EnvName=stage AlarmEmail="$(gh variable get ALARM_EMAIL --env stage --repo vishwasvr/SentinelQA)" \
   --role-arn "$EXEC" --tags app=SentinelQA env=stage --no-execute-changeset
 ```
 Verify: `aws sns list-subscriptions-by-topic --profile sentinelqa-admin --topic-arn $(aws cloudformation list-exports --profile sentinelqa-admin --query "Exports[?Name=='SentinelQA-stage-AlarmTopicArn'].Value" --output text)`; confirm the email (first-deploy §4).
