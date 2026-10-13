@@ -12,6 +12,8 @@ Status: Draft. **Do not execute** unless Vishwas explicitly approves each create
 > **First bootstrap (account OIDC stack + `00-bootstrap`) is an admin run by Vishwas:** follow [bootstrap-admin-run.md](bootstrap-admin-run.md). This page covers the overall order and the later pipeline stacks.
 
 ## 1. Prerequisites
+
+> **Prod:** prod is deployed only into its own account. Complete `prod-account-split.md` (O-03) first.
 - Vishwas does a fresh `aws login` / SSO session himself. Agents never hold or create access keys.
 - **Explicit approval per create/update.** For each stack, present the change set (`--no-execute-changeset` or `describe-change-set`) and execute it only after Vishwas approves that specific change set.
 - `cfn-lint` passes on all templates.
