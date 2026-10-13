@@ -113,7 +113,7 @@ DynamoDB items can be at most 400 KB, and so can each item in a `TransactWriteIt
 ### 4.5 Decisions of 2026-10-13 (OQ-10/14/15/18/21/22/23)
 - **OQ-14 (rule approved by Vishwas, 2026-10-13):** `PoCheck.supplierId` is an optional link to a Supplier. `supplierApprovalWarning` is computed on read (true when the linked Supplier has no qualification at Active on ASL). It is a warning only and never blocks a save.
 - **OQ-15:** manual "Assign training" via `POST /api/quality-records/{id}/training` (CAPA/NCMR) and `POST /api/po-checks/{id}/training` (PO findings). It creates a Training item with `sourceRecordId`/`sourceRecordType`, all in one transaction with the audit event. No automation.
-- **OQ-23:** `POST /api/quality-records/{id}/scar` on an NCMR/CAPA creates a SCAR with `sourceRecordId` and `supplierId` set.
+- **OQ-23:** `POST /api/quality-records/{id}/scar` on an NCMR/CAPA creates a SCAR with `sourceRecordId` and `supplierId` set. UI (approved by Vishwas): an "Issue SCAR" button in the record page action bar next to the stage-advance button, shown only while the record isn't Closed. It opens a small form for supplier and title, and the new SCAR shows as a linked record.
 - **OQ-21:** print is browser print only. The SPA adds a header (ID, status, printed date/by) and an "Uncontrolled when printed" footer. There's no route and no stored PDF.
 - **OQ-22:** Aerospace only. The SPA hides the Industry filter, and the API has no industry param.
 - **OQ-18:** closed as deferred with AI. The observed 0.75 is recorded in the BRD; nothing is built.
@@ -160,13 +160,13 @@ Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (te
 - Domain records already allow `draft` and `aiAssisted:false` fields, and the audit log reserves event types `AI_DRAFT_ACCEPTED/MODIFIED/REJECTED`.
 - When AI is re-enabled, re-open [ADR-0004](adr/0004-ai-provider.md) (provider) and D-04 (prompt retention), and add the `AgentTask` table plus the BR-30 alarms.
 
-## 7. Security / IAM (single account, D-08)
+## 7. Security / IAM (D-08: dev/stage shared account, prod separate before go-live)
 - Environments are separated **by name prefix** `SentinelQA-<env>-*`. Every IAM policy is scoped to ARNs containing its own env prefix. Resources are tagged `env`, and deploy roles carry an `aws:ResourceTag/env` condition where supported.
 - `records-api` role: GetItem/Query/PutItem/UpdateItem/ConditionCheckItem on its own Domain table + indexes (`TransactWriteItems` is authorised per contained action; there is no separate IAM action). On AuditLog: PutItem (conditional, in code) plus **read-only GetItem/Query** for the timeline. **Explicit deny** of `UpdateItem/DeleteItem/BatchWriteItem` on AuditLog and of `DeleteItem/BatchWriteItem` on Domain, **in every environment** (soft delete, §4). `ssm:GetParameter(s)` on `/sentinelqa/<env>/*`. Logs only to its own log group. X-Ray in strict. No `kms:*` (O-09).
 - `reports-api`: read-only on its env Domain table.
 - **Permissions boundary:** every app role (records-api, reports-api, ddb-export, scheduler) sets `PermissionsBoundary` = `SentinelQA-<env>-AppRoleBoundaryArn` (InfraDeploy `00-bootstrap`). The CloudFormation execution role can only create roles with that boundary.
 - GitHub OIDC deploy role per env: trust restricted to `repo:<org>/SentinelQA:environment:<env>`. Permission to manage only `SentinelQA-<env>-*` stacks.
-- **Single-account risk:** a principal with admin rights can affect all envs. Mitigation is a naming/tag discipline and separate deploy roles. Revisit before handling real customer data (open item O-03).
+- **Single-account risk:** a principal with admin rights can affect all envs. Mitigation is a naming/tag discipline and separate deploy roles. This applies to dev/stage only. O-03 decided: prod gets its own account before go-live (§14, ADR-0009 addendum).
 - TLS only, S3 Block Public Access, CloudTrail on. **Encryption at rest (O-09): no customer-managed KMS keys anywhere.** Prod DynamoDB uses the AWS managed key `aws/dynamodb`; prod/non-prod S3 buckets use SSE-S3; SNS uses `alias/aws/sns`; dev/stage DynamoDB uses the AWS owned key ([ADR-0013](adr/0013-environment-profiles.md)). Trade-offs: no custom key policy, no customer-controlled rotation schedule (AWS rotates managed keys automatically), and the key cannot be disabled to crypto-shred data; CloudTrail still logs use of `aws/dynamodb`. KMS API requests to AWS managed keys are billed ($0.03/10k, within 20k/month free at 20 users). No `kms:*` IAM permissions or key policies are needed.
 - No user identity yet: `actorName` is self-asserted (BR-11). SoD is advisory.
 
@@ -199,7 +199,7 @@ A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as 
 | D-05 | Audit immutability | **DynamoDB append-only + IAM deny; no Object Lock** | [0006](adr/0006-immutable-audit-log.md) |
 | D-06 | Compute | **Lambda** | [0002](adr/0002-serverless-compute.md) |
 | D-07 | Weights/thresholds | **Configurable (SSM); values later** | overview §1 |
-| D-08 | Accounts | **Single account; envs by stack/naming** | [0009](adr/0009-region-and-accounts.md) |
+| D-08 | Accounts | **dev/stage share one account; prod in its own account before go-live (O-03, amended 2026-10-13)** | [0009](adr/0009-region-and-accounts.md) |
 | D-09 | Runtime | **TypeScript (Node.js)** | [0002](adr/0002-serverless-compute.md) |
 | D-10 | Alerts | **Email only (SNS)** | — |
 | D-11 | WAF/CAPTCHA | **Deferred** | [0011](adr/0011-edge-protection-deferred.md) |
@@ -215,14 +215,15 @@ A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as 
 - ~~O-09~~ **Resolved:** AWS managed keys, no CMKs anywhere.
 - ~~O-01~~ **Resolved:** monthly job running daily-window incremental DynamoDB exports to S3 Glacier, 7-year lifecycle (`25-backup`).
 - ~~O-02~~ **Resolved (Vishwas, 2026-10-13):** CloudWatch Logs retention 30 days prod, 7 days dev/stage.
-- **O-03** Single-account blast radius. Revisit before production customer data.
+- ~~O-03~~ **Resolved (Vishwas, 2026-10-13):** prod moves to its **own AWS account before go-live**. dev/stage stay in the current account. This is a pre-go-live item (§14); InfraDeploy owns the plan and runbook. Nothing is created until Vishwas signs in as admin and approves. See ADR-0009 addendum.
 - **O-04** Tuned values for D-07 (the PLACEHOLDER defaults ship, DP-16). Marker list decided in BRD v1.4, CFR ranges per v1.4.1 (ff3fd01) (incl. ITAR, EAR, CUI, `22 CFR 120-130`, `15 CFR 730-774`; whole-word, case-insensitive). CFR ranges are stored as structured ranges and checked in code (dev #27, §4); range reading signed off (DP-03). Normalisation, evasion scope and exempt fields decided (DP-03, 2026-10-13).
 - ~~O-05~~ **Resolved (Vishwas, 2026-10-13):** without WAF (D-11), public endpoints rely on API Gateway throttling: HTTP API stage default route **rate 10 req/s, burst 20** (`ThrottleRate`/`ThrottleBurst` defaults in `30-api.yaml`; params files must match). Excess gets 429. Per-route overrides only if real traffic shows a need.
-- **O-06** Whether hidden AI modules show a "coming later" state or are removed from navigation (UX).
+- ~~O-06~~ **Resolved (Vishwas, 2026-10-13):** AI modules stay in the navigation and open a static "Coming later" page (SPA only; no `/api/ai/*` route).
 - ~~O-13~~ **Resolved (Vishwas, 2026-10-13):** all DPs decided. DP-02/03/04/06–11/13/14/16/17/19 as recommended in [dp-proposals.md](../requirements/dp-proposals.md); DP-01 with soft-deleted IDs kept reserved (counter + reservation items in the same transaction as the record and audit event); DP-12 with timezone **America/New_York** (SSM `workspace/timezone`); DP-20 default `dueDate` = open + N days (PLACEHOLDER N). Reflected in `openapi.yaml` (`x-decision`) and 20-data SSM params.
 - ~~O-07~~ **Resolved:** BRD OQs still open (aligned with BRD v1.4 §12; OQ-10 partially answered by BR-31): none. OQ-03/06/07/09/17 closed in BRD v1.5; OQ-08/10/14/15/18/21/22/23 decided 2026-10-13 (§4.5). OQ-05 is deferred with AI. OQ-13 is **closed** (attestation logged on audit events, §4 step 4 / ADR-0005). OQ-01/02/04 are resolved (BR-47 / BR-45).
 
 ## 14. Pre-go-live checklist (prod)
+- **O-03:** stand up the separate prod account (new account, OIDC provider, bootstrap, GitHub prod environment variables) per InfraDeploy's runbook, with Vishwas's admin sign-in and approval. Prod is not deployed into the shared account.
 Complete before the prod go-live. Items deferred by Vishwas on 2026-10-13.
 
 - [ ] **O-10** — *Deferred to pre-go-live (2026-10-13)* Restore runbook: DynamoDB *import from S3* reads full exports. Replaying incremental exports onto a restored baseline needs a custom job. Decide whether to also take a periodic (e.g. annual) **full** export to shorten the restore chain (≈ $0.10/GB per full export).

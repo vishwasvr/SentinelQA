@@ -144,7 +144,7 @@ def action(path,opid,tag,schema,desc,fn='records-api'):
 q=lambda n,sc:{'name':n,'in':'query','schema':sc}
 collection('/api/quality-records','QualityRecord','Quality records',extra=[q('type',enum('CAPA','NCMR','SCAR')),q('severity',STR),q('stage',STR),q('standard',STR)])
 action('/api/quality-records/{id}/transitions','transitionQualityRecord','Quality records',R('Transition'),'Stage advance (BR-13). Rules per DP-02.')
-action('/api/quality-records/{id}/scar','issueScar','Quality records',R('IssueScar'),'Issue SCAR (OQ-23) from an NCMR or CAPA. 422 if the source is a SCAR.')
+action('/api/quality-records/{id}/scar','issueScar','Quality records',R('IssueScar'),'Issue SCAR (OQ-23) from an NCMR or CAPA. 422 if the source is a SCAR or Closed. UI: action-bar button next to stage advance, hidden when Closed (approved).')
 action('/api/quality-records/{id}/training','assignTrainingFromQualityRecord','Training',R('AssignTraining'),'Assign training from a CAPA/NCMR (OQ-15). 422 for SCAR.')
 collection('/api/suppliers','Supplier','Suppliers',extra=[q('standard',STR)])
 collection('/api/supplier-qualifications','SupplierQualification','Supplier qualification',extra=[q('stage',STR)])
@@ -192,7 +192,7 @@ doc={'openapi':'3.1.0','info':{'title':'SentinelQA API','version':'0.5.0','descr
  '- **Controlled-data gate (BR-44)**: free-text fields (`x-free-text`) require `controlledDataAttestation=true` (else 400 `gate:attestation_required`); a marker hit (whole-word, case-insensitive, list in SSM) → 422 `gate:controlled_marker`; nothing persisted, no audit event, text never logged.\n'
  '- **Audit**: every successful write appends one AuditLog event in the same transaction (BR-08, BR-46).\n'
  '- **Sample data (BR-31)**: seed items carry `isSample=true` in every env.\n'
- '- **Not routed**: `/api/ai/*` (reserved AI seam, BRD §12 #1). No `/api/search`: ⌘K is client-side over loaded lists (US-41 decision; scope DP-15). No CSV export route: the only observed CSV (agent task log, US-39) is deferred with AI.'},
+ '- **Not routed**: `/api/ai/*` (reserved AI seam, BRD §12 #1). The SPA keeps the AI modules in navigation with a static "Coming later" page (O-06). No `/api/search`: ⌘K is client-side over loaded lists (US-41 decision; scope DP-15). No CSV export route: the only observed CSV (agent task log, US-39) is deferred with AI.'},
  'servers':[{'url':'/','description':'Via CloudFront only'}],
  'paths':paths,'components':{'schemas':schemas,'parameters':params,'responses':resp}}
 def fix(o):

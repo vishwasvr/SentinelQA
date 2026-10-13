@@ -30,8 +30,8 @@ info:
 
     - **Sample data (BR-31)**: seed items carry `isSample=true` in every env.
 
-    - **Not routed**: `/api/ai/*` (reserved AI seam, BRD §12 #1). No `/api/search`: ⌘K is client-side over loaded lists (US-41 decision; scope DP-15). No CSV export route: the only observed CSV (agent task
-    log, US-39) is deferred with AI.'
+    - **Not routed**: `/api/ai/*` (reserved AI seam, BRD §12 #1). The SPA keeps the AI modules in navigation with a static "Coming later" page (O-06). No `/api/search`: ⌘K is client-side over loaded lists
+    (US-41 decision; scope DP-15). No CSV export route: the only observed CSV (agent task log, US-39) is deferred with AI.'
 servers:
 - url: /
   description: Via CloudFront only
@@ -240,7 +240,7 @@ paths:
       tags:
       - Quality records
       operationId: issueScar
-      description: Issue SCAR (OQ-23) from an NCMR or CAPA. 422 if the source is a SCAR.
+      description: 'Issue SCAR (OQ-23) from an NCMR or CAPA. 422 if the source is a SCAR or Closed. UI: action-bar button next to stage advance, hidden when Closed (approved).'
       parameters:
       - $ref: '#/components/parameters/IdempotencyKey'
       - $ref: '#/components/parameters/IfMatch'

@@ -15,3 +15,6 @@ Revisit if any customer requires controlled-data handling.
 
 ## Resolution (2026-10-13)
 Region **us-east-1 commercial** accepted. Accounts: **single AWS account** chosen; the three-account Organizations option is **rejected for now**. Environments are separated by stack names/prefixes `SentinelQA-<env>-*`, env-scoped IAM resource ARNs, `env` tags and per-env OIDC deploy roles. Single-account blast radius is open item O-03.
+
+## Addendum (2026-10-13, O-03, Vishwas)
+The single-account choice is amended: **prod moves to its own AWS account before go-live**, and dev/stage stay in the current account. The prod account gets its own GitHub OIDC provider, bootstrap stack and deploy role (ADR-0012), with the same stack names. The audit-delete Deny and backup rules stay as they are, now in each account. Account creation needs Vishwas's admin sign-in and approval; InfraDeploy owns the runbook. Nothing has been created yet.
