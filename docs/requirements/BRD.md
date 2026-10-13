@@ -4,7 +4,7 @@
 |---|---|
 | Product | Sentinel QA — "AI Quality Manager" for AS9100D aerospace suppliers |
 | Source | https://sentinel-qa.lovable.app/ (public, unauthenticated exploration) |
-| Version / date | 1.7.2 — 2026-10-13 (v1.7.2: error codes and isSample client rule per 06820a8; v1.7.1: O-06 Coming later, O-03 prod account, Issue SCAR placement; v1.7: remaining OQs decided — OQ-10/14/15/18/21/22/23 and /compare rows 1/8, §13.8; v1.6.3: BR-49 source, isSample immutable, US-04 rows; v1.6.2: BR-49 decided, 422 in prod; v1.6.1: BR-49 pending recommendation now 422; v1.6: /compare Sentinel-only table, internal seed fixtures, FAI Form 2 (GUESS fields), isSample rule BR-49, §13.7; all DPs decided by Vishwas, §13.7; v1.1 + scope decisions from architecture, §12; review responses and build clarifications, §13; Vishwas decisions of 2026-10-13, §13.5; BR-44 CFR range interpretation v1.4.1; CAPA/NCMR overdue rule raised as OQ-25/DP-20 v1.4.2; Vishwas decisions DP-05, DP-18, O-02, O-05, bootstrap deferral and prod reviewer v1.4.3, §13.6; observed findings unchanged; changelog §14) |
+| Version / date | 1.7.3 — 2026-10-13 (v1.7.3: glossary §15, roles §16, changelog checked; v1.7.2: error codes and isSample client rule per 06820a8; v1.7.1: O-06 Coming later, O-03 prod account, Issue SCAR placement; v1.7: remaining OQs decided — OQ-10/14/15/18/21/22/23 and /compare rows 1/8, §13.8; v1.6.3: BR-49 source, isSample immutable, US-04 rows; v1.6.2: BR-49 decided, 422 in prod; v1.6.1: BR-49 pending recommendation now 422; v1.6: /compare Sentinel-only table, internal seed fixtures, FAI Form 2 (GUESS fields), isSample rule BR-49, §13.7; all DPs decided by Vishwas, §13.7; v1.1 + scope decisions from architecture, §12; review responses and build clarifications, §13; Vishwas decisions of 2026-10-13, §13.5; BR-44 CFR range interpretation v1.4.1; CAPA/NCMR overdue rule raised as OQ-25/DP-20 v1.4.2; Vishwas decisions DP-05, DP-18, O-02, O-05, bootstrap deferral and prod reviewer v1.4.3, §13.6; observed findings unchanged; changelog §14) |
 | Basis | Observed behavior only (as-built BRD). No features are invented; roadmap items are marked **[ROADMAP – not live]**. |
 | Evidence | [screenshots/](screenshots/README.md) |
 | Architecture | [architecture-overview.md](../architecture/architecture-overview.md) v0.4, [ADRs](../architecture/adr/) |
@@ -710,3 +710,74 @@ Aligned with Architect overview §4.5 and openapi (6a8f805; OQ-14 rule approval 
 | 1.7 | 2026-10-13 | Remaining OQs decided (Vishwas via Chief of Staff, ~14:45 CT; §13.8; aligned with overview §4.5 and openapi 6a8f805, 968695f): OQ-10 → BR-50/US-44; OQ-14 warning-only supplier approval → BR-51/US-45 (rule approved, not GUESS); OQ-15 manual Assign training → BR-52/US-46; OQ-18 closed as deferred, 0.75 in BR-43; OQ-21 browser print → BR-54/US-48; OQ-22 Aerospace only, Industry filter hidden → BR-55/US-49; OQ-23 Issue SCAR → BR-53/US-47 (button placement GUESS). US-04 row 1 "Not in this build", row 8 "SaaS + API", GUESS marks removed. §11 statuses Decided; stale open-OQ line replaced. |
 | 1.7.1 | 2026-10-13 | Vishwas via Chief of Staff (~14:50 CT), aligned with Architect e444435: O-06 — AI modules stay in navigation with a "Coming later" page, SPA only, no `/api/ai/*` (new BR-56, US-50; §4.16, §4.17, §12 #1, BR-29/30/43 notes). O-03 — prod in its own AWS account before go-live, dev/stage shared (new pre-go-live OI-7; D-08, ADR-0009, ADR-0012). Issue SCAR placement approved: action bar next to stage advance, hidden when Closed, small supplier/title form, linked record; API 422 on Closed source (BR-53, US-47 ACs); GUESS removed. |
 | 1.7.2 | 2026-10-13 | Aligned with Architect 06820a8 (QA-41/42/43): Issue SCAR 422 code `scar_source_invalid` (source is a SCAR or Closed; BR-53, US-47); Assign training 422 code `training_source_invalid` (source is a SCAR; BR-52, US-46); BR-49/US-43: no UI sample control; dev/stage browser app adds `isSample: true` to every create via per-env build config, prod never sends it (overview §4.6). No other BRD error codes conflict with 06820a8. |
+| 1.7.3 | 2026-10-13 | Docs catch-up only (no requirement changes): new glossary §15; new roles §16 (product personas/approvers + project document owners); §14 changelog checked against `git log` and in-body version labels (1.0–1.7.2 complete; known quirk: v1.7 follows v1.6.3 with no v1.6.4). |
+
+## 15. Glossary
+Terms as used in this BRD. Industry expansions are generic; product behaviour is only what the BRD already states. Each term was confirmed present in the BRD body.
+
+| Term | Meaning | Where used |
+|---|---|---|
+| AS9100D | Aerospace quality-management standard that frames the Sentinel QA workspace and clause citations. | §1, §4.2, BR-21, US-04 |
+| AS9102 | First Article Inspection standard (Rev C); Forms 1/2/3 and preparer/evaluator segregation. | §1, §4.10, BR-33, BR-48 |
+| ASL | Approved Supplier List — suppliers reach "Active on ASL" after qualification approval; PO ASL block stays roadmap. | §4.8, BR-35, BR-51, OQ-14 |
+| CAPA | Corrective Action / Preventive Action quality record (Corrective Actions module). | §4.6, BR-12..BR-13, US-13..US-17 |
+| NCMR | Nonconforming Material Report quality record; alone among CAPA/NCMR/SCAR carries Disposition. | §4.6, BR-10, BR-13, US-16 |
+| SCAR | Supplier Corrective Action Request; may be issued from an NCMR or CAPA (BR-53). | §4.5, BR-53, US-47 |
+| FAI (Forms 1/2/3) | First Article Inspection: Form 1 part identity, Form 2 product accountability (GUESS fields), Form 3 characteristic accountability. | §4.10, BR-22, BR-34, BR-48, US-42 |
+| CoC | Certificate of conformance number — a GUESS Form 2 field on the FAI record. | BR-48, US-42 |
+| ITAR | International Traffic in Arms Regulations — controlled-data marker and paste warning. | BR-04, BR-44, §9 |
+| EAR | Export Administration Regulations — controlled-data marker and paste warning. | BR-04, BR-44, US-07 |
+| EAR99 | Configured controlled-data keyword/marker (with ECCN, NOFORN, etc.) under BR-44. | BR-44 |
+| ECCN | Export Control Classification Number — configured controlled-data marker. | BR-44 |
+| CUI | Controlled Unclassified Information — controlled-data marker; whole-word match (not substring of "circuit"). | BR-04, BR-44 |
+| NOFORN | "No Foreign Nationals" marking — configured controlled-data marker. | BR-44 |
+| CFR | Code of Federal Regulations; BR-44 treats `22 CFR 120–130` and `15 CFR 730–774` as part-number **ranges**. | BR-44, DP-03, v1.4.1 |
+| controlled-data gate | Server-side rule: free-text saves need attestation and are blocked (HTTP 422) on a marker hit. | BR-04, BR-05, BR-44, US-02, ADR-0005 |
+| attestation | User/server confirmation that text has no controlled data (`controlledDataAttestation=true`; logged as `controlledDataAttested`). | BR-04, BR-44, OQ-13 |
+| marker id | Identifier of the matched controlled-data keyword/range; logged and named in the 422 message; text itself is not logged. | BR-44, US-02, DP-03 |
+| isSample / sample data | Flag/label for synthetic "ILLUSTRATIVE — SAMPLE RECORDS"; set only at create, immutable; env-specific API rules in BR-49. | BR-31, BR-45, BR-49, US-43 |
+| QMS | Quality Management System — product domain (e.g. QMS Champion maturity assessment). | §1, §4.15, BR-28, BR-41 |
+| QM | Quality Manager — persona shorthand and default approver role label. | §2 (P1/P6), BR-20, US-10 |
+| reviewer of record | Human quality leader who approves drafts and keeps regulatory responsibility (AI outputs are drafts only). | §1, BR-09, §2 P1 |
+| segregation of duties | Independent named approver required for risky actions (e.g. NCMR Use as is / Repair; FAI preparer ≠ evaluator). | BR-10, BR-33, OQ-03, §2 P4 |
+| disposition (Use as is / Repair) | NCMR disposition choices; Use as is and Repair need an independent named approver (BR-10). | BR-10, BR-13, US-16, §6 |
+| PO | Purchase Order — Purchase Controls clause check against AS9100D §8.4.3 (manual in build). | §4.9, BR-21, BR-51, US-22 |
+| KPI | Key performance indicator shown on dashboard tiles and Agent reliability (deferred module). | §4.4, §4.17, BR-42, US-32 |
+| SSM | AWS Systems Manager Parameter Store — holds configurable weights, thresholds and marker list. | BR-44, BR-47, DP-20 |
+| OQ | Open Question in §11 (status: Answered / Closed / Decided / Deferred, etc.). | §11, §13.7, §13.8 |
+| DP | Decision Pending resolved by Vishwas (DP-01..DP-20 in §13.3 / §13.7). | §13.3, §13.7, dp-proposals.md |
+| BR | Business Rule in §7 (BR-01..BR-56). | §7 |
+| US | User Story with acceptance criteria in §8 (US-01..US-50). | §8 |
+| GUESS | Label for a BA/proposal item not grounded in observed evidence; accepted or replaced by Vishwas. | BR-48, US-42, dp-proposals.md, §13.7 |
+| O-xx | Architecture / overview open item id (e.g. O-03 prod account, O-06 Coming later). | §12, §13.6, §13.8, BR-56 |
+| QA-xx | Tester/QA review finding id referenced when the BRD absorbs a fix (e.g. QA-37, QA-40..43). | BR-31, BR-49, v1.7.2 changelog |
+| OI-x | Open item tracked under §13.7 after DP leftovers (e.g. OI-1 /compare, OI-6 isSample prod). | §13.7 |
+
+## 16. Roles
+Companion to §2 Personas. No existing section numbers are changed. Auth and multi-tenancy remain **out of scope** (§1.1).
+
+### 16.1 Product user roles
+| ID / role | Summary | Source |
+|---|---|---|
+| P1 Quality Manager / quality leader | Reviewer of record: approve drafts, audit-ready records, close CAPA/NCMR. | §2 |
+| P2 Quality engineer / inspector | Log nonconformances, run FAI, maintain calibration. | §2 |
+| P3 Supplier quality / buyer | Qualify suppliers, monitor risk, check PO flow-downs. | §2 |
+| P4 Engineering Lead / Production Supervisor | Independent approvers for FAI / PO / dispositions under segregation of duties. | §2, BR-20 |
+| P5 Training / document coordinator | Keep role competency and controlled documents current. | §2 |
+| P6 Prospect / evaluator | Judge fit before a pilot (marketing and public tools). | §2 |
+| P7 Platform/ops owner | Monitor agent quality and alerts (Agent reliability; deferred UI → Coming later). | §2, BR-56 |
+| Approval Roles (module) | Named convenience lists (Quality Manager, Engineering Lead, Production Supervisor defaults per BR-20). **Not access control** — "a convenience only, not a login or permission system" (BR-19, §4.14). | §4.14, BR-19, BR-20 |
+
+### 16.2 Project document roles
+Ownership of repo documents (facts already in the repo; not product RBAC):
+
+| Role | Owns / does | Evidence in repo |
+|---|---|---|
+| BusinessAnalyst | BRD, dp-proposals, ba-responses; records decisions and glossary/roles catch-up. | docs/INDEX.md; docs/reviews/ba-responses.md (Author); this BRD |
+| Architect | Architecture overview, ADRs, OpenAPI, architect-review; aligns build with BRD. | docs/architecture/*; docs/reviews/architect-review.md |
+| Developer | Implementation and developer-review findings (DEV-xx). | docs/reviews/developer-review.md |
+| Tester | QA review findings (QA-xx) and acceptance oracles against the BRD. | docs/reviews/qa-review.md |
+| InfraDeploy | Runbooks, IaC/deploy, infra-review; operator resets and seed/prod gates. | docs/runbooks/*; docs/reviews/infra-review.md; BRD §13.1 |
+| Chief of Staff | Relays Vishwas decisions into BRD/dp-proposals (timestamps in §13.7–§13.8). | BRD §13.7 OI-6, §13.8; dp-proposals.md |
+| Vishwas | Decision owner and approver (DPs, OQs, prod GitHub environment reviewer, prod seed approval). | §13.5–§13.8; BR-31; first-deploy / OI-4 |
+
