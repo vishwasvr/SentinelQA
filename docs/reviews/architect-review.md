@@ -88,3 +88,11 @@ All other in-scope stories and BRs map to an element. No requirement was changed
 1. **F-03 / BR-31:** should prod show illustrative sample records, or should they appear only in dev/stage?
 2. **F-10:** is client-side ⌘K search OK at pilot scale?
 3. Still open from before: O-05 throttle values, BRD OQs listed in O-07, pre-go-live checklist items O-10..O-12.
+
+## Resolution: Developer review #26–#29 (2026-10-13)
+| Finding | Status | Resolution |
+|---|---|---|
+| DEV-26 Lambda roles can't decrypt origin-verify | **Fixed** | `30-api.yaml`: both roles get `kms:Decrypt` on `key/*` with ViaService ssm, EncryptionContext PARAMETER_ARN = `/sentinelqa/<env>/edge/origin-verify`, ResourceAliases `alias/aws/ssm` (mirrors boundary). GetParameter already covered by `/sentinelqa/<env>/*`. Comment fixed, ADR-0015 updated. Alias condition unverified, dev smoke test required |
+| DEV-27 CFR ranges stored as literals | **Fixed (rule pending DP-03)** | `20-data.yaml`: keywords only in `controlled-data/markers`; new `controlled-data/cfr-ranges` structured ranges; citation regex + range check in code (overview §4, ADR-0005). Reference test `iac/tools/test_marker_patterns.py` |
+| DEV-28 boundary PutParameter too broad | **Fixed by InfraDeploy** (ba4fa73) | — |
+| DEV-29 no overdue index for CAPA/NCMR | **Fixed (index); rule open** | GSI2 `dueAt` = quality record `dueDate` (BRD §6 "days left (due)"); new sparse GSI3 `needByAt` for BR-15. Open: BRD defines no CAPA/NCMR overdue rule |

@@ -31,6 +31,8 @@ Resources:
         - { AttributeName: GSI1SK, AttributeType: S }
         - { AttributeName: GSI2PK, AttributeType: S }
         - { AttributeName: dueAt, AttributeType: S }      # generic sparse due attribute (overview §5.1)
+        - { AttributeName: GSI3PK, AttributeType: S }
+        - { AttributeName: needByAt, AttributeType: S }   # CAPA/NCMR need-by date (BR-15), separate from dueAt (dev #29)
       KeySchema:
         - { AttributeName: PK, KeyType: HASH }    # WS#<workspaceId> (tenancy seam)
         - { AttributeName: SK, KeyType: RANGE }
@@ -38,8 +40,11 @@ Resources:
         - IndexName: GSI1               # sparse review queue: GSI1PK=WS#<ws>#REVIEWQ only while awaiting review; GSI1SK=<severityRank>#<openedAt> (BR-14)
           KeySchema: [{ AttributeName: GSI1PK, KeyType: HASH }, { AttributeName: GSI1SK, KeyType: RANGE }]
           Projection: { ProjectionType: ALL }
-        - IndexName: GSI2               # sparse due index: GSI2PK=WS#<ws>#DUE#<entityType>, dueAt copied from the entity's own date (BR-15, BR-18, BR-25, training)
+        - IndexName: GSI2               # sparse due index: GSI2PK=WS#<ws>#DUE#<entityType>, dueAt copied from the entity's own due date (quality record dueDate, BR-18, BR-25, training)
           KeySchema: [{ AttributeName: GSI2PK, KeyType: HASH }, { AttributeName: dueAt, KeyType: RANGE }]
+          Projection: { ProjectionType: ALL }
+        - IndexName: GSI3               # sparse need-by index: GSI3PK=WS#<ws>#NEEDBY, needByAt=open CAPA/NCMR needByDate (BR-15 "Threatens delivery")
+          KeySchema: [{ AttributeName: GSI3PK, KeyType: HASH }, { AttributeName: needByAt, KeyType: RANGE }]
           Projection: { ProjectionType: ALL }
       Tags: [{ Key: env, Value: !Ref EnvName }]
   AuditLogTable:
@@ -82,8 +87,15 @@ Resources:
     Properties:
       Name: !Sub /sentinelqa/${EnvName}/controlled-data/markers
       Type: StringList
-      Description: BR-44 / D-14 block list. Matching is whole-word and case-insensitive (BRD v1.4). Marker id = list position
-      Value: 'ITAR,EAR,EAR99,ECCN,CUI,NOFORN,Distribution Statement,export controlled,22 CFR 120-130,15 CFR 730-774'
+      Description: BR-44 / D-14 KEYWORD markers. Literal, matched whole-word and case-insensitive (BRD v1.4). Marker id = K<list position>
+      Value: 'ITAR,EAR,EAR99,ECCN,CUI,NOFORN,Distribution Statement,export controlled'
+  ControlledCfrRangesParam:   # dev #27: CFR ranges as structured data, not literals (BR-44 reading; Vishwas sign-off pending DP-03)
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /sentinelqa/${EnvName}/controlled-data/cfr-ranges
+      Type: String
+      Description: BR-44 / D-14 CFR range markers. Gate finds citations (title, CFR, optional Part or section sign, part, optional .section) and checks the part in code. Marker id = R<list position>
+      Value: '[{"title":22,"partFrom":120,"partTo":130},{"title":15,"partFrom":730,"partTo":774}]'
 Outputs:
   DomainTableArn:
     Value: !GetAtt DomainTable.Arn

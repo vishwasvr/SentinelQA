@@ -51,7 +51,7 @@
 ## 4. Data flow and API conventions (current build)
 The contract is [api/openapi.yaml](api/openapi.yaml) (OpenAPI 3.1, BRD v1.4). Fields that depend on an open decision are marked `x-tbd: DP-nn`.
 1. The SPA calls CloudFront, e.g. `POST /api/quality-records` with `Idempotency-Key`, body `{ ..., controlledDataAttestation: true, actorName }`. CloudFront adds `X-Origin-Verify`.
-2. Middleware order: **origin header check** (403 `forbidden_origin`, ADR-0015) → workspace (`aerospace`) → **controlled-data gate (BR-44)** on free-text fields: missing attestation → 400 `gate:attestation_required`; marker hit (whole-word, case-insensitive, SSM list) → 422 `gate:controlled_marker`. Nothing is persisted and no audit event is written. Only the marker id is logged; the matched text never is. The gate metric `SentinelQA` / `ControlledDataBlocked` {`Env`} is emitted via EMF (Powertools Metrics). Request bodies are never logged.
+2. Middleware order: **origin header check** (403 `forbidden_origin`, ADR-0015) → workspace (`aerospace`) → **controlled-data gate (BR-44)** on free-text fields: missing attestation → 400 `gate:attestation_required`; marker hit (keywords whole-word, case-insensitive, SSM `controlled-data/markers`; CFR ranges via one citation-finding regex (title, `CFR`, optional `Part` or `§`, part number, optional `.section`) followed by a code check of the part number against the structured ranges in SSM `/sentinelqa/<env>/controlled-data/cfr-ranges` (`[{title:22,partFrom:120,partTo:130},{title:15,partFrom:730,partTo:774}]`). Any citation inside a range matches (e.g. `22 CFR 121.1`, `22 CFR Part 126`, `15 CFR § 774.1`), and the literal range text `22 CFR 120-130` still matches. BA recorded this reading in BR-44; Vishwas sign-off pending (DP-03). Reference check: `iac/tools/test_marker_patterns.py`) → 422 `gate:controlled_marker`. Nothing is persisted and no audit event is written. Only the marker id is logged; the matched text never is. The gate metric `SentinelQA` / `ControlledDataBlocked` {`Env`} is emitted via EMF (Powertools Metrics). Request bodies are never logged.
 3. Domain validation (BR-17/22/23/26/35/37; SoD per DP-08) → errors as `application/problem+json`.
 4. `TransactWriteItems` (`ClientRequestToken` = Idempotency-Key) puts or updates the item with `ConditionExpression version = :expected` (`If-Match`, 412 when stale, 428 when missing), and stage moves are also conditional on `stage = :from` (409). It appends an `AuditLog` put (`attribute_not_exists`) holding actor, event, from/to stage, snapshot and `controlledDataAttested`. The idempotency record is kept 24 h.
 5. **Soft delete everywhere** (BRD v1.4 §13.1): DELETE sets `deletedAt` plus a `DELETED` audit event. Undo is a reversal event. Lists, counts and pickers exclude deleted items. `DeleteItem`/`BatchWriteItem` are denied on both tables in **every** environment.
@@ -63,7 +63,7 @@ Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (te
 
 | BRD entity | PK / SK | Notes |
 |---|---|---|
-| Quality record (CAPA/NCMR/SCAR) | `WS#ws` / `QR#<id>` | type, title, description, severity, stage, clause, dueDate, needByDate, reviewerName, disposition, independentApprover, sourceRecordId (OQ-23). GSI1 stage/severityRank#openedAt (BR-14), GSI2 dueDate (BR-15) |
+| Quality record (CAPA/NCMR/SCAR) | `WS#ws` / `QR#<id>` | type, title, description, severity, stage, clause, dueDate, needByDate, reviewerName, disposition, independentApprover, sourceRecordId (OQ-23). GSI1 stage/severityRank#openedAt (BR-14), GSI2 dueDate (due / overdue), GSI3 needByDate (BR-15) |
 | Audit event | `AuditLog`: `WS#ws#ENT#<id>` / `<ts>#<ulid>` | actor {name, userId:null}, eventType, snapshot, controlledDataAttested, prevHash (optional tamper signal) |
 | Supplier | `WS#ws` / `SUP#<id>` | onTimePct, openScarCount, criticality, certRenewalDate. Score computed from SSM weights (D-07) |
 | Supplier qualification | `WS#ws` / `SQ#<id>` | stage, scope, approverName, approvalDate, reevalDate (GSI2) |
@@ -81,11 +81,12 @@ Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (te
 |---|---|---|---|
 | List an entity type | table | `PK=WS#ws`, `begins_with(SK,'<TYPE>#')` | Filter `attribute_not_exists(deletedAt)`. Projection: lists return summary fields |
 | Review queue (BR-14) | **GSI1 (sparse)** | `GSI1PK=WS#ws#REVIEWQ` | `GSI1SK=<severityRank>#<openedAt>` (Critical=1). Written only while the record is awaiting review; which stages count, and the age basis, are TBD (DP-13, DP-02) |
-| Due / need-by / re-eval / next-due (BR-15/18/25, training) | **GSI2 (sparse)** | `GSI2PK=WS#ws#DUE#<entityType>`, `dueAt <= :date` | `dueAt` copied from each entity's own date (below). Removed on close/complete/soft delete |
+| Need-by "Threatens delivery" (BR-15) | **GSI3 (sparse)** | `GSI3PK=WS#ws#NEEDBY`, `needByAt <= :today+14d` | Open CAPA/NCMR with a `needByDate` only. Removed on close/soft delete |
+| Due / overdue / re-eval / next-due (quality records, BR-18/25, training) | **GSI2 (sparse)** | `GSI2PK=WS#ws#DUE#<entityType>`, `dueAt <= :date` | `dueAt` copied from each entity's own date (below). Removed on close/complete/soft delete |
 | Timeline | AuditLog | `PK=WS#ws#ENT#<id>` | Ascending SK |
 | FAI Form 3 rows | table | `PK=WS#ws`, `begins_with(SK,'FAI#<uuid>#CH#')` | `CH#<zero-padded 4-digit charNo>`. One row + its audit event per transaction (dev #20) |
 
-**`dueAt` mapping (sparse: set only while the item is open/active):** Quality record → `needByDate` (open CAPA/NCMR, BR-15) · Supplier qualification → `reevalDate` (Active on ASL, BR-18) · Calibration → `nextDueDate` (BR-25) · Training → `dueDate` (until completed) · Document → `nextReviewDate` (only when set; reminders not observed, OQ-17).
+**`dueAt` mapping (sparse: set only while the item is open/active):** Quality record → `dueDate` ("days left (due)", BRD §6, open CAPA/NCMR, so `dueAt < :today` lists overdue ones; `needByDate` goes to GSI3, dev #29). Open item: the BRD defines no overdue status/rule for CAPA/NCMR (BR-42 counts only training, calibration, supplier), so the index supports the query but no UI rule is added · Supplier qualification → `reevalDate` (Active on ASL, BR-18) · Calibration → `nextDueDate` (BR-25) · Training → `dueDate` (until completed) · Document → `nextReviewDate` (only when set; reminders not observed, OQ-17).
 
 ### 5.2 Sample data seed (BR-31, BRD v1.4: allowed in every env incl. prod)
 - A versioned seed set (`seed/sample-v<n>.json`, synthetic only) is loaded by a **one-off seed command** (`npm run seed -- --env <env>`), run through the normal `records-api` write path, so the gate, validation and audit apply. Each item carries `isSample=true`. The SPA labels these items "ILLUSTRATIVE — SAMPLE RECORDS" (plus the DEMO badge where observed).
@@ -154,7 +155,7 @@ A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as 
 - ~~O-01~~ **Resolved:** monthly job running daily-window incremental DynamoDB exports to S3 Glacier, 7-year lifecycle (`25-backup`).
 - **O-02** CloudWatch Logs retention (90 days proposed).
 - **O-03** Single-account blast radius. Revisit before production customer data.
-- **O-04** Tuned values for D-07 (the PLACEHOLDER defaults ship, DP-16). Marker list decided in BRD v1.4 (incl. ITAR, EAR, CUI, `22 CFR 120-130`, `15 CFR 730-774`; whole-word, case-insensitive). Normalisation, evasion and exempt fields are still pending (DP-03).
+- **O-04** Tuned values for D-07 (the PLACEHOLDER defaults ship, DP-16). Marker list decided in BRD v1.4 (incl. ITAR, EAR, CUI, `22 CFR 120-130`, `15 CFR 730-774`; whole-word, case-insensitive). CFR ranges are stored as structured ranges and checked in code (dev #27, §4); exact range rules pending Vishwas sign-off. Normalisation, evasion and exempt fields are still pending (DP-03).
 - **O-05** Without WAF (D-11), public endpoints rely on API Gateway throttling. Set the throttle values.
 - **O-06** Whether hidden AI modules show a "coming later" state or are removed from navigation (UX).
 - **O-13** Decisions pending in BRD v1.4 §13.3 (DP-01..DP-19). Fields that depend on them are `x-tbd` in the OpenAPI spec.
