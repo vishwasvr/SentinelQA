@@ -1,10 +1,10 @@
-# Delivery strategy: test environment, branching, CI/CD promotion and versioning (PROPOSAL for Vishwas)
+# Delivery strategy: test environment, branching, CI/CD promotion and versioning (DECIDED)
 Owners: InfraDeploy + Architect (joint); Tester: test stages.
-Status: PROPOSED, 2026-10-13. Architect drafted this; InfraDeploy adds infra details; Tester adds test stages (§3a). Docs only: nothing is created and nothing is pushed.
+Status: DECIDED by Vishwas, 2026-10-13 (decisions 1-4, stage gate and coverage). Architect drafted this; InfraDeploy adds infra details; Tester adds test stages (§3a). Docs only: nothing is created and nothing is pushed.
 
 Today, there is one branch (`main`) with direct pushes. `.github/workflows/` does not exist in the repo yet, so `ci.yml` and `deploy.yml` are designed in ADR-0012 and ADR-0014 but not written. In AWS, only `SentinelQA-dev-Bootstrap` and `SentinelQA-Account-OIDC` exist (account 723940054516). Stage and prod have not been bootstrapped.
 
-Infra note: `.github/workflows/` does not exist yet. `ci.yml` and `deploy.yml` are designed in [ADR-0012](adr/0012-ci-cd-github-actions-oidc.md), [ADR-0014](adr/0014-build-packaging.md) and [ci-and-data-guards.md](iac/ci-and-data-guards.md) §1, and are created only when building opens. Everything below marked (B) is a **PROPOSAL pending Vishwas's decision**.
+Infra note: `.github/workflows/` does not exist yet. `ci.yml` and `deploy.yml` are designed in [ADR-0012](adr/0012-ci-cd-github-actions-oidc.md), [ADR-0014](adr/0014-build-packaging.md) and [ci-and-data-guards.md](iac/ci-and-data-guards.md) §1, and are created only when building opens. Vishwas decided the options marked DECIDED below. Creating the workflows, stage or any GitHub/AWS setting still needs his approval when building opens.
 
 ## 1. Environments
 | Option | What it is | Cost/month (cost-estimate §3b) |
@@ -44,7 +44,7 @@ Same templates and stack order as dev ([first-deploy.md](../runbooks/first-deplo
 
 Agents open PRs; Vishwas (or a designated reviewer) approves the merge. Branch protection is a GitHub setting, so Vishwas makes the change himself or approves it.
 
-### 2a. GitHub settings (PROPOSAL; Vishwas applies or approves, [WRITE, repo settings])
+### 2a. GitHub settings (DECIDED design; Vishwas applies or approves, [WRITE, repo settings])
 **Environments** (ADR-0012, first-deploy §5, prod-account-split §4):
 
 | Env | Account | Variables (not secrets) | Required reviewer | Deployment branches/tags |
