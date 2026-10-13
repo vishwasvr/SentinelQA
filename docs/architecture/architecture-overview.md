@@ -110,6 +110,15 @@ DynamoDB items can be at most 400 KB, and so can each item in a `TransactWriteIt
 
 `scripts/seed` does **not** call the API. It writes straight to DynamoDB with the operator's temporary `aws login` session, never with the records-api role. Each fixture record goes in through the same audit write module as the API (Developer spec `audit-write-path.md`), in one `TransactWriteItems` call with its `AuditLog` entry, with actor `{name:"seed", userId:null}` and `isSample=true`. That way BR-08 holds for seeded data too. The API's isSample 422s (`non_sample_data_forbidden`, `sample_flag_forbidden_in_prod`, `sample_flag_immutable`) apply only to API callers, so they don't conflict with the seed command. In prod, running the seed needs Vishwas's approval, like any other prod write (`ci-and-data-guards.md` §3).
 
+### 4.5 Decisions of 2026-10-13 (OQ-10/14/15/18/21/22/23)
+- **OQ-14 (GUESS for the link design):** `PoCheck.supplierId` is an optional link to a Supplier. `supplierApprovalWarning` is computed on read (true when the linked Supplier has no qualification at Active on ASL). It is a warning only and never blocks a save.
+- **OQ-15:** manual "Assign training" via `POST /api/quality-records/{id}/training` (CAPA/NCMR) and `POST /api/po-checks/{id}/training` (PO findings). It creates a Training item with `sourceRecordId`/`sourceRecordType`, all in one transaction with the audit event. No automation.
+- **OQ-23:** `POST /api/quality-records/{id}/scar` on an NCMR/CAPA creates a SCAR with `sourceRecordId` and `supplierId` set.
+- **OQ-21:** print is browser print only. The SPA adds a header (ID, status, printed date/by) and an "Uncontrolled when printed" footer. There's no route and no stored PDF.
+- **OQ-22:** Aerospace only. The SPA hides the Industry filter, and the API has no industry param.
+- **OQ-18:** closed as deferred with AI. The observed 0.75 is recorded in the BRD; nothing is built.
+- **/compare:** SPA-only static table. Row 1 "Clause-level citation" says "Not in this build", and row 8 keeps "SaaS + API".
+
 ## 5. Data model (BRD §6)
 Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (tenancy seam). **No TTL**. Prod retained ≥ 7 years (D-03, amended: prod only, O-08). Prod may also hold labelled sample records (BR-31). Dev/stage hold synthetic or labelled sample data only, never real customer records (BR-45).
 
@@ -144,7 +153,7 @@ Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (te
 - A versioned seed set (`seed/sample-v<n>.json`, synthetic only) is loaded by a **one-off seed command** (`npm run seed -- --env <env>`), run through the normal `records-api` write path, so the gate, validation and audit apply. Each item carries `isSample=true`. The SPA labels these items "ILLUSTRATIVE — SAMPLE RECORDS" (plus the DEMO badge where observed).
 - Seed IDs are deterministic (the idempotency key is derived from the seed id), so re-runs are no-ops. The audit events carry `actorName="seed"` and event type `CREATED`. They are real append-only events: in prod they stay for 7 years like any other event.
 - **Removal is a soft delete** (`deletedAt` + `DELETED` event), never a hard delete, in every env. In dev/stage, a full reset with InfraDeploy's [reset runbook](../runbooks/nonprod-table-reset.md) is followed by a seed re-run. Prod never gets resets.
-- Reports and KPIs can include or exclude `isSample` items. The default follows the observed UI (samples counted). **Which way is TBD (OQ-10, partially answered).**
+- Reports and KPIs can include or exclude `isSample` items. The default follows the observed UI (samples counted). **OQ-10 decided (Vishwas, 2026-10-13):** the Records page shows all records, with samples labelled.
 
 ## 6. AI seam (deferred, D-01)
 - Reserved API path `/api/ai/*` (not routed). Reserved package `src/ai/` with a `DraftProvider` interface (`draft(taskType, text) → {draft, citations[], confidence}`) and no implementation.
@@ -211,7 +220,7 @@ A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as 
 - ~~O-05~~ **Resolved (Vishwas, 2026-10-13):** without WAF (D-11), public endpoints rely on API Gateway throttling: HTTP API stage default route **rate 10 req/s, burst 20** (`ThrottleRate`/`ThrottleBurst` defaults in `30-api.yaml`; params files must match). Excess gets 429. Per-route overrides only if real traffic shows a need.
 - **O-06** Whether hidden AI modules show a "coming later" state or are removed from navigation (UX).
 - ~~O-13~~ **Resolved (Vishwas, 2026-10-13):** all DPs decided. DP-02/03/04/06–11/13/14/16/17/19 as recommended in [dp-proposals.md](../requirements/dp-proposals.md); DP-01 with soft-deleted IDs kept reserved (counter + reservation items in the same transaction as the record and audit event); DP-12 with timezone **America/New_York** (SSM `workspace/timezone`); DP-20 default `dueDate` = open + N days (PLACEHOLDER N). Reflected in `openapi.yaml` (`x-decision`) and 20-data SSM params.
-- **O-07** BRD OQs still open (aligned with BRD v1.4 §12; OQ-10 partially answered by BR-31): OQ-03, 06, 07, 08, 09, 10, 14, 15, 17, 18, 21, 22, 23. OQ-05 is deferred with AI. OQ-13 is **closed** (attestation logged on audit events, §4 step 4 / ADR-0005). OQ-01/02/04 are resolved (BR-47 / BR-45).
+- ~~O-07~~ **Resolved:** BRD OQs still open (aligned with BRD v1.4 §12; OQ-10 partially answered by BR-31): none. OQ-03/06/07/09/17 closed in BRD v1.5; OQ-08/10/14/15/18/21/22/23 decided 2026-10-13 (§4.5). OQ-05 is deferred with AI. OQ-13 is **closed** (attestation logged on audit events, §4 step 4 / ADR-0005). OQ-01/02/04 are resolved (BR-47 / BR-45).
 
 ## 14. Pre-go-live checklist (prod)
 Complete before the prod go-live. Items deferred by Vishwas on 2026-10-13.

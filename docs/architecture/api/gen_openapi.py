@@ -43,6 +43,7 @@ schemas={
    'disposition':enum('Use as is','Rework','Repair','Scrap','Return to supplier'),
    'independentApprover':s('string',description='Required for Use as is / Repair (BR-10). Independent = different from the author after trim/whitespace-collapse/case-fold; hard block 409 sod_violation (DP-08).'),
    'sourceRecordId':s('string',description='e.g. NCMR that raised a SCAR (OQ-23)'),
+   'supplierId':s('string',description='OQ-23 DECIDED 2026-10-13: required on a SCAR (set by issueScar); the Supplier it is issued to. Feeds Supplier.openScarCount.'),
    'stepFields':dec('DP-02','CAPA/NCMR step 2–6 fields per the approved step specs',s('object'))}),
  'Supplier':s('object',allOf=[R('Meta'),R('WriteCommon')],description='Supplier master record with create/edit (DP-10).',properties={
    'name':STR,'commodity':STR,'criticality':enum('Critical','Standard'),
@@ -59,7 +60,9 @@ schemas={
    'stepFields':dec('DP-02','SQ step 3/4/6 fields per the approved step specs; forward-only',s('object'))}),
  'PoFinding':s('object',properties={'rowId':ro(STR),'requirement':FT(),'clause':enum('AS9100D §8.4.3','AS9102'),'status':enum('Missing','Weak','Present','Not captured'),'suggestedWording':FT(),'whyCitation':FT('"Why this citation" note.')}),
  'PoCheck':s('object',allOf=[R('Meta'),R('WriteCommon')],description='Manual entry, observed fields only (BRD §13.2). Field classes per DP-04.',properties={
-   'poNumber':STR,'supplier':STR,'part':STR,'quantity':STR,'revision':FT('Observed as free text.'),
+   'poNumber':STR,'supplier':STR,
+   'supplierId':s('string',description='OQ-14 DECIDED 2026-10-13 (link design is a GUESS, not observed): optional link to a Supplier. Free-text supplier stays as observed.'),
+   'supplierApprovalWarning':ro(s('boolean',description='OQ-14: WARNING ONLY, never blocks a save. GUESS: true when supplierId is set and that Supplier has no SupplierQualification at Active on ASL. Computed on read.')),'part':STR,'quantity':STR,'revision':FT('Observed as free text.'),
    'findings':s('array',items=R('PoFinding')),
    'summaryCounts':ro(s('object',description='Derived count per status',additionalProperties=s('integer')))}),
  'Fai':s('object',allOf=[R('Meta'),R('WriteCommon')],required=['partNumber','partName'],properties={
@@ -85,7 +88,9 @@ schemas={
    'certificateRef':STR,'lastCalibrationDate':DATE,'nextDueDate':{**DATE,'description':'+6/+12/+24 months helper; clamps to last day of month (DP-12)'},
    'calibratedBy':STR,'nistStatement':FT('NIST traceability statement.'),
    'status':ro(enum('Active','Due soon','Overdue'))}),
- 'Training':s('object',allOf=[R('Meta'),R('WriteCommon')],properties={'role':STR,'person':STR,'course':STR,'sourceRecordId':STR,'standardOrSop':STR,'dueDate':DATE,
+ 'IssueScar':s('object',allOf=[R('WriteCommon')],required=['supplierId','title'],properties={'supplierId':STR,'title':FT('SCAR title.'),'severity':enum('Critical','Major','Minor')},description='OQ-23: creates a SCAR QualityRecord with sourceRecordId = this NCMR/CAPA and the given supplierId, in one transaction with its CREATED audit event. 404 if supplierId is unknown.'),
+ 'AssignTraining':s('object',allOf=[R('WriteCommon')],required=['person','course'],properties={'person':STR,'role':STR,'course':STR,'standardOrSop':STR,'dueDate':DATE,'findingRowId':s('string',description='PO checks only: the finding row this came from')},description='OQ-15: manual only, no automation. Creates a Training item with sourceRecordId (and sourceRecordType) set to this record, plus its CREATED audit event, in one transaction.'),
+ 'Training':s('object',allOf=[R('Meta'),R('WriteCommon')],properties={'role':STR,'person':STR,'course':STR,'sourceRecordId':STR,'sourceRecordType':ro(enum('CAPA','NCMR','PO')),'standardOrSop':STR,'dueDate':DATE,
    'completedDate':ro(DATE),'status':ro(enum('Current','Due soon','Overdue','Not started')),
    'recurrence':dec('DP-07','Per-course recurrence in months (none = one-off); next due = completion + interval; Not started until start-by passes, then Overdue',s('object'))}),
  'Document':s('object',allOf=[R('Meta'),R('WriteCommon')],required=['name'],properties={
@@ -139,10 +144,13 @@ def action(path,opid,tag,schema,desc,fn='records-api'):
 q=lambda n,sc:{'name':n,'in':'query','schema':sc}
 collection('/api/quality-records','QualityRecord','Quality records',extra=[q('type',enum('CAPA','NCMR','SCAR')),q('severity',STR),q('stage',STR),q('standard',STR)])
 action('/api/quality-records/{id}/transitions','transitionQualityRecord','Quality records',R('Transition'),'Stage advance (BR-13). Rules per DP-02.')
+action('/api/quality-records/{id}/scar','issueScar','Quality records',R('IssueScar'),'Issue SCAR (OQ-23) from an NCMR or CAPA. 422 if the source is a SCAR.')
+action('/api/quality-records/{id}/training','assignTrainingFromQualityRecord','Training',R('AssignTraining'),'Assign training from a CAPA/NCMR (OQ-15). 422 for SCAR.')
 collection('/api/suppliers','Supplier','Suppliers',extra=[q('standard',STR)])
 collection('/api/supplier-qualifications','SupplierQualification','Supplier qualification',extra=[q('stage',STR)])
 action('/api/supplier-qualifications/{id}/transitions','transitionSupplierQualification','Supplier qualification',R('Transition'),'Step advance (BR-36). To Active on ASL requires approverName (BR-35).')
 collection('/api/po-checks','PoCheck','Purchase controls',extra=[q('status',STR),q('clause',STR)])
+action('/api/po-checks/{id}/training','assignTrainingFromPoCheck','Training',R('AssignTraining'),'Assign training from a PO finding (OQ-15).')
 collection('/api/fai','Fai','FAI')
 action('/api/fai/{id}/signatures','signFai','FAI',R('FaiSignature'),'Sign as preparer/evaluator (BR-33).')
 paths['/api/fai/{id}/characteristics']={'x-sentinelqa-function':'records-api','parameters':[P('Id')],

@@ -232,6 +232,86 @@ paths:
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+  /api/quality-records/{id}/scar:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    post:
+      tags:
+      - Quality records
+      operationId: issueScar
+      description: Issue SCAR (OQ-23) from an NCMR or CAPA. 422 if the source is a SCAR.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueScar'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/quality-records/{id}/training:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    post:
+      tags:
+      - Training
+      operationId: assignTrainingFromQualityRecord
+      description: Assign training from a CAPA/NCMR (OQ-15). 422 for SCAR.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignTraining'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
   /api/suppliers:
     x-sentinelqa-function: records-api
     get:
@@ -690,6 +770,46 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+  /api/po-checks/{id}/training:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    post:
+      tags:
+      - Training
+      operationId: assignTrainingFromPoCheck
+      description: Assign training from a PO finding (OQ-15).
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignTraining'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
   /api/fai:
@@ -2212,6 +2332,9 @@ components:
         sourceRecordId:
           type: string
           description: e.g. NCMR that raised a SCAR (OQ-23)
+        supplierId:
+          type: string
+          description: 'OQ-23 DECIDED 2026-10-13: required on a SCAR (set by issueScar); the Supplier it is issued to. Feeds Supplier.openScarCount.'
         stepFields:
           type: object
           description: CAPA/NCMR step 2–6 fields per the approved step specs (Decided DP-02, 2026-10-13; see dp-proposals.md)
@@ -2357,6 +2480,13 @@ components:
       properties:
         poNumber: *id001
         supplier: *id001
+        supplierId:
+          type: string
+          description: 'OQ-14 DECIDED 2026-10-13 (link design is a GUESS, not observed): optional link to a Supplier. Free-text supplier stays as observed.'
+        supplierApprovalWarning:
+          type: boolean
+          description: 'OQ-14: WARNING ONLY, never blocks a save. GUESS: true when supplierId is set and that Supplier has no SupplierQualification at Active on ASL. Computed on read.'
+          readOnly: true
         part: *id001
         quantity: *id001
         revision:
@@ -2579,6 +2709,44 @@ components:
           - Due soon
           - Overdue
           readOnly: true
+    IssueScar:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/WriteCommon'
+      required:
+      - supplierId
+      - title
+      properties:
+        supplierId: *id001
+        title:
+          type: string
+          description: 'SCAR title. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
+          x-free-text: true
+        severity:
+          type: string
+          enum:
+          - Critical
+          - Major
+          - Minor
+      description: 'OQ-23: creates a SCAR QualityRecord with sourceRecordId = this NCMR/CAPA and the given supplierId, in one transaction with its CREATED audit event. 404 if supplierId is unknown.'
+    AssignTraining:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/WriteCommon'
+      required:
+      - person
+      - course
+      properties:
+        person: *id001
+        role: *id001
+        course: *id001
+        standardOrSop: *id001
+        dueDate: *id004
+        findingRowId:
+          type: string
+          description: 'PO checks only: the finding row this came from'
+      description: 'OQ-15: manual only, no automation. Creates a Training item with sourceRecordId (and sourceRecordType) set to this record, plus its CREATED audit event, in one transaction.'
     Training:
       type: object
       allOf:
@@ -2589,6 +2757,13 @@ components:
         person: *id001
         course: *id001
         sourceRecordId: *id001
+        sourceRecordType:
+          type: string
+          enum:
+          - CAPA
+          - NCMR
+          - PO
+          readOnly: true
         standardOrSop: *id001
         dueDate: *id004
         completedDate:
