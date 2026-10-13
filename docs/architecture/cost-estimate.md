@@ -192,6 +192,13 @@ See §0 (20 / 50 / 100 users, year 1 and year 7). Variable cost ≈ $0.04–0.05
 5. **Backup exports:** ≈ $0.06–0.09/month (10 MB minimum per export dominates).
 6. **KMS requests to `aws/dynamodb`:** ≈ $0.06 without free tier at 20 users. ≈ $0.24 at 100 users after the 20k free.
 
+## 9a. O-03 separate prod account (decided 2026-10-13): cost effect, NOT re-priced
+- The account itself, AWS Organizations and IAM Identity Center (SSO) have no fee.
+- Always-free allowances apply **per account**, so prod and non-prod no longer share them (§1 U-16 note, §3 "account-wide" columns, the ≈ 3 GB DynamoDB overage in §0). Splitting should lower or keep the total, not raise it. The account-wide figures in §0–§3 are now out of date for prod.
+- New in the prod account: a second CloudTrail trail's S3 storage (first management copy is free) and a budget alarm (AWS Budgets pricing still unverified, §6).
+- A newly created account may get the credit-based free tier (§4), which is unverified for accounts created under an existing Organization.
+- **TODO before go-live (OI-7):** re-price §0–§3 per account. I haven't recalculated these numbers.
+
 ## 10. Caveats
 - Usage is assumed, not measured. Validate with Cost Explorer after month 1.
 - List prices retrieved 2026-10-13. No tax, Support plan, discounts, or credits included. New accounts (on/after 2025-07-15) get up to $200 credits, which would cover several years at this run rate if the credits didn't expire after 12 months.
