@@ -14,11 +14,13 @@
     "coverage": "vitest run --coverage",
     "coverage:gate": "node scripts/ci/coverage-gate.mjs",
     "seed-fixture-lint": "node scripts/ci/seed-fixture-lint.mjs",
+    "params-schema": "node scripts/ci/params-schema.mjs",
     "releases-path-check": "node scripts/ci/releases-path-check.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
     "@vitest/coverage-v8": "^3.2.7",
+    "ajv": "^8.20.0",
     "eslint": "^9.39.5",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.71.2",
