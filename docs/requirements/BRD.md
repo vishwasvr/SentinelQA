@@ -4,7 +4,7 @@
 |---|---|
 | Product | Sentinel QA — "AI Quality Manager" for AS9100D aerospace suppliers |
 | Source | https://sentinel-qa.lovable.app/ (public, unauthenticated exploration) |
-| Version / date | 1.2.2 — 2026-10-13 (v1.1 + scope decisions from architecture, see §12 and §13; observed findings unchanged) |
+| Version / date | 1.2.3 — 2026-10-13 (v1.1 + scope decisions from architecture, see §12 and §13; observed findings unchanged) |
 | Basis | Observed behavior only (as-built BRD). No features are invented; roadmap items are marked **[ROADMAP – not live]**. |
 | Evidence | [screenshots/](screenshots/README.md) |
 | Architecture | [architecture-overview.md](../architecture/architecture-overview.md) v0.4, [ADRs](../architecture/adr/) |
@@ -279,7 +279,7 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **BR-05** The action button stays disabled until the checkbox is ticked (and, where applicable, text is present). The CAPA/NCMR create form shows "Tick the controlled-data confirmation to continue." **[Changed v1.2]** *Build rule:* the checkbox remains, and a server-side controlled-data keyword hit additionally blocks the save (BR-44).
 - **BR-06** Pasted text is sent to the server and the AI provider for processing and is not retained. Demo records are stored in the browser only. **[Changed v1.2]** *Build rule:* no text is sent to an AI provider (AI out of scope); records are persisted server-side, not in the browser (BR-45, D-03).
 - **BR-07** No files are stored. Certificates and documents are recorded as references or links only (e.g. "Where this document lives", calibration certificate reference).
-- **BR-08** Every record has an audit timeline: creation, stage changes, AI draft acceptances, reviewer decisions. When signed in, each event writes an immutable activity_log row with the actor and a snapshot. **[Changed v1.2]** *Build rule:* the audit log is append-only in every environment, independent of sign-in; corrections are new events (BR-46, D-05, ADR-0006). AI draft acceptance events are reserved but not emitted (AI deferred).
+- **BR-08** Every record has an audit timeline: creation, stage changes, AI draft acceptances, reviewer decisions. When signed in, each event writes an immutable activity_log row with the actor and a snapshot. **[Changed v1.2]** *Build rule:* the app writes the audit log append-only, independent of sign-in; corrections are new events, and single-event updates/deletes are denied in every environment. Prod is strictly append-only; dev/stage admins may do full table resets per decision C-1 (BR-46, D-05, ADR-0006). AI draft acceptance events are reserved but not emitted (AI deferred).
 - **BR-09** The human quality leader is the reviewer of record. AI outputs are drafts only.
 - **BR-10** Segregation of duties: the "Use as is" and "Repair" NCMR dispositions need an independent named approver.
 - **BR-11** CAPA/NCMR need a reviewer name ("Your name" + Save). The name is recorded on each step.
@@ -493,3 +493,4 @@ Still open OQs: OQ-03, 06, 07, 08, 09, 10, 14, 15, 17, 18, 21, 22, 23 (consisten
 | 1.2 | 2026-10-13 | Architecture scope decisions (§12): AI generate/draft flows deferred with `/api/ai/*` seam; server-side persistence with prod-only 7-year retention; controlled-data keyword hit blocks all free-text saves (BR-44); configurable risk weights/bands and due-soon thresholds (BR-47); append-only audit log (BR-46); OQ-04 closed, OQ-05/OQ-13 deferred, OQ-01/OQ-02 resolved as configurable. Observed findings unchanged. |
 | 1.2.1 | 2026-10-13 | OQ-13 changed from Deferred to Closed: the build logs `controlledDataAttested` on audit events for all free-text saves (architecture-overview §4, ADR-0005, BR-44). |
 | 1.2.2 | 2026-10-13 | BR-46 amended per decision C-1: append-only covers app behavior; single-event updates/deletes denied everywhere; prod strictly append-only; dev/stage admins may do full table resets. OQ-13 citation corrected to architecture-overview §4 / ADR-0005. |
+| 1.2.3 | 2026-10-13 | BR-08 build rule aligned with BR-46/C-1 (dev/stage full table resets; prod strictly append-only). |
