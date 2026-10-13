@@ -9,12 +9,14 @@ Parameters:
     AllowedValues: [lean, strict]
     Default: lean
     Description: lean = non-prod (dev/stage), strict = prod (ADR-0013)
-  ArtifactBucket:
-    Type: String
   RecordsApiKey:
     Type: String
+    AllowedPattern: '^[0-9a-f]{7,40}/records-api\.zip$'
+    Description: <commit-sha>/records-api.zip, supplied by the pipeline (ADR-0014)
   ReportsApiKey:
     Type: String
+    AllowedPattern: '^[0-9a-f]{7,40}/reports-api\.zip$'
+    Description: <commit-sha>/reports-api.zip, supplied by the pipeline (ADR-0014)
   ThrottleRate:
     Type: Number
     Default: 20          # TODO O-05
@@ -32,31 +34,40 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement: [{ Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }]
-      ManagedPolicyArns: !If
-        - IsStrict
-        - [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole', !Sub 'arn:${AWS::Partition}:iam::aws:policy/AWSXRayDaemonWriteAccess']   # X-Ray Active in strict
-        - [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole']
+      PermissionsBoundary: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AppRoleBoundaryArn' }
       Policies:
         - PolicyName: least-privilege
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              - Effect: Allow                     # own log group only (no managed AWSLambdaBasicExecutionRole wildcards)
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/SentinelQA-${EnvName}-records-api:*'
+              - !If
+                - IsStrict
+                - { Effect: Allow, Action: [xray:PutTraceSegments, xray:PutTelemetryRecords], Resource: '*' }   # X-Ray Active in strict
+                - !Ref AWS::NoValue
               - Effect: Allow
                 Action: [dynamodb:GetItem, dynamodb:Query, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:ConditionCheckItem]
                 Resource:
                   - { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' }
                   - !Sub [ '${T}/index/*', { T: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' } } ]
               - Effect: Allow
-                Action: dynamodb:PutItem          # append-only audit (conditional put in code)
+                Action: dynamodb:PutItem          # append-only audit (conditional put attribute_not_exists in code)
                 Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' }
+              - Effect: Allow                     # read-only timeline (US-03, BR-08, BR-36) + prevHash lookup
+                Action: [dynamodb:GetItem, dynamodb:Query]
+                Resource:
+                  - { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' }
+                  - !Sub [ '${T}/index/*', { T: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' } } ]
               - Effect: Deny                      # ADR-0006
                 Action: [dynamodb:UpdateItem, dynamodb:DeleteItem, dynamodb:BatchWriteItem]
                 Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' }
-              - Effect: Deny
+              - Effect: Deny                      # ALL envs: removals are soft deletes + audit event (BRD v1.4 §13.1)
                 Action: [dynamodb:DeleteItem, dynamodb:BatchWriteItem]
                 Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' }
               - Effect: Allow
-                Action: [ssm:GetParameter, ssm:GetParameters, ssm:GetParametersByPath]
+                Action: [ssm:GetParameter, ssm:GetParameters]   # BR-47 config, markers, origin-verify SecureString (ADR-0015)
                 Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*'
   ReportsApiRole:
     Type: AWS::IAM::Role
@@ -65,12 +76,15 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement: [{ Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }]
-      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole']
+      PermissionsBoundary: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AppRoleBoundaryArn' }
       Policies:
         - PolicyName: read-only
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              - Effect: Allow                     # own log group only (no managed AWSLambdaBasicExecutionRole wildcards)
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/SentinelQA-${EnvName}-reports-api:*'
               - Effect: Allow
                 Action: [dynamodb:GetItem, dynamodb:Query]
                 Resource:
@@ -81,6 +95,7 @@ Resources:
                 Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*'
   RecordsApiFn:
     Type: AWS::Lambda::Function
+    DependsOn: RecordsLogs        # create the log group first (dev #18)
     Properties:
       FunctionName: !Sub SentinelQA-${EnvName}-records-api
       Runtime: nodejs24.x          # TypeScript compiled to JS (D-09)
@@ -89,7 +104,7 @@ Resources:
       Timeout: 10
       MemorySize: 512
       Role: !GetAtt RecordsApiRole.Arn
-      Code: { S3Bucket: !Ref ArtifactBucket, S3Key: !Ref RecordsApiKey }
+      Code: { S3Bucket: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-ArtifactBucketName' }, S3Key: !Ref RecordsApiKey }
       Environment:
         Variables:
           ENV_NAME: !Ref EnvName
@@ -99,17 +114,21 @@ Resources:
       TracingConfig: { Mode: !If [IsStrict, Active, PassThrough] }
   ReportsApiFn:
     Type: AWS::Lambda::Function
+    DependsOn: ReportsLogs
     Properties:
       FunctionName: !Sub SentinelQA-${EnvName}-reports-api
       Runtime: nodejs24.x
       Handler: index.handler
       Architectures: [arm64]
       Timeout: 10
+      MemorySize: 512
       Role: !GetAtt ReportsApiRole.Arn
-      Code: { S3Bucket: !Ref ArtifactBucket, S3Key: !Ref ReportsApiKey }
+      Code: { S3Bucket: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-ArtifactBucketName' }, S3Key: !Ref ReportsApiKey }
       Environment:
         Variables:
+          ENV_NAME: !Ref EnvName
           DOMAIN_TABLE: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableName' }
+      TracingConfig: { Mode: PassThrough }
   RecordsLogs:
     Type: AWS::Logs::LogGroup
     Properties:
