@@ -259,9 +259,9 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 ---
 
 ## Remaining OQs for Vishwas (2026-10-13)
-**Status: PROPOSED — needs Vishwas's decision.** The OQs still open after BRD v1.6.2. Each one has the BRD §11 evidence, options and a BA recommendation. Anything not grounded in the BRD or site evidence is marked **GUESS**.
+**Status: DECIDED by Vishwas 2026-10-13 (via Chief of Staff, ~14:45 CT); folded into BRD v1.7 §13.8.** Chosen: OQ-10 (a); OQ-14 (b) warning only, rule approved (no longer GUESS); OQ-15 (b) manual Assign training; OQ-18 (a); OQ-21 (a); OQ-22 (b) Industry filter hidden; OQ-23 (a), button placement GUESS. OQ-14, 15 and 22 differ from the BA recommendation. The OQs still open after BRD v1.6.2 were: Each one has the BRD §11 evidence, options and a BA recommendation. Anything not grounded in the BRD or site evidence is marked **GUESS**.
 
-### OQ-10 — Do records created in modules show up in Records?
+### OQ-10 — Do records created in modules show up in Records? — DECIDED (a)
 **Evidence:** Records shows only the 6 sample records; whether user-created records appear was not observed ([35](screenshots/35-records-status-board.png)). Sample records are allowed in every env, labelled (BR-31, BR-45). Records tabs: CAPA/NCMR/SCAR, FAI, Supplier Qualification, Calibration, Document Control (§4.5).
 | Option | Trade-offs |
 |---|---|
@@ -271,7 +271,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 
 **Recommendation:** (a). Confidence: Inferred (the tabs and the review queue only make sense with real records).
 
-### OQ-14 — Should a PO be blocked when the supplier isn't on the ASL?
+### OQ-14 — Should a PO be blocked when the supplier isn't on the ASL? — DECIDED (b), rule approved
 **Evidence:** SQ approval adds the supplier to the ASL ([39](screenshots/39-sq-wizard-step5-approval-gated.png)); the PO "ASL gate" is badged **ROADMAP – not live** (§4.9); no timeline.
 | Option | Trade-offs |
 |---|---|
@@ -281,7 +281,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 
 **Recommendation:** (a). Confidence: Observed (roadmap badge).
 
-### OQ-15 — Should new CAPAs/NCMRs/PO findings create training assignments automatically?
+### OQ-15 — Should new CAPAs/NCMRs/PO findings create training assignments automatically? — DECIDED (b)
 **Evidence:** sample rows say "Auto-assigned · CAPA-2026-0031 / NCMR-2026-0082 / PO clause-check finding" and "3 auto-generated from CAPAs or PO findings", but "CAPA-driven training assignment" is badged **ROADMAP** ([50](screenshots/50-training-matrix-baseline-rivera-row.png), §4.12).
 | Option | Trade-offs |
 |---|---|
@@ -291,7 +291,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 
 **Recommendation:** (a). Confidence: Observed (ROADMAP badge); how a training assignment is created without automation (manual entry) is not observed — **GUESS**.
 
-### OQ-18 — What escalation thresholds and rules does Agent reliability use, and can users edit them?
+### OQ-18 — What escalation thresholds and rules does Agent reliability use, and can users edit them? — DECIDED (a)
 **Evidence:** "Drafts below 0.75 confidence (should escalate)"; escalated tasks in the CSV include 0.76–0.85 ([58](screenshots/58-reliability-export-csv.png), CSV); rule editing not observed. The whole Agent reliability module is **deferred** with AI (BR-29, BR-30, BR-43, §12 #1).
 | Option | Trade-offs |
 |---|---|
@@ -301,7 +301,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 
 **Recommendation:** (a), recording 0.75 as the observed value in the deferred BR-43. Confidence: Observed.
 
-### OQ-21 — Is the print view a controlled record, and is it in the build?
+### OQ-21 — Is the print view a controlled record, and is it in the build? — DECIDED (a)
 **Evidence:** CAPA/NCMR create form has a Print link (`/capa/<id>/print`, §4.6); the FAI record has "Print FAI" ([41](screenshots/41-fai-record-created-form3.png)); neither output was opened.
 | Option | Trade-offs |
 |---|---|
@@ -311,7 +311,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 
 **Recommendation:** (a). Confidence: buttons Observed; print content **GUESS**.
 
-### OQ-22 — Does the build support industries other than Aerospace?
+### OQ-22 — Does the build support industries other than Aerospace? — DECIDED (b)
 **Evidence:** FAQ says API Spec Q1/Q2 and medical-device standards are in early access ([33](screenshots/33-home-faq-expanded.png)); the workspace and Records Industry filter show only Aerospace ([35](screenshots/35-records-status-board.png)); assumption A-04 single workspace.
 | Option | Trade-offs |
 |---|---|
@@ -321,7 +321,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 
 **Recommendation:** (a). Confidence: Observed.
 
-### OQ-23 — How is a SCAR created?
+### OQ-23 — How is a SCAR created? — DECIDED (a)
 **Evidence:** NCMR-2026-0087 proposes "scrap + SCAR" and "Issue SCAR (AS9100D §8.7.2) with 30-day corrective action" ([34](screenshots/34-records-ncmr-2026-0087-detail.png)); no SCAR create entry point was observed; SCAR is a quality-record type with `SCAR-` IDs (BR-12, §6); the data model has `sourceRecordId` (overview §5, OQ-23).
 | Option | Trade-offs |
 |---|---|
