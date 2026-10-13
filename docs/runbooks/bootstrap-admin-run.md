@@ -105,7 +105,7 @@ aws iam get-role --role-name SentinelQA-$ENV-cfn-exec --query Role.AssumeRolePol
 aws s3api get-bucket-versioning --bucket sentinelqa-$ENV-artifacts-723940054516      # Enabled
 aws s3api get-public-access-block --bucket sentinelqa-$ENV-artifacts-723940054516    # all true
 ```
-Then set the GitHub environment variable `AWS_ROLE_ARN` to the `DeployRoleArn` output. It is not a secret.
+Then set the GitHub environment variable `AWS_DEPLOY_ROLE_ARN` to the `DeployRoleArn` output. It is not a secret.
 
 ## 7. Rollback / delete
 - **If a change set looks wrong:** `aws cloudformation delete-change-set --change-set-name <ARN>`. Nothing has been created at that point.
@@ -127,4 +127,4 @@ Then set the GitHub environment variable `AWS_ROLE_ARN` to the `DeployRoleArn` o
 
 | Date (CT) | Run by | Stacks | Result | Notes |
 |---|---|---|---|---|
-| 2026-10-13 | Chief of Staff, with Vishwas's approval, using his temporary admin login (since logged out and deleted) | `SentinelQA-Account-OIDC` (`CreateOidcProvider=true`, termination protection on); `SentinelQA-dev-Bootstrap` | CREATE_COMPLETE (as reported by Chief of Staff; not independently verified by InfraDeploy) | `DeployRoleArn` = `arn:aws:iam::723940054516:role/SentinelQA-dev-deploy`. GitHub environment `dev` created with variable `AWS_ROLE_ARN`. `params/account.json` now sets `CreateOidcProvider` to `"true"` to match. Stage and prod bootstrap not yet run. |
+| 2026-10-13 | Chief of Staff, with Vishwas's approval, using his temporary admin login (since logged out and deleted) | `SentinelQA-Account-OIDC` (`CreateOidcProvider=true`, termination protection on); `SentinelQA-dev-Bootstrap` | CREATE_COMPLETE (as reported by Chief of Staff; not independently verified by InfraDeploy) | `DeployRoleArn` = `arn:aws:iam::723940054516:role/SentinelQA-dev-deploy`. GitHub environment `dev` created with variable `AWS_DEPLOY_ROLE_ARN`. `params/account.json` now sets `CreateOidcProvider` to `"true"` to match. Stage and prod bootstrap not yet run. |

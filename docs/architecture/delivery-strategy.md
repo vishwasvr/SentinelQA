@@ -53,7 +53,7 @@ Agents open PRs; Vishwas (or a designated reviewer) approves the merge. Branch p
 | stage | shared 723940054516 | same three, stage values | **proposed: Tester** (fallback Vishwas) | `main` and tags `v*` |
 | prod | new prod account (O-03) | same three, prod account values | **Vishwas**, no self-review bypass | tags `v*` (and `main`) only |
 
-No AWS secrets anywhere; OIDC only. Note: first-deploy §5 names the role variable `AWS_ROLE_ARN`; prod-account-split §4 uses `AWS_DEPLOY_ROLE_ARN`. Proposal: standardise on `AWS_DEPLOY_ROLE_ARN` and update first-deploy §5 when the workflows are written. Check that no dev/stage variable carries the prod account ID.
+No AWS secrets anywhere; OIDC only. Note: first-deploy §5 names the role variable `AWS_DEPLOY_ROLE_ARN`; prod-account-split §4 uses `AWS_DEPLOY_ROLE_ARN`. Proposal: standardise on `AWS_DEPLOY_ROLE_ARN` and update first-deploy §5 when the workflows are written. Check that no dev/stage variable carries the prod account ID.
 
 **Branch protection on `main`:** PR required (1 approval), required status checks = the `ci.yml` jobs below, branch up to date before merge, squash merge / linear history, no force pushes, no deletion, **include administrators**.
 

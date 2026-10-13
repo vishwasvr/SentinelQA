@@ -9,7 +9,7 @@ Owner: InfraDeploy. Status: **design only**. No `.github/workflows` file exists 
 | Workflow | Trigger | AWS access | Purpose |
 |---|---|---|---|
 | `ci.yml` | `pull_request` to `main`, `push` to `main` | **None** (no OIDC, `permissions: contents: read`) | Lint and test. Required status check for merge. |
-| `deploy.yml` | `workflow_run` of `ci.yml` succeeded on `main`; manual `workflow_dispatch` | OIDC via `AWS_ROLE_ARN` of the GitHub environment (`id-token: write`) | Package, change set, approval, execute (ADR-0012). |
+| `deploy.yml` | `workflow_run` of `ci.yml` succeeded on `main`; manual `workflow_dispatch` | OIDC via `AWS_DEPLOY_ROLE_ARN` of the GitHub environment (`id-token: write`) | Package, change set, approval, execute (ADR-0012). |
 
 `deploy.yml` never runs on a pull request, so code from a fork or a branch can't assume the deploy role. The OIDC trust (00-bootstrap) already limits `sub` to `repo:vishwasvr/SentinelQA:environment:<env>`.
 

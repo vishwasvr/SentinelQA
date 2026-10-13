@@ -54,7 +54,7 @@ After 10-security, AWS emails `vishwas.learn@yahoo.com`. Vishwas must click **Co
 - Create the environments `dev`, `stage` and `prod` in `vishwasvr/SentinelQA`. The OIDC `sub` is `repo:vishwasvr/SentinelQA:environment:<env>`.
 - `prod`: require manual approval with **required reviewer Vishwas**, deployment branches limited to `main`, and no self-review bypass.
 - `stage`: deploy from `main` only. `dev`: unrestricted.
-- Store `AWS_ROLE_ARN` (the deploy role ARN from 00) as an environment variable for each environment. No AWS secrets.
+- Store `AWS_DEPLOY_ROLE_ARN` (the deploy role ARN from 00) as an environment variable for each environment. No AWS secrets.
 
 ## 5a. Prod gate: no PLACEHOLDER parameters (before the prod deploy approval)
 
