@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SentinelQA SKELETON - HTTP API + TypeScript Lambdas with least-privilege roles. Not deployed. AI routes deferred (/api/ai/* not routed).
+Parameters:
+  EnvName:
+    Type: String
+    AllowedValues: [dev, stage, prod]
+  ArtifactBucket:
+    Type: String
+  RecordsApiKey:
+    Type: String
+  ReportsApiKey:
+    Type: String
+  ThrottleRate:
+    Type: Number
+    Default: 20          # TODO O-05
+  ThrottleBurst:
+    Type: Number
+    Default: 40
+Resources:
+  RecordsApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub SentinelQA-${EnvName}-records-api
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{ Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }]
+      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole']
+      Policies:
+        - PolicyName: least-privilege
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:Query, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:ConditionCheckItem]
+                Resource:
+                  - { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' }
+                  - !Sub [ '${T}/index/*', { T: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' } } ]
+              - Effect: Allow
+                Action: dynamodb:PutItem          # append-only audit (conditional put in code)
+                Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' }
+              - Effect: Deny                      # ADR-0006
+                Action: [dynamodb:UpdateItem, dynamodb:DeleteItem, dynamodb:BatchWriteItem]
+                Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' }
+              - Effect: Deny
+                Action: [dynamodb:DeleteItem, dynamodb:BatchWriteItem]
+                Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' }
+              - Effect: Allow
+                Action: [ssm:GetParameter, ssm:GetParameters, ssm:GetParametersByPath]
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*'
+              - Effect: Allow
+                Action: [kms:Decrypt, kms:GenerateDataKey]
+                Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+  ReportsApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub SentinelQA-${EnvName}-reports-api
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{ Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }]
+      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole']
+      Policies:
+        - PolicyName: read-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:Query]
+                Resource:
+                  - { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' }
+                  - !Sub [ '${T}/index/*', { T: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableArn' } } ]
+              - Effect: Allow
+                Action: [ssm:GetParameter, ssm:GetParameters]
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/*'
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+  RecordsApiFn:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub SentinelQA-${EnvName}-records-api
+      Runtime: nodejs24.x          # TypeScript compiled to JS (D-09)
+      Handler: index.handler
+      Architectures: [arm64]
+      Timeout: 10
+      MemorySize: 512
+      Role: !GetAtt RecordsApiRole.Arn
+      Code: { S3Bucket: !Ref ArtifactBucket, S3Key: !Ref RecordsApiKey }
+      Environment:
+        Variables:
+          ENV_NAME: !Ref EnvName
+          DOMAIN_TABLE: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableName' }
+          AUDIT_TABLE: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableName' }
+          CONTROLLED_GATE_MODE: block       # D-14
+      TracingConfig: { Mode: Active }
+  ReportsApiFn:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub SentinelQA-${EnvName}-reports-api
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Architectures: [arm64]
+      Timeout: 10
+      Role: !GetAtt ReportsApiRole.Arn
+      Code: { S3Bucket: !Ref ArtifactBucket, S3Key: !Ref ReportsApiKey }
+      Environment:
+        Variables:
+          DOMAIN_TABLE: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableName' }
+  RecordsLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/SentinelQA-${EnvName}-records-api
+      RetentionInDays: 90            # O-02
+  ReportsLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/SentinelQA-${EnvName}-reports-api
+      RetentionInDays: 90
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub SentinelQA-${EnvName}-api
+      ProtocolType: HTTP
+      # Authorizer seam (ADR-0008): add AWS::ApiGatewayV2::Authorizer (JWT/Cognito) later
+  RecordsIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt RecordsApiFn.Arn
+      PayloadFormatVersion: '2.0'
+  ReportsIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ReportsApiFn.Arn
+      PayloadFormatVersion: '2.0'
+  RecordsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: ANY /api/records/{proxy+}   # TODO: explicit routes per module
+      Target: !Sub integrations/${RecordsIntegration}
+  ReportsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/reports/{proxy+}
+      Target: !Sub integrations/${ReportsIntegration}
+  # Deferred (D-01): no /api/ai/* route.
+  DefaultStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings: { ThrottlingRateLimit: !Ref ThrottleRate, ThrottlingBurstLimit: !Ref ThrottleBurst }
+  RecordsInvokePerm:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref RecordsApiFn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*
+  ReportsInvokePerm:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ReportsApiFn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*
+Outputs:
+  ApiDomain:
+    Value: !Sub ${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-ApiDomain' }
+  RecordsFnName:
+    Value: !Ref RecordsApiFn
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-RecordsFnName' }

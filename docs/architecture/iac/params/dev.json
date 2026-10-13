@@ -1,0 +1,8 @@
+{
+  "_comment": "SKELETON. Per-stack parameter values for dev; convert to --parameter-overrides per template.",
+  "all": { "EnvName": "dev" },
+  "00-bootstrap": { "GitHubRepo": "TODO/SentinelQA", "OidcProviderArn": "TODO" },
+  "10-security": { "AlarmEmail": "TODO" },
+  "30-api": { "ArtifactBucket": "TODO", "RecordsApiKey": "TODO", "ReportsApiKey": "TODO", "ThrottleRate": 20, "ThrottleBurst": 40 },
+  "40-web": { "WebACLArn": "" }
+}

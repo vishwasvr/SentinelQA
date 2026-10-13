@@ -1,27 +1,25 @@
-# IaC outline: AWS CDK v2 (TypeScript)
-Status: **skeleton only, never synthesized or deployed.** Tool choice: [ADR-0001](../adr/0001-iac-tool.md).
+# IaC outline: plain AWS CloudFormation (YAML)
+Status: **skeleton only, never deployed.** Tool: [ADR-0010](../adr/0010-iac-cloudformation.md) (supersedes the CDK choice in ADR-0001).
+Single AWS account, us-east-1. Environments are separated by stack name `SentinelQA-<env>-<stack>` and the `EnvName` parameter (D-08).
 
-## Stacks (per environment: `SentinelQA-<env>-*`)
-| Stack | Resources | Notes |
-|---|---|---|
-| `Security` | KMS CMK (rotation on), CloudTrail trail + bucket, AWS Config recorder (prod), Budgets alarm | Org-level SCPs live outside this repo (D-08) |
-| `Data` | DynamoDB `Domain` (PK/SK, GSI1 stage/severity, GSI2 dueDate), `AuditLog` (stream NEW_IMAGE), `AgentTask` (TTL attr `expiresAt`). PITR, CMK, deletion protection + RETAIN in prod | Retention per D-03 |
-| `AuditArchive` (prod; optional elsewhere) | S3 bucket with Object Lock (compliance, N years), `audit-archiver` Lambda on the AuditLog stream | D-05 |
-| `Ai` | Bedrock Guardrail (+ version), SSM parameters: modelId, marker list, confidence threshold 0.75 | Model access enablement is a manual console/account step |
-| `Api` | HTTP API, Lambdas `records-api`, `ai-gateway`, `reports-api`, a per-function IAM role, log groups (retention set), X-Ray | No authorizer yet (ADR-0008 slot) |
-| `Web` | S3 site bucket (OAC), CloudFront (`/api/*` → HTTP API), WAFv2 web ACL (scope CLOUDFRONT, must be created in us-east-1), managed rules + rate rule | |
-| `Observability` | CloudWatch dashboard, alarms for BR-30 rules (failure rate 5%/1h, timeout 2%/1h, latency 4000 ms/24h, low-confidence 15%/24h, rejection 10%/7d disabled), SNS topic(s) | Channels per D-10 |
+## Templates (deploy order)
+| # | Template | Stack name | Resources | Notes |
+|---|---|---|---|---|
+| 00 | [00-bootstrap.yaml](templates/00-bootstrap.yaml) | `SentinelQA-<env>-Bootstrap` | GitHub OIDC deploy role scoped to `SentinelQA-<env>-*` | OIDC provider is one per account, pre-existing (ADR-0012). TODO: CFN service role permissions |
+| 10 | [10-security.yaml](templates/10-security.yaml) | `SentinelQA-<env>-Security` | KMS CMK (rotation, Retain), alias, SNS email topic | CloudTrail/Budgets TODO (account-level, once) |
+| 20 | [20-data.yaml](templates/20-data.yaml) | `SentinelQA-<env>-Data` | DynamoDB `Domain` (GSI1, GSI2), `AuditLog`. PITR, KMS, deletion protection (non-dev), Retain, **no TTL** (7-year retention). SSM params: risk weights, due-soon days, controlled-data markers (placeholders, D-07/D-14) | No stream / no Object Lock (D-05) |
+| 30 | [30-api.yaml](templates/30-api.yaml) | `SentinelQA-<env>-Api` | HTTP API, `records-api` + `reports-api` Lambdas (nodejs24.x, arm64), least-privilege roles with explicit audit deny, log groups 90 d, throttling | No `/api/ai/*` route (AI deferred). Authorizer seam |
+| 40 | [40-web.yaml](templates/40-web.yaml) | `SentinelQA-<env>-Web` | Private S3 + OAC, CloudFront (`/api/*` → API), TLS-only bucket policy | `WebACLArn` empty (WAF deferred, ADR-0011) |
+| 50 | [50-observability.yaml](templates/50-observability.yaml) | `SentinelQA-<env>-Observability` | Lambda error alarm → SNS email | More alarms TODO. AI/agent alarms deferred |
 
-Dependency order: Security → Data → (AuditArchive, Ai) → Api → Web → Observability.
+Cross-stack wiring uses exports named `SentinelQA-<env>-<Name>`. Parameter values per env: [params/](params/) (placeholders).
 
-## Config (`cdk.json` context per env)
-`account`, `region` (us-east-1 proposed), `modelId`, `logRetentionDays`, `auditRetentionYears`, `wafRateLimit`, `alarmEmail`, `seedSampleData` (dev/stage only).
+## Validation performed
+- `cfn-lint` 1.57.2 (offline): **all 6 templates pass with no errors or warnings** (2026-10-13).
+- `aws cloudformation validate-template`: **not run**, the AWS CLI session had expired. It would be read-only.
 
-## Guardrails in CI
-`cdk synth` + `cdk-nag` AwsSolutions, `cdk diff` on PRs, manual approval for prod. Nothing in this repo runs `cdk deploy`.
+## Deploy flow (documented, not executed)
+GitHub Actions (OIDC) → `cfn-lint` → upload Lambda zip to the artifact bucket → `aws cloudformation create-change-set` → manual approval for stage/prod → `execute-change-set`. No deploy has been performed from this repo.
 
-## Skeleton files
-- [skeleton/bin/app.ts](skeleton/bin/app.ts)
-- [skeleton/lib/stacks/data-stack.ts](skeleton/lib/stacks/data-stack.ts)
-- [skeleton/lib/stacks/api-stack.ts](skeleton/lib/stacks/api-stack.ts)
-- [skeleton/lib/stacks/other-stacks.ts](skeleton/lib/stacks/other-stacks.ts) (Security, Ai, Web, Observability, AuditArchive stubs)
+## Deferred / removed vs v0.1
+Removed: CDK skeleton, Bedrock/Guardrails, AgentTask table, `ai-gateway`, `audit-archiver`, S3 Object Lock, WAF.

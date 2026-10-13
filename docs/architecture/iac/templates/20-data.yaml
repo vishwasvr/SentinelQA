@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SentinelQA SKELETON - DynamoDB Domain + AuditLog (7-year retention, no TTL), SSM config. Not deployed.
+Parameters:
+  EnvName:
+    Type: String
+    AllowedValues: [dev, stage, prod]
+Conditions:
+  IsDev: !Equals [!Ref EnvName, dev]
+Resources:
+  DomainTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain          # D-03: 7-year retention. Dev may delete manually
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub SentinelQA-${EnvName}-Domain
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: !If [IsDev, false, true]
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true }
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+      AttributeDefinitions:
+        - { AttributeName: PK, AttributeType: S }
+        - { AttributeName: SK, AttributeType: S }
+        - { AttributeName: GSI1PK, AttributeType: S }
+        - { AttributeName: GSI1SK, AttributeType: S }
+        - { AttributeName: GSI2PK, AttributeType: S }
+        - { AttributeName: dueDate, AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }    # WS#<workspaceId> (tenancy seam)
+        - { AttributeName: SK, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1               # stage / severityRank#openedAt (BR-14)
+          KeySchema: [{ AttributeName: GSI1PK, KeyType: HASH }, { AttributeName: GSI1SK, KeyType: RANGE }]
+          Projection: { ProjectionType: ALL }
+        - IndexName: GSI2               # due / need-by / re-eval (BR-15, BR-18, BR-25)
+          KeySchema: [{ AttributeName: GSI2PK, KeyType: HASH }, { AttributeName: dueDate, KeyType: RANGE }]
+          Projection: { ProjectionType: ALL }
+      Tags: [{ Key: env, Value: !Ref EnvName }]
+  AuditLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub SentinelQA-${EnvName}-AuditLog
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: !If [IsDev, false, true]
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true }
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+      AttributeDefinitions:
+        - { AttributeName: PK, AttributeType: S }   # WS#<ws>#ENT#<entityId>
+        - { AttributeName: SK, AttributeType: S }   # <ts>#<ulid>
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      # No StreamSpecification: no WORM archive (D-05). No TTL (D-03).
+      Tags: [{ Key: env, Value: !Ref EnvName }]
+  # D-07 configurable values (placeholders; real values supplied later)
+  RiskWeightsParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /sentinelqa/${EnvName}/supplier-risk/weights
+      Type: String
+      Value: '{"TODO":"weights for openScars,onTimePct,criticality,certFreshness; bands"}'
+  DueSoonParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /sentinelqa/${EnvName}/due-soon-days
+      Type: String
+      Value: '{"calibration":"TODO","training":"TODO","supplierReeval":"TODO"}'
+  ControlledMarkersParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /sentinelqa/${EnvName}/controlled-data/markers
+      Type: StringList
+      Value: 'ITAR,EAR99,ECCN,CUI,NOFORN,Distribution Statement,export controlled'   # D-14 block list, owner to confirm
+Outputs:
+  DomainTableArn:
+    Value: !GetAtt DomainTable.Arn
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-DomainTableArn' }
+  DomainTableName:
+    Value: !Ref DomainTable
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-DomainTableName' }
+  AuditLogTableArn:
+    Value: !GetAtt AuditLogTable.Arn
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-AuditLogTableArn' }
+  AuditLogTableName:
+    Value: !Ref AuditLogTable
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-AuditLogTableName' }

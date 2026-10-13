@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SentinelQA SKELETON - KMS key, alarm topic (email), budget. Not deployed.
+Parameters:
+  EnvName:
+    Type: String
+    AllowedValues: [dev, stage, prod]
+  AlarmEmail:
+    Type: String
+Resources:
+  DataKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: !Sub SentinelQA ${EnvName} data key
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AccountAdmin
+            Effect: Allow
+            Principal: { AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root' }
+            Action: kms:*
+            Resource: '*'
+          # Service roles get kms:Decrypt/GenerateDataKey through their IAM policies
+      Tags: [{ Key: env, Value: !Ref EnvName }]
+  DataKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub alias/sentinelqa-${EnvName}-data
+      TargetKeyId: !Ref DataKey
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub SentinelQA-${EnvName}-alarms
+      KmsMasterKeyId: alias/aws/sns
+      Subscription: [{ Protocol: email, Endpoint: !Ref AlarmEmail }]   # D-10 email only
+  # TODO: CloudTrail trail (account-level, create once, not per env); AWS::Budgets::Budget
+Outputs:
+  DataKeyArn:
+    Value: !GetAtt DataKey.Arn
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-DataKeyArn' }
+  AlarmTopicArn:
+    Value: !Ref AlarmTopic
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }

@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SentinelQA SKELETON - GitHub OIDC deploy role per env (ADR-0012). Not deployed.
+Parameters:
+  EnvName:
+    Type: String
+    AllowedValues: [dev, stage, prod]
+  GitHubRepo:
+    Type: String
+    Description: owner/repo (open item)
+  OidcProviderArn:
+    Type: String
+    Description: Existing token.actions.githubusercontent.com provider ARN (one per account)
+Resources:
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub SentinelQA-${EnvName}-deploy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Federated: !Ref OidcProviderArn }
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubRepo}:environment:${EnvName}
+      Policies:
+        - PolicyName: env-scoped-deploy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [cloudformation:CreateChangeSet, cloudformation:DescribeChangeSet, cloudformation:ExecuteChangeSet, cloudformation:DescribeStacks, cloudformation:DescribeStackEvents, cloudformation:GetTemplate]
+                Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/SentinelQA-${EnvName}-*/*
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/SentinelQA-${EnvName}-*
+              # TODO: resource-scoped permissions CloudFormation needs for each stack (or a CFN service role)
+Outputs:
+  DeployRoleArn:
+    Value: !GetAtt DeployRole.Arn
