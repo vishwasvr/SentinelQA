@@ -259,7 +259,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 ---
 
 ## Remaining OQs for Vishwas (2026-10-13)
-**Status: DECIDED by Vishwas 2026-10-13 (via Chief of Staff, ~14:45 CT); folded into BRD v1.7 §13.8.** Chosen: OQ-10 (a); OQ-14 (b) warning only, rule approved (no longer GUESS); OQ-15 (b) manual Assign training; OQ-18 (a); OQ-21 (a); OQ-22 (b) Industry filter hidden; OQ-23 (a), button placement GUESS. OQ-14, 15 and 22 differ from the BA recommendation. The OQs still open after BRD v1.6.2 were: Each one has the BRD §11 evidence, options and a BA recommendation. Anything not grounded in the BRD or site evidence is marked **GUESS**.
+**Status: DECIDED by Vishwas 2026-10-13 (via Chief of Staff, ~14:45 CT); folded into BRD v1.7 §13.8.** Chosen: OQ-10 (a); OQ-14 (b) warning only, rule approved (no longer GUESS); OQ-15 (b) manual Assign training; OQ-18 (a); OQ-21 (a); OQ-22 (b) Industry filter hidden; OQ-23 (a), button placement approved v1.7.1 (action bar next to stage-advance, hidden when Closed). OQ-14, 15 and 22 differ from the BA recommendation. The OQs still open after BRD v1.6.2 were: Each one has the BRD §11 evidence, options and a BA recommendation. Anything not grounded in the BRD or site evidence is marked **GUESS**.
 
 ### OQ-10 — Do records created in modules show up in Records? — DECIDED (a)
 **Evidence:** Records shows only the 6 sample records; whether user-created records appear was not observed ([35](screenshots/35-records-status-board.png)). Sample records are allowed in every env, labelled (BR-31, BR-45). Records tabs: CAPA/NCMR/SCAR, FAI, Supplier Qualification, Calibration, Document Control (§4.5).
@@ -325,7 +325,7 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 **Evidence:** NCMR-2026-0087 proposes "scrap + SCAR" and "Issue SCAR (AS9100D §8.7.2) with 30-day corrective action" ([34](screenshots/34-records-ncmr-2026-0087-detail.png)); no SCAR create entry point was observed; SCAR is a quality-record type with `SCAR-` IDs (BR-12, §6); the data model has `sourceRecordId` (overview §5, OQ-23).
 | Option | Trade-offs |
 |---|---|
-| **(a) "Issue SCAR" action on an NCMR (and CAPA), creating a SCAR with `sourceRecordId` and the supplier linked (DP-10) (recommended)** | Matches the observed sample flow and the existing data field; new button, placement is **GUESS** |
+| **(a) "Issue SCAR" action on an NCMR (and CAPA), creating a SCAR with `sourceRecordId` and the supplier linked (DP-10) (recommended)** | Matches the observed sample flow and the existing data field; new button; placement approved v1.7.1 (no longer GUESS) |
 | (b) A standalone "Start a new SCAR" form like NCMR/CAPA | Simple and consistent with §4.6; loses the NCMR link unless entered by hand |
 | (c) No SCAR creation; SCARs are sample-only | Least work; Supply Chain SCAR counts (DP-10) stay at zero for real data |
 
