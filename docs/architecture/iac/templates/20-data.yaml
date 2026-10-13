@@ -30,16 +30,16 @@ Resources:
         - { AttributeName: GSI1PK, AttributeType: S }
         - { AttributeName: GSI1SK, AttributeType: S }
         - { AttributeName: GSI2PK, AttributeType: S }
-        - { AttributeName: dueDate, AttributeType: S }
+        - { AttributeName: dueAt, AttributeType: S }      # generic sparse due attribute (overview §5.1)
       KeySchema:
         - { AttributeName: PK, KeyType: HASH }    # WS#<workspaceId> (tenancy seam)
         - { AttributeName: SK, KeyType: RANGE }
       GlobalSecondaryIndexes:
-        - IndexName: GSI1               # stage / severityRank#openedAt (BR-14)
+        - IndexName: GSI1               # sparse review queue: GSI1PK=WS#<ws>#REVIEWQ only while awaiting review; GSI1SK=<severityRank>#<openedAt> (BR-14)
           KeySchema: [{ AttributeName: GSI1PK, KeyType: HASH }, { AttributeName: GSI1SK, KeyType: RANGE }]
           Projection: { ProjectionType: ALL }
-        - IndexName: GSI2               # due / need-by / re-eval (BR-15, BR-18, BR-25)
-          KeySchema: [{ AttributeName: GSI2PK, KeyType: HASH }, { AttributeName: dueDate, KeyType: RANGE }]
+        - IndexName: GSI2               # sparse due index: GSI2PK=WS#<ws>#DUE#<entityType>, dueAt copied from the entity's own date (BR-15, BR-18, BR-25, training)
+          KeySchema: [{ AttributeName: GSI2PK, KeyType: HASH }, { AttributeName: dueAt, KeyType: RANGE }]
           Projection: { ProjectionType: ALL }
       Tags: [{ Key: env, Value: !Ref EnvName }]
   AuditLogTable:
@@ -68,19 +68,22 @@ Resources:
     Properties:
       Name: !Sub /sentinelqa/${EnvName}/supplier-risk/weights
       Type: String
-      Value: '{"TODO":"weights for openScars,onTimePct,criticality,certFreshness; bands"}'
+      Description: PLACEHOLDER BR-47 defaults (DP-16). Vishwas tunes later. Not validated values
+      Value: '{"status":"PLACEHOLDER","weights":{"openScars":0.25,"onTimePct":0.25,"criticality":0.25,"certFreshness":0.25},"bands":"PLACEHOLDER"}'
   DueSoonParam:
     Type: AWS::SSM::Parameter
     Properties:
       Name: !Sub /sentinelqa/${EnvName}/due-soon-days
       Type: String
-      Value: '{"calibration":"TODO","training":"TODO","supplierReeval":"TODO"}'
+      Description: PLACEHOLDER BR-47 due-soon thresholds in days (DP-16). Vishwas tunes later
+      Value: '{"status":"PLACEHOLDER","calibration":30,"training":30,"supplierReeval":30}'
   ControlledMarkersParam:
     Type: AWS::SSM::Parameter
     Properties:
       Name: !Sub /sentinelqa/${EnvName}/controlled-data/markers
       Type: StringList
-      Value: 'ITAR,EAR99,ECCN,CUI,NOFORN,Distribution Statement,export controlled'   # D-14 block list, owner to confirm
+      Description: BR-44 / D-14 block list. Matching is whole-word and case-insensitive (BRD v1.4). Marker id = list position
+      Value: 'ITAR,EAR,EAR99,ECCN,CUI,NOFORN,Distribution Statement,export controlled,22 CFR 120-130,15 CFR 730-774'
 Outputs:
   DomainTableArn:
     Value: !GetAtt DomainTable.Arn

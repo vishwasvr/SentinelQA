@@ -6,6 +6,8 @@ Parameters:
     AllowedValues: [dev, stage, prod]
   AlarmEmail:
     Type: String
+    AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+    ConstraintDescription: must be a single email address (name@domain.tld); set per env in params (InfraDeploy)
 Resources:
   AlarmTopic:
     Type: AWS::SNS::Topic
