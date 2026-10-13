@@ -15,7 +15,7 @@ Status: **PLAN ONLY.** Nothing in this runbook has been run. Every step marked [
 5. Record the new account ID in `params/prod.json` (an account ID isn't a secret) and in the GitHub environment variable (§4). Keep the account's region as the ADR-0009 region.
 
 ## 2. Account baseline [CREATE]
-- Set an AWS Budgets alarm on the account (the threshold is a PLACEHOLDER for Vishwas to set), which emails `vishwas.learn@yahoo.com`.
+- Set an AWS Budgets alarm on the account (the threshold is a PLACEHOLDER for Vishwas to set), which emails the address in the `prod` GitHub environment variable `ALARM_EMAIL`.
 - CloudTrail (M-8) in the prod account, which the 25-backup residual-risk note relies on.
 - Turn on S3 account-level Block Public Access.
 

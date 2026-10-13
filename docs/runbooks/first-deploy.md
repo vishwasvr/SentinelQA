@@ -7,7 +7,7 @@ Status: Draft. **Do not execute** unless Vishwas explicitly approves each create
 | Account / region | `723940054516` / `us-east-1` |
 | Repo | `vishwasvr/SentinelQA` (GitHub environments `dev`, `stage`, `prod`) |
 | Params | `docs/architecture/iac/params/<env>.json` |
-| Alarm email | `vishwas.learn@yahoo.com` |
+| Alarm email | GitHub environment variable `ALARM_EMAIL` (per env; never in params). See [iac README](../architecture/iac/README.md#alarmemail-contract-deploy-time) |
 
 > **First bootstrap (account OIDC stack + `00-bootstrap`) is an admin run by Vishwas:** follow [bootstrap-admin-run.md](bootstrap-admin-run.md). This page covers the overall order and the later pipeline stacks.
 
@@ -48,7 +48,7 @@ Do not echo or paste the value anywhere. The command keeps it out of shell histo
 3. Prod: enable termination protection and a stack policy (M-5) before the first update.
 
 ## 4. SNS confirmation
-After 10-security, AWS emails `vishwas.learn@yahoo.com`. Vishwas must click **Confirm subscription**, otherwise no alarms are delivered. Check with `aws sns list-subscriptions-by-topic`: the subscription ARN must not be `PendingConfirmation`.
+After 10-security, AWS emails the address in the `<env>` environment's `ALARM_EMAIL` variable. The deploy job runs with `environment: <env>` and passes `AlarmEmail=${{ vars.ALARM_EMAIL }}`; an admin run uses `gh variable get ALARM_EMAIL --env <env>`. Vishwas must click **Confirm subscription**, otherwise no alarms are delivered. Check with `aws sns list-subscriptions-by-topic`: the subscription ARN must not be `PendingConfirmation`.
 
 ## 5. GitHub environment protection
 - Create the environments `dev`, `stage` and `prod` in `vishwasvr/SentinelQA`. The OIDC `sub` is `repo:vishwasvr/SentinelQA:environment:<env>`.

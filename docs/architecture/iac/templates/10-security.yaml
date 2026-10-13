@@ -7,7 +7,7 @@ Parameters:
   AlarmEmail:
     Type: String
     AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
-    ConstraintDescription: must be a single email address (name@domain.tld); set per env in params (InfraDeploy)
+    ConstraintDescription: must be a single email address (name@domain.tld); supplied at deploy time from the GitHub environment variable vars.ALARM_EMAIL (never in params)
 Resources:
   AlarmTopic:
     Type: AWS::SNS::Topic

@@ -9,7 +9,7 @@
     "note": { "type": "string" }
   },
   "type": "object",
-  "required": ["all", "00-bootstrap", "10-security", "30-api", "40-web", "_meta"],
+  "required": ["all", "00-bootstrap", "30-api", "40-web", "_meta"],
   "propertyNames": { "pattern": "^(_[A-Za-z_]+|all|00-bootstrap|10-security|20-data|25-backup|30-api|40-web|50-observability)$" },
   "patternProperties": { "^_(?!meta$)[A-Za-z_]+$": { "$ref": "#/definitions/note" } },
   "properties": {
@@ -25,8 +25,8 @@
       }
     },
     "10-security": {
-      "type": "object", "additionalProperties": false, "required": ["AlarmEmail"],
-      "properties": { "AlarmEmail": { "type": "string", "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" } }
+      "description": "AlarmEmail is forbidden here: the deploy job passes it from the per-environment GitHub variable vars.ALARM_EMAIL. No other 10-security params are file-supplied.",
+      "type": "object", "additionalProperties": false, "properties": {}
     },
     "25-backup": {
       "type": "object", "additionalProperties": false, "required": ["ExportFnKey", "RetentionDays"],
