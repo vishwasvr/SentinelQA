@@ -82,3 +82,13 @@ Docs only. These tests get written once building opens.
 - **OQ-10, 18, 21 and 22, and /compare:** these are browser-app only, with no API tests.
   - The UI tests check that the Records page shows sample records with a label, and that the print view has the header and the 'Uncontrolled when printed' footer.
   - They also check that the Industry filter is hidden and that /compare row 1 says 'Not in this build'.
+
+## 6. Final decisions (2026-10-13, Vishwas; Architect `e444435`, BA `5857ec5`)
+- **O-06 / BR-56 'Coming later' modules:** Ask the agent and Agent reliability.
+  - The UI test checks that both stay in the navigation and each opens the 'Coming later' page.
+  - The API test checks that there is no `/api/ai/*` route (404).
+- **Issue SCAR placement:**
+  - The UI test checks that the button is in the NCMR/CAPA action bar next to the stage-advance button, and that it's hidden when the record is Closed.
+  - The button opens a form with supplier and title, and the new SCAR shows as a linked record.
+  - The API test checks that `POST /api/quality-records/{id}/scar` on a Closed source record returns 422, with no SCAR and no audit entry written.
+- **O-03 separate prod account:** this needs no spec change. The tests don't depend on which account they run in, and the per-environment config still comes from SSM.
