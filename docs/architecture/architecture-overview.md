@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **v0.3: v0.2 decisions D-01..D-14 + environment profiles (lean non-prod / strict prod, [ADR-0013](adr/0013-environment-profiles.md), proposed).** Nothing deployed and no AWS resources created |
+| Status | **v0.4: D-01..D-14 (D-03 amended by O-08) + environment profiles ([ADR-0013](adr/0013-environment-profiles.md), accepted). O-01/O-08/O-09 resolved 2026-10-13.** Nothing deployed and no AWS resources created |
 | Basis | [BRD v1.1](../requirements/BRD.md) (approved), screenshots 01–58, reliability CSV |
 | Diagrams | [diagrams.md](diagrams.md) · Decisions: [adr/](adr/) · IaC: [iac/README.md](iac/README.md) (CloudFormation) · Cost: [cost-estimate.md](cost-estimate.md) |
 
@@ -13,7 +13,7 @@
 |---|---|---|
 | Human is reviewer of record | BR-09 | Records carry named reviewer/approver fields. All state changes are human-initiated |
 | Controlled-data gate | BR-04/05, US-15 | Kept server-side on every free-text write (attestation + keyword block, [ADR-0005](adr/0005-controlled-data-gate-enforcement.md)) |
-| Server-side persistence, 7-year retention | D-03 (overrides demo browser-only, OQ-04) | DynamoDB with no TTL on records/audit, deletion protection, RETAIN policies |
+| Server-side persistence, 7-year retention **in prod** | D-03 as amended by O-08 (overrides demo browser-only, OQ-04) | DynamoDB with no TTL on records/audit, deletion protection, RETAIN policies |
 | No file storage | BR-07 | References only ([ADR-0007](adr/0007-references-only-no-file-storage.md)) |
 | Immutable audit trail | BR-08, BR-36 | Append-only DynamoDB + IAM explicit deny (D-05). No WORM archive |
 | Segregation of duties by named person | BR-10/20/33/35/37 | Domain-logic checks. Advisory until auth exists |
@@ -39,7 +39,8 @@
 | Static | S3 (private, OAC, Block Public Access) | SPA bundle |
 | API | API Gateway HTTP API | REST endpoints, stage throttling |
 | Compute | Lambda, **Node.js/TypeScript** (D-06, D-09) | `records-api` (CRUD, workflow, SoD, controlled-data gate), `reports-api` (dashboard aggregates, trends) |
-| Data | DynamoDB on-demand. Prod: PITR, KMS CMK, deletion protection. Non-prod: AWS owned key, no PITR | `Domain` table + `AuditLog` table |
+| Data | DynamoDB on-demand. Prod: PITR, AWS managed key `aws/dynamodb`, deletion protection. Non-prod: AWS owned key, no PITR | `Domain` table + `AuditLog` table |
+| Backup (prod) | DynamoDB incremental export → S3 (SSE-S3) → Glacier Flexible Retrieval, 7-year lifecycle; EventBridge Scheduler + export Lambda (monthly) | O-01, `25-backup` stack |
 | Config | SSM Parameter Store | Risk weights/bands, due-soon thresholds, controlled-data marker list |
 | Observability | CloudWatch Logs/metrics/alarms → **SNS email** (D-10) | Lambda errors, API 5xx, throttles, DynamoDB errors |
 | Governance | CloudTrail, Budgets | Account baseline |
@@ -54,7 +55,7 @@
 5. Reads compute derived status (calibration BR-25, training, re-eval buckets) from dates and SSM thresholds.
 
 ## 5. Data model (BRD §6)
-Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (tenancy seam). **No TTL**, retained ≥ 7 years (D-03).
+Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (tenancy seam). **No TTL**. Prod retained ≥ 7 years (D-03, amended: prod only, O-08). Dev/stage hold synthetic data only.
 
 | BRD entity | PK / SK | Notes |
 |---|---|---|
@@ -82,21 +83,22 @@ Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (te
 - `reports-api`: read-only on its env Domain table.
 - GitHub OIDC deploy role per env: trust restricted to `repo:<org>/SentinelQA:environment:<env>`. Permission to manage only `SentinelQA-<env>-*` stacks.
 - **Single-account risk:** a principal with admin rights can affect all envs. Mitigation is a naming/tag discipline and separate deploy roles. Revisit before handling real customer data (open item O-03).
-- TLS only, S3 Block Public Access, CloudTrail on. **Encryption at rest:** prod (strict) uses one customer-managed KMS key; dev/stage (lean) use DynamoDB's AWS owned key ([ADR-0013](adr/0013-environment-profiles.md)).
+- TLS only, S3 Block Public Access, CloudTrail on. **Encryption at rest (O-09): no customer-managed KMS keys anywhere.** Prod DynamoDB uses the AWS managed key `aws/dynamodb`; prod/non-prod S3 buckets use SSE-S3; SNS uses `alias/aws/sns`; dev/stage DynamoDB uses the AWS owned key ([ADR-0013](adr/0013-environment-profiles.md)). Trade-offs: no custom key policy, no customer-controlled rotation schedule (AWS rotates managed keys automatically), and the key cannot be disabled to crypto-shred data; CloudTrail still logs use of `aws/dynamodb`. KMS API requests to AWS managed keys are billed ($0.03/10k, within 20k/month free at 20 users). No `kms:*` IAM permissions or key policies are needed.
 - No user identity yet: `actorName` is self-asserted (BR-11). SoD is advisory.
 
-## 8. Retention (D-03)
-- Records and audit events: kept **≥ 7 years**. No TTL, `DeletionProtectionEnabled`, `DeletionPolicy/UpdateReplacePolicy: Retain` on tables and the KMS key in all envs except dev.
-- PITR covers 35 days only. Long-term backup (AWS Backup vault with 7-year rule, or periodic S3 export) is **not decided** (O-01).
+## 8. Retention (D-03 as amended by O-08)
+- **Prod:** records and audit events kept **≥ 7 years**. No TTL, `DeletionProtectionEnabled`, `DeletionPolicy/UpdateReplacePolicy: Retain`, PITR on (35 days, also required for exports).
+- **Dev/stage:** synthetic data only. No retention obligation, no PITR, no backup. Real customer records must never be loaded there.
+- **Long-term backup (O-01, decided):** a monthly job (EventBridge Scheduler, day 2) runs a Lambda that issues DynamoDB **incremental exports** for the previous month. Each export window is ≤ 24 h (an API limit), so a month is about 30 windows per table, all inside the 35-day PITR window. Exports land in S3 (SSE-S3, versioned), move to Glacier Flexible Retrieval after 1 day, and expire after 2,557 days (≈ 7 y). A one-time full export is the baseline. Not WORM, consistent with D-05.
 - CloudWatch Logs retention: proposed 90 days (logs contain no record content). O-02.
 
 ## 9. Cost drivers
-Detailed estimate with sources, split by prod and non-prod: **[cost-estimate.md](cost-estimate.md)**. At 20 users: prod ≈ $2.92, non-prod ≈ $2.03 without free tier (≈ $1.33 / $0.06 with always-free).
+Detailed estimate with sources, split by prod and non-prod: **[cost-estimate.md](cost-estimate.md)**. At 20 users, year 1: prod ≈ $2.09, non-prod ≈ $2.03, combined ≈ $4.12 without free tier (≈ $0.40 / $0.06 / $0.46 with always-free). Year 7 combined ≈ $6.31 / $1.34.
 
-Near zero at pilot volume: Lambda, API GW, DynamoDB on-demand, S3/CloudFront. Fixed: KMS CMKs (one per env), CloudWatch alarms. DynamoDB storage grows linearly over 7 years (small). Bedrock and WAF costs are gone for now.
+Near zero at pilot volume: Lambda, API GW, DynamoDB on-demand, S3/CloudFront. Fixed: CloudWatch alarms (8 total, within 10 free), CI minutes. No KMS key fees (O-09). DynamoDB storage grows linearly over 7 years (small). Bedrock and WAF costs are gone for now.
 
 ## 10. Environments
-Profiles per [ADR-0013](adr/0013-environment-profiles.md): `EnvProfile=lean` for dev/stage (synthetic data only, AWS owned keys, no PITR/backup, 7-day logs, 1 alarm) and `EnvProfile=strict` for prod (CMK, PITR, deletion protection, 7-year retention, 90-day logs, 5 alarms, backup per O-01).
+Profiles per [ADR-0013](adr/0013-environment-profiles.md): `EnvProfile=lean` for dev/stage (synthetic data only, AWS owned keys, no PITR/backup, 7-day logs, 1 alarm) and `EnvProfile=strict` for prod (AWS managed key, PITR, deletion protection, 7-year retention, 90-day logs, 5 alarms + export-errors alarm, monthly incremental export backup).
 
 dev / stage / prod as stack sets in **one AWS account, us-east-1**. Stack names `SentinelQA-<env>-<Stack>`, parameters per env file (`iac/params/<env>.json`). GitHub Actions: lint → create change set → manual approval (stage/prod) → execute.
 
@@ -108,7 +110,7 @@ A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as 
 |---|---|---|---|
 | D-01 | AI provider | **Deferred**. AI features out of scope. Seam kept | [0004](adr/0004-ai-provider.md) (Deferred) |
 | D-02 | Region | **us-east-1 commercial** | [0009](adr/0009-region-and-accounts.md) |
-| D-03 | Persistence/retention | **Server-side; 7 years for records and audit** | [0003](adr/0003-datastore.md) |
+| D-03 | Persistence/retention | **Server-side; 7 years for records and audit — prod only (amended 2026-10-13, O-08); dev/stage synthetic data** | [0003](adr/0003-datastore.md) |
 | D-04 | Prompt retention | **N/A** (AI deferred) | [0004](adr/0004-ai-provider.md) |
 | D-05 | Audit immutability | **DynamoDB append-only + IAM deny; no Object Lock** | [0006](adr/0006-immutable-audit-log.md) |
 | D-06 | Compute | **Lambda** | [0002](adr/0002-serverless-compute.md) |
@@ -124,9 +126,12 @@ A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as 
 **D-14 note:** the gate is *more* relevant without AI, not less. Free text (event descriptions, review notes, scope, PO findings) is now persisted for 7 years, and BR-04/05 already apply to the CAPA/NCMR create form. It applies to all free-text write endpoints.
 
 ## 13. Open items
-- **O-08** Confirm that D-03 (7-year retention) applies to prod only and that non-prod holds synthetic data only (ADR-0013).
-- **O-09** Prod key choice: CMK (proposed) vs AWS-managed key (saves $1–3/mo, less control).
-- **O-01** (proposed: S3 incremental export, prod only, see cost-estimate §7 S-6) Long-term backup for 7-year retention beyond PITR's 35 days (AWS Backup vs S3 export). Note: an S3 export is a "copy", not a WORM archive, so it is consistent with D-05.
+- ~~O-08~~ **Resolved:** 7-year retention in prod only; dev/stage synthetic only.
+- ~~O-09~~ **Resolved:** AWS managed keys, no CMKs anywhere.
+- ~~O-01~~ **Resolved:** monthly job running daily-window incremental DynamoDB exports to S3 Glacier, 7-year lifecycle (`25-backup`).
+- **O-10 (new)** Restore runbook: DynamoDB *import from S3* reads full exports. Replaying incremental exports onto a restored baseline needs a custom job. Decide whether to also take a periodic (e.g. annual) **full** export to shorten the restore chain (≈ $0.10/GB per full export).
+- **O-11 (new)** S3 lifecycle does not transition objects smaller than 128 KB by default (behaviour **unverified** in this review). Small export files may stay in S3 Standard. The cost impact is cents, but confirm.
+- **O-12 (new)** Export bucket deletion protection: versioning only (no Object Lock per D-05). Decide whether to add a bucket-policy deny on `s3:DeleteObject*` for all principals except a break-glass role.
 - **O-02** CloudWatch Logs retention (90 days proposed).
 - **O-03** Single-account blast radius. Revisit before production customer data.
 - **O-04** Values for D-07 (weights, bands, due-soon windows) and the controlled-data marker list (D-14).
