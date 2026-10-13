@@ -4,7 +4,7 @@
 |---|---|
 | Product | Sentinel QA — "AI Quality Manager" for AS9100D aerospace suppliers |
 | Source | https://sentinel-qa.lovable.app/ (public, unauthenticated exploration) |
-| Version / date | 1.0 — 2026-10-12 |
+| Version / date | 1.1 — 2026-10-12 (v1.0 + second pass of non-AI workspace flows, screenshots 31–58 and a reliability CSV export) |
 | Basis | Observed behavior only (as-built BRD). No features are invented; roadmap items are marked **[ROADMAP – not live]**. |
 | Evidence | [screenshots/](screenshots/README.md) |
 
@@ -19,7 +19,7 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 ### 1.1 Scope
 **In scope (this BRD):** the marketing site (/, /compare, /pricing, /validation, /privacy, /terms, /security), the public tools (/demo, /try-your-document) and the demo workspace (/app/aerospace and its modules). That covers the dashboard, Records, NCMR, Corrective Actions, Supply Chain, Supplier Qualification, Purchase Controls, FAI, Calibration, Training, Document Control, Approval Roles, QMS Champion, Ask the agent and Agent reliability, plus the cross-cutting governance rules.
 
-**Out of scope:** authentication (/auth: Continue with Google, Sign in, Create an account), user accounts and multi-tenancy, billing, and server-side persistence for signed-in users. Also out of scope is any AI output content: it was deliberately not triggered (see §10).
+**Out of scope:** authentication (/auth: Continue with Google, Sign in, Create an account), user accounts and multi-tenancy, billing, and server-side persistence for signed-in users. Also out of scope is any AI output content: at the user's request, AI generate flows (Try the agent prompts, Check clauses, Try a sample, Start my CAPA, Build my FAI record, "Ask about …", "Continue drafting in the agent", "Ask the agent to draft a full gap-closure plan") were deliberately not run in either pass (see §10). AI-labelled content quoted in this BRD is pre-seeded sample/demo content or locally computed summaries that appeared without triggering generation.
 
 ## 2. Personas
 | ID | Persona | Goals | Observed touchpoints |
@@ -49,15 +49,24 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 
 ### 4.1 Cross-cutting / workspace chrome
 - Sidebar groups: **Today** (Records, badge 6); **Nonconformance** (NCMR, Corrective Actions); **Supplier** (Supply Chain badge 6, Supplier Qualification, Purchase Controls badge 5); **Inspection** (First Article Inspection, Calibration); **Compliance** (Training badge 3, Document Control, Approval Roles, QMS Champion "Assess"); **Assistant** (Ask the agent, Agent reliability); a "How outputs are governed" link.
-- Header: DEMO badge, Search with ⌘K palette, Marketing site link. Page subtitle "Aerospace · AS9100D".
+- Header: DEMO badge, Search with ⌘K palette, Marketing site link. Page subtitle "Aerospace · AS9100D". The workspace header reads "Aerospace workspace — AS9100D · AS9102 · AS9145 · AS13100 · NADCAP special processes", with a workspace switcher pill "Workspace: Aerospace AS9100D" and the hint "Scoped to Aerospace · AS9100D. Use the sidebar or ⌘K to jump between modules." [37](screenshots/37-workspace-demo-utilities-menu.png)
+- **⌘K command palette** [36](screenshots/36-cmdk-command-palette.png): search box "Search records, modules, docs…" (Esc/× to close). A "Modules" group lists Workspace (Module launcher — live status at a glance), Records (CAPA / NCMR / SCAR queue), Supply Chain (Supplier risk scorecards), Purchase Controls (PO clause check), Training (Role → training matrix), QMS Champion (QMS maturity self-assessment); the list scrolls, so further entries exist but were not captured.
+- **Demo utilities** menu (floating "…" button, bottom right) [37](screenshots/37-workspace-demo-utilities-menu.png): **Send feedback** and **Reset demo**. Neither was executed.
 - A floating "Ask about <module>" assistant on each module. First-party analytics notice with an OK button. A "Demo utilities" button.
 - Governance: clause citations with "Why this citation:", hypothesis prefixing, a controlled-data gate, an audit timeline, and segregation of duties (see §7).
 
 ### 4.2 Marketing site
 - **Home (/)** ([01](screenshots/01-home.png)): nav Capabilities, How it works, ROI, Compare, Pricing, Try your document, FAQ, Sign in, Open workspace (/app), Try the agent (/demo). Stats: AI hypotheses "Flagged", CAPA draft "~90s", reviewer of record "You". Sample card NC-2026-0087 (Ti bracket, AeroForge, 3 of 40 OOT, Major, Clause 8.7). Capabilities: CAPA drafting §10.2, NC triage §8.7, Risk & supplier assist §8.1.1, Standards update impact §4.4/§7.2. A "Where AS9100 shops fail audits most" section by clause. Footer: Privacy, Terms, Security, AI validation summary. Disclaimer: "draft assistance, not regulatory judgment."
+- **Home sections (second pass):**
+  - *Reliability before speed* ("How we keep this safe") [31](screenshots/31-home-roi-calculator-default.png): Hedging by default (any root cause or fact not in the input is prefixed "AI hypothesis — confirm"); Clause citations with sourcing ("Why this citation" note); Output audit trail (demo drafts retained in a local workspace with prompt, output, timestamp and referenced clauses; link to the AI validation summary).
+  - *ROI / Time savings* "What could ~90-second drafting do for your team?" [31](screenshots/31-home-roi-calculator-default.png): presets Small team / Established team; inputs Records / month (default 20; "CAPAs, NCMRs, SCARs — anything your team drafts") and Manual draft time (min) (default 90). Output "Your estimate": 29.5 hours/month returned, 354 h/yr annualized, 44.3 days/yr at 8h/day. Footnote: "Estimate only. Reviewer time is not deducted — a qualified quality leader still reviews and approves every draft." (The defaults are consistent with records × (manual min − 1.5 min) / 60 = 20 × 88.5 / 60 = 29.5 h; ×12 = 354 h; ÷8 = 44.3 days.)
+  - *Clause cards* [32](screenshots/32-home-how-it-works.png): Clause 7.1.5.2 Measurement traceability — "Live today" (calibration records missing a NIST-traceable statement, or instruments used past due date); Clause 8.4 External provider control — "Next" (appears four times in the top 10 findings). Note: "Supplier controls: live in demo (PO clause check, supplier scorecards); certificate watch and incoming inspection triage on roadmap."
+  - *How it works* "From event to audit-ready record" [32](screenshots/32-home-how-it-works.png): a three-step loop "designed to fit inside your existing SOP": 01 Describe the event (paste the nonconformity, audit finding, supplier issue or standard update in plain language); 02 Agent drafts the record (structured output referencing clauses in your selected standards and QMS process areas); 03 Your quality leader makes the call (reviewer of record edits, approves and releases; every output marked draft assistance).
+  - *Weekly digest* [33](screenshots/33-home-faq-expanded.png): mock email/Slack summary ("Sent every Monday · quiet weeks stay quiet", e.g. 3 CAPAs need review, Precision Polymers cert expires in 30 days, 2 training records expired, AS9100D §7.2 revision impact draft ready), labelled "Illustrative" and "Mock preview — the notification pipeline is on the roadmap." **[ROADMAP – not live]**
+  - *FAQ* "What quality leaders ask first" [33](screenshots/33-home-faq-expanded.png): "Does Sentinel QA replace our Quality Manager?" → No; it drafts, the qualified reviewer of record approves and takes regulatory responsibility. "Which standards is the agent trained on?" → AS9100D in early access for aerospace and expanding alongside AS9102, AS9145 and NADCAP; API Spec Q1/Q2 with API 6A and NACE MR0175 / ISO 15156 (petroleum / oil & gas) also in early access; medical device coverage (ISO 13485, ISO 14971, EU MDR, FDA 21 CFR 820, IEC 62304) is lighter; clause numbers cited in every draft. "Is our data used to train models?" → answer begins "This is a public demo agent — do not paste ITAR / EAR-controlled data, drawings, or supplier NDAs…" (rest cut off).
 - **Compare** ([02](screenshots/02-compare.png)): rows are clause-level citation, AS9100D depth, AI-hypothesis flagging, agent-first, cross-module traceability, human-in-loop, trial access, deployment, industry focus. Values are Yes / Partial / No / Not verified.
 - **Pricing** ([03](screenshots/03-pricing.png)): a single Pilot card, "60–90 days, contact us".
-- **Validation** ([06](screenshots/06-validation.png)): uncertainty hedging; clause-citation discipline; standards coverage (AS9102, AS9145, AS13100, NADCAP); output audit trail; known limitations.
+- **Validation** ([06](screenshots/06-validation.png), [47](screenshots/47-validation-how-outputs-governed.png)), title "How Sentinel QA's own outputs are governed" (linked from the sidebar "How outputs are governed" and record "see how this is governed" badges). Disclaimer: "maintained by the Sentinel QA team and is not an independent certification … not a completed formal validation of your specific intended use." Sections: 1 Uncertainty hedging (root cause, failure mechanism, part number, quantity, date or supplier facts not in the input are prefixed "AI hypothesis — confirm:"; multiple plausible causes are ranked as investigation candidates; insufficient input → a targeted clarifying question before drafting); 2 Clause-citation discipline (every claim carries a clause reference plus a one-sentence "Why this citation:"; the agent is instructed not to fabricate clause numbers and writes "clause reference to confirm" if unsure); 3 Aerospace standards coverage (AS9102, AS9145 APQP/PPAP, AS13100, NADCAP); 4 Output audit trail (demo interactions retained in the browser; in the authenticated register every create/update on a Risk, CAPA, NCMR or Audit writes an immutable activity_log row with actor and snapshot); known limitations (below the fold).
 - **Privacy / Terms / Security** ([22](screenshots/22-privacy.png), [23](screenshots/23-terms.png), [24](screenshots/24-security.png)): static content.
 
 ### 4.3 Public AI tools
@@ -67,7 +76,8 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 ### 4.4 Workspace dashboard (/app → /app/aerospace) ([08](screenshots/08-workspace-dashboard.png))
 - Headline "8 items need attention".
 - Tiles: Awaiting review (CAPA/NCMR) 0; FAI sign-off pending 0; Supplier re-evaluation 2 (0 overdue, 1 in 0–30d, 1 in 31–60d, 0 in 61–90d); Calibration 5 instruments (2 active, 2 due soon, 1 overdue); Effectiveness checks due 0; Training 3 (2 expired, 1 due soon).
-- Needs attention list (8 items, tagged Overdue / Due soon), e.g. J. Park counterfeit part awareness expired 14d; CAL-2026-001 Mitutoyo caliper overdue 12d; Alloy Precision Machining re-evaluation in 18d.
+- Needs attention list (8 items, tagged Overdue / Due soon) [37](screenshots/37-workspace-demo-utilities-menu.png): J. Park — Counterfeit part awareness (training expired 14 days ago, Overdue); Instrument CAL-2026-001 Mitutoyo digital caliper 0–150 mm (overdue by 12 days, Overdue); L. Brandt — AMS 2750 pyrometry basics (expired 3 days ago, Overdue); M. Alvarez — FOD awareness SOP-AS-002 (due in 12 days, Due soon); Supplier Alloy Precision Machining Ltd. (re-evaluation due in 18 days, Due soon); Instrument CAL-2026-002 Zeiss CONTURA CMM (due in 25 days, Due soon); Supplier Northline Heat Treat (re-evaluation due in 53 days, Due soon); Instrument CAL-2026-003 Torque wrench 5–50 Nm (due in 64 days, Due soon). The 8 = 3 training + 3 calibration + 2 supplier items.
+- Section label "Audit readiness — Aggregated from Records, FAI, Supplier Qualification, effectiveness checks, Calibration and Training."
 - "Threatens delivery (14 days)", currently empty: "No open CAPA or NCMR has a need-by date in the next 14 days."
 - "Your records" (empty, with an Open Records link). Module cards: Records, Supply Chain, Ask the agent.
 
@@ -76,7 +86,9 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - Stage counts (Open/Investigation/QM Review/Closed): CAPA 1/1/0/0; NCMR 0/1/1/0; SCAR 1/0/0/1.
 - Filters: Type (All/CAPA/NCMR/SCAR); Industry (Aerospace); Severity (All/Critical/Major/Minor); Status (All/New/Containment/Investigation/Draft Ready/QM Review/Closed); Standard (All/AS9100D). 6 records.
 - "Awaiting your review", sorted by severity then age: Critical NCMR-2026-0087 Ti bracket hole Ø §8.7, 9d left; Major SCAR-2026-0044 FAI flatness fail §8.4, 12d left.
-- A status board with show/hide.
+- Header text: "AI-drafted CAPAs, NCMRs, and SCARs surfaced at the human checkpoint for AS9100D aerospace quality teams." Notice: "Records you create stay in your browser; pasted text is sent to an AI provider and not retained — click around freely. Hover any acronym for a plain-language definition. Press ⌘K to jump anywhere." [35](screenshots/35-records-status-board.png)
+- **Status board** "Triage-to-resolution across CAPA, NCMR, and SCAR" (Hide toggle), one column per stage with a count [35](screenshots/35-records-status-board.png): New — CAPA-2026-0026 Minor "Missed FOD sweep — final assembly bay 3" §8.5.4; Containment — CAPA-2026-0031 Critical "Counterfeit-part risk — fastener sub-tier" §8.1.4; Investigation — NCMR-2026-0082 Major "Heat-treat furnace excursion — NADCAP…" §8.5.1; Draft Ready — SCAR-2026-0044 Major "FAI flatness fail — AI housing, AeroForge" §8.4; QM Review — NCMR-2026-0087 Critical "Ti bracket P/N TB-4471 — hole Ø out of…" §8.7; Closed — SCAR-2026-0041 Minor "NDT re-cert lapsed — bracket supplier" §8.4.
+- **Record detail drawer** (NCMR-2026-0087) [34](screenshots/34-records-ncmr-2026-0087-detail.png): badges Critical, NCMR; title "Ti bracket P/N TB-4471 — hole Ø out of tolerance"; meta "Aerospace · AS9100D §8.7 · opened 6d ago · supplier: AeroForge"; badge "AI-assisted draft — see how this is governed". Summary: 3 of 40 titanium brackets from AeroForge outside Ø6.35 ±0.02 mm on a primary-structure critical hole; disposition proposed: scrap + SCAR. Root cause candidates, each tagged AI HYPOTHESIS: boring-bar wear on OP-40 crossed limit without in-process check; CMM datum shift from misaligned fixture. Actions: segregate lot, 100% CMM on remaining stock; issue SCAR (AS9100D §8.7.2) with 30-day corrective action; re-qualify OP-40 tool-life curve, add SPC on Ø. Citations: AS9100D §8.7 (Why this citation: control of nonconforming outputs — mandates disposition and containment); AS9102 (any change to the machining process re-triggers FAI on the affected characteristic). Button "Continue drafting in the agent →" (not run). Note: the home-page sample card shows this case as Major, the Records sample as Critical.
 - Trends: opened vs closed over 12 weeks, severity mix 2/2/2, by standard, and a Pareto by clause ("80% of findings come from §8.4, §8.1.4, §8.5.1, §8.5.4").
 
 ### 4.6 NCMR and Corrective Actions (CAPA)
@@ -93,7 +105,10 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **Live:** supplier risk scorecard, ranked worst-first. The score blends SCARs, on-time %, criticality and cert freshness. Standard filter: All, AMS 2750, AS6174, AS9100D, AS9102, NADCAP, NAS 410.
 - Rows: 48 AeroFast Distribution (Fasteners, Critical, 82%, 0 SCARs); 62 AeroForge (Ti machining, Critical, 88%, 2); 74 Precision Heat Ltd (NADCAP heat treat, Critical, 96%, 0); 84 AeroWire (Cables/wire harness, Standard, 97%, 0).
 - Detail (AeroForge "Watch · 62"): cert renews in 42d; AI risk narrative; flags an open SCAR on TB-4471 and an FAI flatness fail 18d ago; next step "escalate to ASL review".
-- **[ROADMAP – not live]** Incoming inspection triage; sub-tier flow-down monitor; cert expiry watch (90/60/30-day alerts); geopolitical risk map.
+- Detail (AeroFast Distribution "At risk · 48") [48](screenshots/48-supply-chain-aerofast-detail.png): Fasteners · Aerospace; 82% on-time, 0 open SCARs, cert in 30d. "AI draft — risk narrative": "Critical-path supplier. Score 48 reflects 82% on-time delivery, and cert renewal in 30 days." plus "AI hypothesis — confirm root causes on any open SCARs before de-risking the score." Flags: Counterfeit-risk CAPA open; Sub-tier not on ASL. Suggested next step: "Escalate to Approved Supplier List review; add to next quality council agenda."
+- Detail (AeroWire Cables "Approved · 84") [49](screenshots/49-supply-chain-aerowire-detail.png): Wire harness · Aerospace; 97% on-time, 0 open SCARs, cert in 180d; narrative "Score 84 reflects 97% on-time delivery, and cert renewal in 180 days."; no flags; next step "Maintain current oversight cadence; no action needed."; link "Try the agent →".
+- Observed score bands: At risk (48), Watch (62), Approved (84). Precision Heat (74) band not captured.
+- **[ROADMAP – not live]** Incoming inspection triage (auto-route lots to skip-lot, reduced or 100% inspection); sub-tier flow-down monitor (track AS9100 §8.1.4 requirements cascading to sub-tier distributors); certificate expiry watch (ISO / NADCAP / AS9100 certs, alerts 90/60/30 days out); geopolitical & logistics risk map.
 
 ### 4.8 Supplier Qualification ([13](screenshots/13-supplier-qualification.png), [28](screenshots/28-new-supplier-qualification-wizard.png))
 - Tabs: Active on ASL / All qualifications. Columns: Record, Supplier, Stage, Approved scope, Re-evaluation, Created.
@@ -104,6 +119,11 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
   - SQ-2026-003 Helix Fastener Supply: Evaluation.
   - SQ-2026-006 Veridian Composites: Documentation & cert review.
 - New wizard, 6 steps: Request, Docs & certs, Risk, Evaluation, Approval, Active on ASL. Fields: Supplier name (e.g. AeroForge Precision Ltd), Scope requested. Back / Continue (Continue disabled: "Enter the supplier name to continue."). Audit trail.
+- Opening an existing record resumes the wizard at its stage (route `/app/aerospace/supplier-qualification/new?id=SQ-2026-006`) with "← Back to supplier qualification". Banner: "AI-assisted draft · Aerospace · approver: you. Every risk rating is a hypothesis until you confirm it." plus a "How this is governed" link. A "Your name" bar ("Recorded as the person on every step, AI acceptance and approval in the timeline. Saved in this browser only.") [38](screenshots/38-sq-wizard-step2-docs-certs.png)
+- **Step 2 of 6 — Documentation & cert review** [38](screenshots/38-sq-wizard-step2-docs-certs.png): one free-text area "Documentation & certification review" (sample: "Awaiting AS9100D certificate and quality manual."); Back / Continue.
+- **Steps 3 (Risk) and 4 (Evaluation)** were advanced through but their contents were not captured; the audit trail records the advances.
+- **Step 5 of 6 — Approval decision** [39](screenshots/39-sq-wizard-step5-approval-gated.png): Approver (named individual — required) dropdown "Select an approver…" with hint "No saved roles yet — type a custom name, or set up Approval Roles"; Approval scope (what this supplier is approved to provide), placeholder "CNC machining of aluminium and titanium detail parts. Excludes special processes."; Approval date; Re-evaluation / expiry date (both date pickers, entered manually). Rule text: "A named approver is required before this supplier can go active on the ASL." With no approver, "Approve & add to ASL →" is disabled and "Name an approver to continue." is shown. Step 6 (Active on ASL) was not reached.
+- Audit trail example [39](screenshots/39-sq-wizard-step5-approval-gated.png): 9/6/2026 7:22:00 PM · demo data · illustrative demo record · "New supplier request"; 10/12/2026 7:51:07 PM · Reviewer · Advanced Docs & certs → Risk · "Risk classification"; 7:51:15 PM · Advanced Risk → Evaluation · "Evaluation"; 7:51:16 PM · Advanced Evaluation → Approval · "Approval decision".
 
 ### 4.9 Purchase Controls (/purchase-controls) ([14](screenshots/14-purchase-controls.png))
 - **Live:** PO clause check against AS9100D §8.4.3. A paste box with Check clauses / Try a sample.
@@ -117,19 +137,32 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 
 ### 4.10 First Article Inspection ([15](screenshots/15-fai.png), [29](screenshots/29-new-fai-form1.png))
 - A paste box "Build my FAI record" (disabled until confirmed). Empty state "No FAI records yet. Start with a new Form 1".
-- AS9102 Form 1 — Part identification: Part Number*, Part Name*, Part Revision (optional), FAI Report Number ("Generated automatically if blank"), Part Type, FAI Type, Reason for FAI (default initial FAI), Manufacturing Routing Number, Create FAI.
+- AS9102 Form 1 — Part identification (/app/aerospace/fai/new): "Text references only. Do not attempt to attach drawings or reports — this platform stores references, never the files themselves." Part Number*, Part Name*, Part Revision (optional), FAI Report Number ("Generated automatically if blank"), Part Type (default Detail), FAI Type (default Full), Reason for FAI ("Optional — defaults to initial first article inspection"), Manufacturing Routing Number, Create FAI.
+- **Validation on submit** [40](screenshots/40-fai-form1-validation-errors.png): empty required fields are outlined red with "Part Number is required." / "Part Name is required."; a summary line "Fill in the highlighted fields to continue: Part Number, Part Name."; a toast "Please fill in: Part Number, Part Name." Create FAI stays clickable (validation runs on click).
+- **FAI record page** (/app/aerospace/fai/<uuid>) [41](screenshots/41-fai-record-created-form3.png): header "TEST-PN-001 — TEST bracket", "AS9102 Form 1 · text references only, no files are stored here". Fields: Part number, Part name, Revision (N/A when blank), FAI report number (auto: FAIR-2026-1576064A), FAI type (Full), Status (Draft).
+  - *Approval actions*: "AS9102 Rev C requires the evaluator to be a different person than the preparer." Buttons Sign as Preparer, Sign as Evaluator (disabled, "Preparer must sign first."), Print FAI; status "Preparer: not signed · Evaluator: not signed"; "Acting as Reviewer 1 (you)" with "Simulate second reviewer". Signing was not exercised.
+  - *Form 3 — Characteristic accountability*: Excel-style grid (Tab/Shift+Tab across cells, arrows move between cells, Enter moves down; Tab or Enter from the last cell of the bottom row commits it and opens a new one; empty Reference Location, Result and Equipment cells auto-fill "N/A"). Columns: Char. No., Ref. Location, Designator (dropdown, default None), Requirement, Result, Equipment, Pass/Fail (default PASS), NCR / Disposition, Checks. "+ Add characteristic" (hint "Fill Char. no., Requirement (and NCR if Fail) to add a row"). Completeness banner: "No completeness issues detected. Advisory only — entry and sign-off are not blocked."
+  - Form 2 was not observed.
 
 ### 4.11 Calibration ([16](screenshots/16-calibration.png), [27](screenshots/27-new-calibration-instrument-form.png))
 - Tabs: All / Due soon / Overdue. KPIs: active 4; due ≤30d 1; ≤60d 1; ≤90d 2; overdue 1. Columns: Record, Instrument, Type, Status, Certificate, Next due.
-- Register an instrument (fields in §6). Next-due shortcuts +6/+12/+24 months. Save to the register.
+- Register an instrument (fields in §6). Next-due shortcuts +6/+12/+24 months. Save to the register. Form note: "Saved entries are active immediately — status is calculated from the next-due date. This platform stores certificate references, never files." and "Saved in this browser for the demo."
+- **+24 months** [42](screenshots/42-calibration-new-instrument-plus24mo.png): last calibration 01/15/2026 → next due 01/15/2028 (the +24 chip shows selected).
+- **Register after save** (/app/aerospace/calibration?view=all, "Calibration & Equipment Register") [43](screenshots/43-calibration-register-after-save.png): new row CAL-DEMO-MV5YVOKD "TEST caliper", type "—" (none chosen), Active, certificate CERT-TEST-001, next due 2028-01-15 (ID auto-generated because Equipment ID was blank). KPIs: Active instruments 5; Due within 30 days 1; Due within 60 days 1; Due within 90 days 2; Overdue 1. Rows: CAL-2026-001 Mitutoyo digital caliper 0–150 mm (Caliper, Overdue, CERT-2025-8841, 2026-09-30 · overdue); CAL-2026-002 Zeiss CONTURA CMM · CMM-02 (Due soon, CERT-2026-0113, 2026-11-05 · 25d); CAL-2026-003 Torque wrench 5–50 Nm · TW-0071 (Due soon, CERT-2025-9902, 2026-12-14 · 64d); CAL-2026-004 Granite surface plate 600 × 900 mm (Active, CERT-2026-0044, 2027-05-15); CAL-2026-005 Micrometer 25–50 mm · MIC-0233 (Active, CERT-2026-0090, 2027-03-09). "Active instruments" counts all non-overdue instruments (4 → 5 after the save); the 30/60/90 buckets are cumulative (the ≤90 count of 2 includes the 25d item).
 
 ### 4.12 Training (/training) ([17](screenshots/17-training.png))
 - **Live:** role-to-training matrix (§7.2). KPIs: current 2, due soon 1, overdue 2, not started 1. Standard filter. Columns: Role·Person, Course, Standard, Due, Status, Action (Mark complete).
-- Assignments can be sourced from CAPA, NCMR or PO-check findings (see the sample rows).
+- Assignments can be sourced from CAPA, NCMR or PO-check findings (see the sample rows). Subtitle: "6 assignments shown · 3 auto-generated from CAPAs or PO findings · Clear filters"; standard filter Aerospace; "Try the agent →".
+- **Baseline rows** [50](screenshots/50-training-matrix-baseline-rivera-row.png), [51](screenshots/51-training-mark-complete-alvarez.png): J. Park, Incoming Inspector — Counterfeit part awareness (Auto-assigned · CAPA-2026-0031), AS9100D §8.1.4, 14d overdue, Overdue; L. Brandt, Heat-Treat Operator — AMS 2750 pyrometry basics (Auto-assigned · NCMR-2026-0082), AMS 2750, 3d overdue, Overdue; R. Chen, Buyer — Purchase controls & flow-down (Auto-assigned · PO clause-check finding), AS9100D §8.4.3, 7d to start, Not started; M. Alvarez, Production Operator — FOD awareness — SOP-AS-002, AS9100D §8.5.4, 12d, Due soon; **D. Rivera, NDT Technician — Level II PT re-certification, AS9100D §8.4 / NAS 410, 90d, Current**; J. Park, Incoming Inspector — AS9102 First Article Inspection, AS9102, 340d, Current.
+- **Mark complete** [51](screenshots/51-training-mark-complete-alvarez.png), [52](screenshots/52-training-mark-complete-brandt.png): the Due cell becomes "Completed 2026-10-13", status becomes Current, the action becomes "Undo", and KPIs update (Alvarez: Current 2→3, Due soon 1→0; Brandt: Current 2→3, Overdue 2→1). No dialog for evidence, verifier or date was shown. In 52 Alvarez is back to Due soon (12d) while Brandt is complete. Mark complete on the D. Rivera row itself was not captured (Rivera stays Current, 90d, with Mark complete available).
 - **[ROADMAP – not live]** CAPA-driven assignment (automation); procedure-change re-training; competency evaluation; audit-ready report.
 
 ### 4.13 Document Control ([18](screenshots/18-document-control.png), [30](screenshots/30-new-document-form.png))
 - Tabs: All / Under review / Released. KPIs: Released, Under review, Draft, Superseded (all 0). Empty register. Add a document form (fields in §6).
+- Add form header: "We store a reference to where this document lives — never the file itself. Paste a link or describe where your team keeps it. No upload, nothing stored." Placeholder for location: "Paste a link (SharePoint, Drive, your PLM) or describe where your team keeps it — e.g. 'Quality share drive › Work Instructions › WI-QA-014'."
+- **Release needs an approver** [44](screenshots/44-document-new-released-approver-required.png): with Status = Released and "Approved for release by" empty ("Select an approver…"), Save to the register is disabled with "Name an approver to release." and "Pick who approved this release before saving." Helper text: "Releasing a document needs a named approver. Any earlier released revision of the same document is marked superseded automatically." The approver picker offers saved roles or "Custom name…" (free-text, e.g. "D. Okafor, Quality Manager"); "No saved roles yet — type a custom name, or set up Approval Roles."
+- With a custom approver entered ("TEST Approver, QM"), Save is enabled [45](screenshots/45-document-new-released-approver-entered.png) (in this capture location and effective date were blank).
+- **After save** [46](screenshots/46-document-saved-edit-view.png): the record reopens at /app/aerospace/documents/new?id=DOC-DEMO-MV5YVSZE as "Edit a controlled document" (WI-TEST-001, Rev A, Work Instruction, "Test share drive > WI", effective 10/12/2026, Released, approver "Test Approver"). The register list after save was not captured.
 
 ### 4.14 Approval Roles ([19](screenshots/19-approval-roles.png))
 - "A convenience only, not a login or permission system."
@@ -139,6 +172,16 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 ### 4.15 QMS Champion (/qms-champion) ([20](screenshots/20-qms-champion.png))
 - **Live:** maturity self-assessment, 8 dimensions rated 1–5 ("0/8 answered", ~3 min). Dimensions: Leadership §5; Risk §6.1/§8.1.1; CAPA effectiveness §10.2; Nonconformity §8.7; Supplier §8.4; Training §7.2; Documents §7.5; Monitoring §9/§10.
 - Outputs: score, gap heatmap, 90-day plan.
+- Header "QMS maturity self-assessment — Rate each dimension 1–5. 8/8 answered · takes about 3 minutes", progress bar, "Saved for this session", AS9100D badge and Reset [53](screenshots/53-qms-champion-ratings-all-3.png). Each dimension card shows the clause, a question, buttons 1–5, the current rating badge (n/5), and an anchor quote for the chosen level, e.g. Leadership "How visibly does top management own the QMS?" 3 = "Reviewed annually"; Risk 2 = "Risk file exists, rarely updated", 3 = "Updated at design changes"; CAPA 3 = "Closed on time, weak effectiveness", 4 = "Effectiveness verified statistically", 5 = "Repeat-issue rate < 5%, trended"; Nonconformity 3 = "Consistent disposition"; Supplier 2 = "ASL exists, not enforced", 3 = "ASL enforced at PO"; Training 3 = "Matrix + tracking"; Documents 3 = "Controlled release workflow", 4 = "Change control with impact"; Monitoring 3 = "Reviewed at management review" [55](screenshots/55-qms-champion-ratings-mixed.png).
+- **AI-drafted maturity summary** (badge "Draft assistance — a QM reviews before action"; it appeared once all 8 were rated, without running any generate action): Overall n / 5 with a band, "Top 3 gaps to close" (dimension, clause, n/5, suggested next step), a dimension heatmap, a "90-day priority" box, and "Ask the agent to draft a full gap-closure plan →" (not run). Observed results:
+
+  | Ratings (Lead, Risk, CAPA, NC, Supplier, Training, Docs, Monitoring) | Overall | Top 3 gaps | 90-day priority | Evidence |
+  |---|---|---|---|---|
+  | 3,3,3,3,3,3,3,3 | 3.0 / 5 · Defined | Leadership 3; Risk 3; CAPA effectiveness 3 | Leadership & Risk: "moving both from level 3 to level 5 would lift the overall band to Managed" | [54](screenshots/54-qms-champion-summary-all-3.png) |
+  | 3,2,4,3,2,3,4,3 | 3.0 / 5 · Defined | Risk 2; Supplier controls 2; Leadership 3 | Risk & Supplier: "moving both from level 2 to level 4 would lift the overall band to Managed" | [56](screenshots/56-qms-champion-summary-mixed.png) |
+  | 1,3,5,3,3,3,3,3 | 3.0 / 5 · Defined | Leadership 1; Risk 3; Nonconformity 3 | Leadership & Risk: "moving both from level 1 to level 3 would lift the overall band to Managed" | [57](screenshots/57-qms-champion-summary-leadership-1.png) |
+
+  Suggested next steps seen: Leadership — "Stand up a monthly quality council with documented actions…"; Risk — "Link every open CAPA back to a hazard in the risk file. Assign an owner to keep the file live…"; CAPA — "Introduce statistical effectiveness verification (n=3 lots or 90 days trending)…"; Supplier — "Enforce ASL at PO issue and add sub-tier disclosure to your standard PO clauses (AS9100D §8.1.4)"; Nonconformity — "Add trending across sites/product families…".
 - **[ROADMAP – not live]** Mock audit; management review pack; internal audit planner; readiness score; KPI tracker.
 
 ### 4.16 Ask the agent
@@ -149,7 +192,9 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - KPIs: 240 tasks; 88.3% success; 3.3% failures; 2.1% timeouts; 3.0s average latency; 61% human acceptance (27 rejected).
 - Alert banner: 1 firing (timeout).
 - Alert rules table (see BR-30).
-- Task log: filters for status (Success/Failure/Timeout/Escalated) and module. Columns: When, Task, Module, Status, Latency, Conf., Decision, Reviewer. Example: "Detect expired certifications", Training, Escalated, 0.48 conf (below threshold, routed to human), Modified by M. Okafor.
+- Task log ("240 of 240", search "Search task, ID, error…"): filters for status (Success/Failure/Timeout/Escalated) and module. Columns: When, Task, Module, Status, Latency, Conf., Decision, Reviewer. Example: "Detect expired certifications" T-255S, Training, Escalated, 0.48 conf ("Confidence below threshold — routed to human reviewer"), Modified by M. Okafor [58](screenshots/58-reliability-export-csv.png).
+- Alert rule descriptions: Failure rate spike "Any agent task failing (5xx, tool error, schema mismatch)"; Timeout budget "Tasks exceeding 30s ceiling"; Latency SLO "Average end-to-end latency"; Low-confidence drift "Drafts below 0.75 confidence (should escalate)"; Reviewer rejection rate "Human reviewers rejecting agent drafts". Summary "4 enabled · 1 breached".
+- **Export CSV** ([58-reliability-task-log-export.csv](screenshots/58-reliability-task-log-export.csv)): 240 rows (the full task log), columns `id, ts, module, task, status, latency_ms, confidence, decision, reviewer, tokens, error_code`. `ts` is ISO-8601 UTC; rows span 2026-10-11T21:02Z to 2026-10-13T00:56Z (Oct 11 4:02 PM – Oct 12 7:56 PM CT, about 28 h, although the page says "last 24h"). Two fields, `tokens` and `error_code`, are not shown in the UI. Content reconciles with the KPIs: status success 212 / escalated 15 / failure 8 / timeout 5 (88.3% / 3.3% / 2.1%); mean latency 3034 ms (= Latency SLO current); 21 of 240 (8.75%) below 0.75 confidence (= Low-confidence drift 8.8%); decisions accepted 138 / modified 62 / rejected 27 / n/a 13 (138 of 227 decided = 61% acceptance; 27/240 = 11.3% rejection). Error codes: TIMEOUT_30S (5, latency 30.9–32.5 s), TOOL_ERROR 2, MODEL_5XX 2, SCHEMA_MISMATCH 2, RATE_LIMIT 2. Modules: QMS Champion 64, Purchase Controls 49, Supply Chain 48, Training 42, Records 37. Reviewer "—" on 45 rows. 16 task types (e.g. Draft CAPA root-cause, Classify NCMR severity, Suggest SCAR response, Link related deviations, Score supplier risk, Flag cert expiry, Summarize audit findings, PO clause check (AS9100 / AS9100D), Detect missing FAI clause, Match role → training, Suggest refresher plan, Detect expired certifications, Maturity gap analysis, Cite clause reference, Draft 90-day plan). Escalated rows have confidences 0.40–0.85 (12 of 15 below 0.75), so escalation is not purely confidence-based.
 
 ## 5. Screen inventory
 | # | Screen | Route | Screenshot |
@@ -182,23 +227,45 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 | S28 | New supplier qualification | Supplier Qualification → New | [28](screenshots/28-new-supplier-qualification-wizard.png) |
 | S29 | AS9102 Form 1 | FAI → New | [29](screenshots/29-new-fai-form1.png) |
 | S30 | Add a document | Document Control → Add | [30](screenshots/30-new-document-form.png) |
-| — | Not captured | CAPA print view, record detail pages, ⌘K palette, Demo utilities, Ask the agent workspace page | — |
+| S31 | Home — Reliability / ROI calculator | / (#roi) | [31](screenshots/31-home-roi-calculator-default.png) |
+| S32 | Home — clause cards / How it works | / (#how-it-works) | [32](screenshots/32-home-how-it-works.png) |
+| S33 | Home — weekly digest mock / FAQ | / (#faq) | [33](screenshots/33-home-faq-expanded.png) |
+| S34 | Record detail drawer (NCMR-2026-0087) | /dashboard-preview?module=records | [34](screenshots/34-records-ncmr-2026-0087-detail.png) |
+| S35 | Records status board | /dashboard-preview?module=records | [35](screenshots/35-records-status-board.png) |
+| S36 | ⌘K command palette | any workspace page | [36](screenshots/36-cmdk-command-palette.png) |
+| S37 | Demo utilities menu (on dashboard) | /app/aerospace | [37](screenshots/37-workspace-demo-utilities-menu.png) |
+| S38 | SQ wizard step 2 — Docs & certs | /app/aerospace/supplier-qualification/new?id=SQ-2026-006 | [38](screenshots/38-sq-wizard-step2-docs-certs.png) |
+| S39 | SQ wizard step 5 — Approval decision | same | [39](screenshots/39-sq-wizard-step5-approval-gated.png) |
+| S40 | FAI Form 1 validation errors | /app/aerospace/fai/new | [40](screenshots/40-fai-form1-validation-errors.png) |
+| S41 | FAI record (Form 1 summary, sign-off, Form 3) | /app/aerospace/fai/<uuid> | [41](screenshots/41-fai-record-created-form3.png) |
+| S42 | Register instrument (+24 months) | /app/aerospace/calibration/new | [42](screenshots/42-calibration-new-instrument-plus24mo.png) |
+| S43 | Calibration register after save | /app/aerospace/calibration?view=all | [43](screenshots/43-calibration-register-after-save.png) |
+| S44–45 | Add document — Released needs approver / approver entered | /app/aerospace/documents/new | [44](screenshots/44-document-new-released-approver-required.png), [45](screenshots/45-document-new-released-approver-entered.png) |
+| S46 | Edit a controlled document (after save) | /app/aerospace/documents/new?id=DOC-DEMO-… | [46](screenshots/46-document-saved-edit-view.png) |
+| S47 | How outputs are governed | /validation | [47](screenshots/47-validation-how-outputs-governed.png) |
+| S48–49 | Supplier detail (AeroFast, AeroWire) | /supply-chain | [48](screenshots/48-supply-chain-aerofast-detail.png), [49](screenshots/49-supply-chain-aerowire-detail.png) |
+| S50–52 | Training matrix baseline / Mark complete | /training | [50](screenshots/50-training-matrix-baseline-rivera-row.png), [51](screenshots/51-training-mark-complete-alvarez.png), [52](screenshots/52-training-mark-complete-brandt.png) |
+| S53–57 | QMS Champion ratings and maturity summary | /qms-champion | [53](screenshots/53-qms-champion-ratings-all-3.png)–[57](screenshots/57-qms-champion-summary-leadership-1.png) |
+| S58 | Agent reliability at export + CSV | /reliability | [58 png](screenshots/58-reliability-export-csv.png), [58 csv](screenshots/58-reliability-task-log-export.csv) |
+| — | Not captured | CAPA/NCMR print view and steps 2–6, SQ steps 3/4/6, FAI Form 2, FAI print, Document register after save, Ask the agent workspace page, Reset demo result | — |
 
 ## 6. Data entities and key fields
 | Entity | Key fields (observed) | Enumerations |
 |---|---|---|
 | Quality record (CAPA / NCMR / SCAR) | ID (CAPA-DEMO-xxxx, NCMR-DEMO-xxxx; samples like NCMR-2026-0087, SCAR-2026-0044), type, short title, event description, severity, stage, standard/clause, days left (due), reviewer name, delivery details (optional; need-by date implied by the "Threatens delivery" panel), disposition (NCMR only), timeline | Type: CAPA, NCMR, SCAR. Severity: Critical, Major, Minor. Stage: New, Containment, Investigation, Draft Ready, QM Review, Closed. Disposition: Use as is, Rework, Repair, Scrap, Return to supplier |
 | Audit timeline event | Timestamp, actor/reviewer, event (created, stage change, AI draft acceptance, reviewer decision), stage; signed-in: activity_log row with actor + snapshot | — |
-| Supplier (risk scorecard) | Score (0–100), name, commodity, criticality, on-time %, open SCAR count, cert renewal (days), standards, AI narrative, flags, next step | Criticality: Critical, Standard. Band e.g. "Watch". Standard: AMS 2750, AS6174, AS9100D, AS9102, NADCAP, NAS 410 |
-| Supplier qualification | Record (SQ-YYYY-NNN), supplier name, scope requested / approved scope, stage, re-evaluation date (+ days), created | Stage: Request, Docs & certs (shown as "Documentation & cert review"), Risk, Evaluation, Approval, Active on ASL (plus status "Approved") |
+| Supplier (risk scorecard) | Score (0–100), name, commodity, criticality, on-time %, open SCAR count, cert renewal (days), standards, AI narrative, flags, next step | Criticality: Critical, Standard. Band: At risk (48), Watch (62), Approved (84). Standard: AMS 2750, AS6174, AS9100D, AS9102, NADCAP, NAS 410 |
+| Supplier qualification | Record (SQ-YYYY-NNN), supplier name, scope requested / approved scope, stage, documentation & certification review notes, approver (named individual, required), approval date, re-evaluation / expiry date, re-evaluation days, created, reviewer name, audit trail | Stage: Request, Docs & certs (shown as "Documentation & cert review"), Risk, Evaluation, Approval, Active on ASL (plus status "Approved") |
 | PO clause check | PO number, supplier, part, qty, revision, findings[] (requirement, status, clause, suggested wording, why-citation), summary counts | Status: Missing, Weak, Present (plus "not captured"). Clause: AS9100D §8.4.3, AS9102 |
-| FAI (AS9102 Form 1) | Part Number*, Part Name*, Part Revision, FAI Report Number (auto if blank), Part Type, FAI Type, Reason for FAI, Manufacturing Routing Number | Part Type: Detail, Sub-Assembly, Assembly, COTS, Software. FAI Type: Full, Partial, Delta |
-| Calibration instrument | Record (CAL-YYYY-NNN), equipment name, equipment ID/asset no., type, certificate reference*, last calibration date, next due date, calibrated by, NIST traceability statement*, status (computed) | Type: Caliper, Micrometer, Gauge, Height gauge, CMM, Torque wrench, Surface plate, Test equipment, Other. Status: Active, Due soon, Overdue |
-| Training assignment | Role, person, course, source record (CAPA/NCMR/PO finding), standard/clause or SOP, due offset, status | Status: Current, Due soon, Overdue (expired), Not started |
-| Controlled document | Name, document ID/number, revision, type, location (link/description), effective date, next review date, status | Type: Work Instruction, Procedure, Drawing, Quality Manual section, Form, Specification, Other. Status: Draft, Under review, Released (KPI also counts Superseded) |
+| FAI (AS9102 Form 1) | id (UUID in URL), Part Number*, Part Name*, Part Revision (N/A if blank), FAI Report Number (auto, e.g. FAIR-2026-1576064A), Part Type, FAI Type, Reason for FAI, Manufacturing Routing Number, status, preparer signature, evaluator signature | Part Type: Detail, Sub-Assembly, Assembly, COTS, Software. FAI Type: Full, Partial, Delta. Status observed: Draft |
+| FAI characteristic (AS9102 Form 3) | Char. No., Ref. Location, Designator, Requirement, Result, Equipment, Pass/Fail, NCR / Disposition, Checks | Designator default None; Pass/Fail: PASS (default) / FAIL |
+| Calibration instrument | Record (CAL-YYYY-NNN; user-created CAL-DEMO-xxxxxxxx), equipment name, equipment ID/asset no., type, certificate reference*, last calibration date, next due date, calibrated by, NIST traceability statement*, status (computed) | Type: Caliper, Micrometer, Gauge, Height gauge, CMM, Torque wrench, Surface plate, Test equipment, Other. Status: Active, Due soon, Overdue |
+| Training assignment | Role, person, course, source record ("Auto-assigned · <record>"), standard/clause or SOP, due offset, completion date ("Completed YYYY-MM-DD"), status | Status: Current, Due soon, Overdue (expired), Not started |
+| Controlled document | Record id (DOC-DEMO-xxxxxxxx), name, document ID/number, revision, type, location (link/description), effective date, next review date (optional), status, approved for release by (required when Released; saved role or custom name) | Type: Work Instruction, Procedure, Drawing, Quality Manual section, Form, Specification, Other. Status: Draft, Under review, Released (KPI also counts Superseded) |
 | Approval role | Role name, people[], default for record types | Record types: Supplier Qualification, CAPA, NCMR, Document, FAI, Purchase Order |
-| Maturity assessment | 8 dimension ratings (1–5), score, heatmap, 90-day plan | Dimensions listed in §4.15 |
-| Agent task | When, task, module, status, latency, confidence, decision, reviewer | Status: Success, Failure, Timeout, Escalated. Decision e.g. Modified / accepted / rejected |
+| Maturity assessment | 8 dimension ratings (1–5) with level anchor text, answered count, overall score (n.n / 5), band, top 3 gaps (with suggested next step), heatmap, 90-day priority; saved for the session | Bands observed: Defined (3.0); Managed named as the next band |
+| Agent task | id (T-xxxx), ts (UTC), module, task, status, latency_ms, confidence, decision, reviewer, tokens, error_code (CSV export) | Status: success, failure, timeout, escalated. Decision: accepted, modified, rejected, n/a. Error code: TIMEOUT_30S, TOOL_ERROR, MODEL_5XX, SCHEMA_MISMATCH, RATE_LIMIT |
+| Record detail (sample) | ID, severity, type, title, industry, clause, age, supplier, summary, root-cause candidates (AI hypothesis), actions, citations (clause + why) | — |
 | Alert rule | Name, current value, threshold, window, channel, enabled, state | Channel: PagerDuty, Slack, Email. Window: 1h, 24h, 7d |
 
 ## 7. Business rules and validations
@@ -223,13 +290,13 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **BR-19** Approval Roles are a convenience only, not an access-control mechanism.
 - **BR-20** Default approvers: Supplier Qualification, CAPA, NCMR and Document → Quality Manager; FAI → Engineering Lead; Purchase Order → Production Supervisor. The default is skipped if it would break segregation of duties.
 - **BR-21** The PO clause check evaluates the PO against AS9100D §8.4.3 (and AS9102 for FAI). Each requirement is classified Missing / Weak / Present (or not captured) and comes with suggested wording.
-- **BR-22** FAI Form 1 requires Part Number and Part Name. The FAI Report Number is generated automatically if left blank. Reason for FAI defaults to initial FAI.
+- **BR-22** FAI Form 1 requires Part Number and Part Name. On Create FAI with them empty, each shows "<Field> is required.", plus "Fill in the highlighted fields to continue: Part Number, Part Name." and a toast "Please fill in: Part Number, Part Name." ([40](screenshots/40-fai-form1-validation-errors.png)). The FAI Report Number is generated automatically if left blank (FAIR-YYYY-xxxxxxxx). Reason for FAI defaults to initial FAI. A new FAI starts in status Draft.
 - **BR-23** Calibration "Save to the register" is disabled until an equipment name is entered ("Enter an equipment name."). Certificate reference and NIST traceability statement are required.
 - **BR-24** The +6/+12/+24-month next-due buttons stay disabled until a last calibration date is set. When used, they set next due = last date + N months.
 - **BR-25** Calibration status is computed from the next-due date: Overdue if past; Due soon inside a window (observed ≤30d, ≤60d and ≤90d buckets, with a 64-day item shown as Due soon); otherwise Active.
 - **BR-26** Document Control "Save" is disabled until a document name is entered ("Enter a document name.").
 - **BR-27** Training assignments can trace back to a source record (CAPA, NCMR, PO-check finding). Items past their due date show as overdue/expired. Mark complete updates the status.
-- **BR-28** The QMS Champion assessment needs a 1–5 rating on each of the 8 dimensions (progress "x/8 answered") before results are produced (assumed; see OQ).
+- **BR-28** The QMS Champion assessment takes a 1–5 rating on each of the 8 dimensions (progress "x/8 answered"). Results were observed only at 8/8; behavior with fewer answers was not captured.
 - **BR-29** Agent tasks below the confidence threshold are escalated (routed to a human reviewer), e.g. a confidence of 0.48.
 - **BR-30** An alert rule fires when its metric breaches the threshold over its window. Observed rules:
 
@@ -241,8 +308,19 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
   | Low-confidence drift | 8.8% / 15% | 24h | Email | Enabled |
   | Reviewer rejection rate | 11.3% / 10% | 7d | Email | Disabled (so not firing despite the breach) |
 
+- **BR-33** FAI sign-off follows AS9102 Rev C segregation: the evaluator must be a different person than the preparer; Sign as Evaluator is disabled until the preparer signs ("Preparer must sign first."). The demo simulates a second person with "Simulate second reviewer" ([41](screenshots/41-fai-record-created-form3.png)).
+- **BR-34** FAI Form 3 completeness checks are advisory only; entry and sign-off are not blocked. Empty Reference Location, Result and Equipment cells auto-fill "N/A". A row needs Char. no. and Requirement (and NCR if Fail).
+- **BR-35** A supplier cannot go active on the ASL without a named approver: "Approve & add to ASL" is disabled with "Name an approver to continue." ([39](screenshots/39-sq-wizard-step5-approval-gated.png)). Approval date and re-evaluation/expiry date are entered manually at step 5.
+- **BR-36** Every SQ step advance is written to the audit trail with timestamp, actor ("Reviewer" when no name is saved) and "Advanced <from> → <to>". Every risk rating is a hypothesis until confirmed.
+- **BR-37** Releasing a document requires a named approver ("Name an approver to release." / "Pick who approved this release before saving."); saving a Released revision automatically marks any earlier released revision of the same document as Superseded ([44](screenshots/44-document-new-released-approver-required.png)).
+- **BR-38** Approver pickers (SQ, Document) list saved Approval Roles or accept a custom free-text name.
+- **BR-39** Calibration ID is auto-generated (CAL-DEMO-xxxxxxxx) when Equipment ID is blank; new entries are active immediately. Register KPIs: "Active instruments" = all non-overdue instruments; due-within-30/60/90 buckets are cumulative; Due soon status covers at least 25d and 64d, Active at 147d+ ([43](screenshots/43-calibration-register-after-save.png)).
+- **BR-40** Mark complete sets the training row to Current with "Completed <date>", replaces the action with Undo and updates the KPIs. No evidence or verifier is captured ([51](screenshots/51-training-mark-complete-alvarez.png)).
+- **BR-41** QMS Champion overall score equals the mean of the 8 ratings in all three observed cases (3.0 → band Defined). Top 3 gaps are the lowest-rated dimensions, with ties resolved in dimension order; the 90-day priority targets the two lowest ([54](screenshots/54-qms-champion-summary-all-3.png), [56](screenshots/56-qms-champion-summary-mixed.png), [57](screenshots/57-qms-champion-summary-leadership-1.png)). Ratings persist for the session; Reset clears them.
+- **BR-42** The dashboard "items need attention" count is the number of Needs attention items: overdue/expired or due-soon training, calibration and supplier re-evaluations (8 = 3 + 3 + 2).
+- **BR-43** Low-confidence drift counts drafts below 0.75 confidence; a timeout is a task exceeding 30 s (TIMEOUT_30S).
 - **BR-31** Records sample data is labelled "ILLUSTRATIVE — SAMPLE RECORDS".
-- **BR-32** Disabled-in-demo actions: none observed beyond the validation gates. Destructive or AI actions were not exercised.
+- **BR-32** Disabled-in-demo actions: none observed beyond the validation gates. AI generate actions were not exercised (user request); Reset demo was not executed.
 
 ## 8. User stories and acceptance criteria
 
@@ -295,6 +373,7 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **US-21** As supplier quality, I want to start a qualification.
   - *Given* the New wizard at step Request, *When* the supplier name is empty, *Then* Continue is disabled with "Enter the supplier name to continue."
   - *When* it is filled, *Then* I can continue to Docs & certs.
+- **US-38** As a QM, I want supplier approval to be explicit. *Given* step 5 Approval decision, *When* no named approver is selected, *Then* "Approve & add to ASL" is disabled with "Name an approver to continue."; each step advance is logged in the audit trail.
 
 ### 8.8 Purchase Controls
 - **US-22** As a buyer, I want a PO checked against §8.4.3.
@@ -303,8 +382,11 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 
 ### 8.9 FAI
 - **US-23** As an inspector, I want to create AS9102 Form 1.
-  - *Given* Form 1, *When* Part Number or Part Name is empty, *Then* the FAI cannot be created (error text not observed, OQ-12).
+  - *Given* Form 1, *When* I click Create FAI with Part Number or Part Name empty, *Then* the FAI is not created, each empty field shows "<Field> is required.", and a summary line and toast list the missing fields.
   - *When* the FAI Report Number is blank, *Then* it is generated automatically.
+- **US-34** As an inspector, I want the FAI record created from Form 1. *When* Create FAI succeeds, *Then* the record page shows the Form 1 summary (auto report number, status Draft), approval actions and an empty Form 3 grid.
+- **US-35** As a QM, I want preparer/evaluator segregation on FAI. *Given* the preparer has not signed, *Then* Sign as Evaluator is disabled with "Preparer must sign first.", and the evaluator must be a different person.
+- **US-36** As an inspector, I want to key in Form 3 characteristics quickly. *Then* the grid supports Tab/Enter keyboard entry, auto-fills N/A, and shows advisory completeness issues without blocking sign-off.
 - **US-24** As an inspector, I want to build an FAI from pasted text. *Then* Build my FAI record is disabled until the confirmation is ticked.
 
 ### 8.10 Calibration
@@ -313,13 +395,15 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
   - *Given* the form, *When* the equipment name is empty, *Then* Save is disabled with "Enter an equipment name."
   - *When* the last date is set, *Then* the +6/+12/+24 buttons fill in the next due date.
   - Certificate reference and NIST statement are required.
+  - *When* I set last date 01/15/2026 and click +24 months, *Then* next due becomes 01/15/2028; *When* I save, *Then* the register shows a new Active row with an auto CAL-DEMO id and the KPIs update.
 
 ### 8.11 Training
 - **US-27** As a training coordinator, I want a role-to-training matrix. *Then* each row shows role·person, course, source record, standard, due and status, with a Mark complete action.
-- **US-28** *When* I click Mark complete, *Then* the row status becomes Current and the KPIs update (behavior not exercised, OQ-16).
+- **US-28** *When* I click Mark complete, *Then* the row shows "Completed <date>", status Current, the action becomes Undo, and the KPIs update (observed for M. Alvarez and L. Brandt).
 
 ### 8.12 Document Control
 - **US-29** As a document controller, I want to register a controlled document. *When* the name is empty, *Then* Save is disabled with "Enter a document name." Location is a link or description (no upload).
+- **US-37** As a QM, I want released documents to have a named approver. *Given* Status = Released and no approver, *Then* Save is disabled with "Name an approver to release."; *When* I choose a role or type a custom name, *Then* Save is enabled and earlier released revisions are superseded automatically.
 
 ### 8.13 Approval Roles
 - **US-30** As a QM, I want default approvers per record type.
@@ -327,10 +411,13 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
   - *Given* a default would make the author also the approver, *Then* the default is skipped.
 
 ### 8.14 QMS Champion
-- **US-31** As a QM, I want a maturity self-assessment. *When* I rate all 8 dimensions 1–5, *Then* I get a score, a gap heatmap and a 90-day plan.
+- **US-31** As a QM, I want a maturity self-assessment. *When* I rate all 8 dimensions 1–5, *Then* I get an overall score with band, top 3 gaps with next steps, a heatmap and a 90-day priority, marked draft assistance (e.g. all 3s → 3.0 / 5 Defined).
 
 ### 8.15 Agent reliability
 - **US-32** As an ops owner, I want agent KPIs and alerts. *Then* I see 24h KPIs, firing alerts with their channel, a rules table and a filterable task log; Export CSV downloads the log.
+- **US-39** As an ops owner, I want to export the task log. *When* I click Export CSV, *Then* I get one row per logged task with id, UTC timestamp, module, task, status, latency_ms, confidence, decision, reviewer, tokens and error_code.
+- **US-40** As a QM, I want to open a sample record. *When* I click a record in Records, *Then* a drawer shows summary, AI-hypothesis root causes, actions and citations with "Why this citation".
+- **US-41** As any user, I want to jump anywhere. *When* I press ⌘K, *Then* a palette lets me search records, modules and docs.
 - **US-33** *Given* task confidence is below the threshold, *Then* the task is Escalated to a human and the reviewer's decision is logged.
 
 ## 9. Non-functional and compliance notes (observed)
@@ -343,44 +430,37 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **UX:** responsive web app; ⌘K search; demo mode clearly badged (DEMO, ILLUSTRATIVE).
 
 ## 10. Coverage notes
-- **Covered:** all public marketing pages, the public tool entry screens, the workspace dashboard and every sidebar module's landing page, and step 1 of the create forms (NCMR, CAPA, calibration, supplier qualification, FAI Form 1, document). There are 30 screenshots.
-- **Not reached (deliberately or because sign-in is required):**
-  - the sign-in-gated workspace;
-  - all AI output generation (demo prompts, Check clauses, Try a sample, Start my CAPA, Build my FAI record);
-  - CAPA/NCMR steps 2–6 and the print view;
-  - SQ wizard steps 2–6;
-  - FAI forms beyond Form 1;
-  - QMS Champion results;
-  - session history;
-  - record detail pages (e.g. SQ-2025-014);
-  - the ⌘K palette contents and Demo utilities;
-  - the details of the home How it works / ROI / FAQ sections;
-  - FAI required-field error messages;
-  - the D. Rivera training row.
-- The sample Purchase Controls findings and Supply Chain data were already shown on the landing page; no generation was triggered.
-
+- **Pass 1 (screenshots 01–30):** all public marketing pages, the public tool entry screens, the workspace dashboard and every sidebar module's landing page, and step 1 of the create forms (NCMR, CAPA, calibration, supplier qualification, FAI Form 1, document).
+- **Pass 2 (screenshots 31–58 + 1 CSV), non-AI workspace flows:** home Reliability / ROI / clause cards / How it works / digest / FAQ; Records detail drawer and status board; ⌘K palette; Demo utilities menu; SQ wizard steps 2 and 5 (approval gate); FAI Form 1 validation, a created FAI record with sign-off and Form 3; calibration +24 months and the register after save; document release approver gate and saved edit view; "How outputs are governed"; supplier details for AeroFast and AeroWire; training baseline (incl. D. Rivera) and Mark complete; QMS Champion ratings and three maturity summaries; reliability Export CSV. The second pass produced 34 captures; 5 duplicates/near-duplicates were removed, leaving 28 screenshots + the CSV.
+- **Totals:** 58 screenshots + 1 CSV. OQs: 6 answered, 13 partially answered, 5 still open (§11).
+- **Deliberately not run (user request):** all AI generate flows — /demo prompts, Check clauses, Try a sample, Start my CAPA, Build my FAI record, "Ask about <module>", "Continue drafting in the agent", "Ask the agent to draft a full gap-closure plan", "Try the agent". AI-labelled content in this BRD is sample data or a locally computed summary.
+- **Not reached / not captured:** the sign-in-gated workspace; CAPA/NCMR steps 2–6 and print view; SQ steps 3, 4 (contents) and 6; FAI Form 2, signing, and Print FAI; the Document Control register after save; the effect of Reset demo; Mark complete on the D. Rivera row; Precision Heat detail; session history; the full ⌘K list (it scrolls).
 ## 11. Open questions
-- **OQ-01** How is the supplier risk score weighted (SCARs vs on-time % vs criticality vs cert freshness)? What are the band thresholds (e.g. "Watch")?
-- **OQ-02** What are the exact "Due soon" thresholds for calibration, training and supplier re-evaluation? A calibration item 64 days out shows Due soon, which suggests 90d, but the dashboard buckets use 30/60/90.
-- **OQ-03** Segregation-of-duties detail: which roles count as "independent"? Does SoD apply to stages beyond the Use as is / Repair dispositions (e.g. QM Review closure)? How is it enforced without a permission system?
-- **OQ-04** Persistence model: browser-only for demo vs server for signed-in users. Migration, export and retention periods?
-- **OQ-05** Which AI provider/model is used, under what data-processing terms, and in which region? How is "not retained" verified?
-- **OQ-06** What happens in CAPA/NCMR steps 2–6? What content is required per stage, and when does AI drafting occur?
-- **OQ-07** What are the content and validations of Supplier Qualification steps 2–6? Who approves, and how is the re-evaluation interval set?
-- **OQ-08** Are FAI Forms 2 and 3 (AS9102) supported after Form 1?
-- **OQ-09** How is the QMS Champion score calculated, and how is the 90-day plan generated?
-- **OQ-10** How does Records (sample data under /dashboard-preview) relate to user-created records in the modules?
-- **OQ-11** How is the dashboard "items need attention" count composed (8 items vs tile totals)?
-- **OQ-12** What error messages and validation does FAI Form 1 show for missing required fields?
-- **OQ-13** Is the controlled-data confirmation logged in the audit trail?
-- **OQ-14** Is the ASL gate (blocking POs to non-ASL suppliers) planned to integrate with Supplier Qualification? What is the timeline for each roadmap item?
-- **OQ-15** Is training auto-assignment from CAPA/NCMR/PO findings live or only seeded sample data? The sample rows cite source records, but "CAPA-driven assignment" is listed as roadmap.
-- **OQ-16** What does Mark complete record (date, evidence reference, verifier)?
-- **OQ-17** Document lifecycle: how is Superseded reached, and are revisions linked? Are there review reminders?
-- **OQ-18** What is the confidence threshold for escalation, and can it be configured? Are alert rules editable by users?
-- **OQ-19** What does Export CSV contain, and what time range does it cover?
-- **OQ-20** What are the contents and purpose of "Demo utilities" (e.g. reset sample data)? What can the ⌘K palette do?
-- **OQ-21** Does the print view constitute a controlled record, and is it signed or dated?
-- **OQ-22** Is the "Industry" filter (Aerospace only) intended to support other industries?
-- **OQ-23** Are SCARs created from NCMRs or from the Supply Chain module? There is no SCAR create entry point.
-- **OQ-24** What do the How it works / ROI / FAQ sections claim (e.g. the ROI calculation inputs)?
+Status legend: **Answered** · **Partially answered** · **Still open** (with reason: AI-gated, login-gated, or not observable).
+
+| OQ | Status | Answer / what is still missing | Evidence |
+|---|---|---|---|
+| OQ-01 Supplier risk score weighting and bands | Partially answered | Bands observed: At risk (48), Watch (62), Approved (84). Narratives cite on-time % and cert renewal days; flags cite open CAPAs and sub-tier ASL status. Weights and band cut-offs are not shown (not observable). | [48](screenshots/48-supply-chain-aerofast-detail.png), [49](screenshots/49-supply-chain-aerowire-detail.png), [12](screenshots/12-supply-chain.png) |
+| OQ-02 "Due soon" thresholds | Partially answered | Calibration: Due soon at 25d and 64d, Active at 147d+; register buckets are cumulative (≤90d = 2), consistent with a 90-day window. Supplier re-eval: Due soon at 18d and 53d. Training: Due soon at 12d, Current at 90d and 340d. Exact thresholds per module are not stated. | [43](screenshots/43-calibration-register-after-save.png), [37](screenshots/37-workspace-demo-utilities-menu.png), [50](screenshots/50-training-matrix-baseline-rivera-row.png) |
+| OQ-03 Segregation of duties | Partially answered | Additional SoD/approval points: FAI evaluator must differ from preparer (AS9102 Rev C), evaluator cannot sign before preparer; supplier needs a named approver before ASL; released documents need a named approver. Enforcement is by named individuals only (demo offers "Simulate second reviewer"; Approval Roles is not a permission system). Which roles count as independent and QM Review closure rules remain unobserved. | [41](screenshots/41-fai-record-created-form3.png), [39](screenshots/39-sq-wizard-step5-approval-gated.png), [44](screenshots/44-document-new-released-approver-required.png) |
+| OQ-04 Persistence model | Partially answered | Demo: "Saved in this browser for the demo", "Your name … Saved in this browser only", QMS ratings "Saved for this session", "Records you create stay in your browser". Signed-in: authenticated register writes immutable activity_log rows. Migration, export and retention are still open (login-gated). | [42](screenshots/42-calibration-new-instrument-plus24mo.png), [35](screenshots/35-records-status-board.png), [47](screenshots/47-validation-how-outputs-governed.png) |
+| OQ-05 AI provider / model / region | Still open — not observable | Only "pasted text is sent to an AI provider and not retained" is stated; no provider, terms or region shown. | [35](screenshots/35-records-status-board.png) |
+| OQ-06 CAPA/NCMR steps 2–6 | Partially answered | The sample NCMR-2026-0087 drawer shows the drafted content structure (summary with proposed disposition, AI-hypothesis root causes, actions, citations), and the status board shows one sample per stage. The step 2–6 screens and when drafting occurs were not captured (AI-gated). | [34](screenshots/34-records-ncmr-2026-0087-detail.png), [35](screenshots/35-records-status-board.png) |
+| OQ-07 Supplier Qualification steps 2–6 | Partially answered | Step 2: free-text documentation & certification review. Step 5: required named approver (saved role or custom name), approval scope, approval date and re-evaluation/expiry date entered manually; "Approve & add to ASL" gated on approver. Steps advance with audit-trail entries. Steps 3/4 contents and step 6 were not captured. | [38](screenshots/38-sq-wizard-step2-docs-certs.png), [39](screenshots/39-sq-wizard-step5-approval-gated.png) |
+| OQ-08 FAI Forms 2 and 3 | Partially answered | Form 3 (Characteristic accountability) is live on the FAI record page as an Excel-style grid with advisory completeness checks. Form 2 was not observed. | [41](screenshots/41-fai-record-created-form3.png) |
+| OQ-09 QMS Champion score / 90-day plan | Partially answered | Overall score equals the mean of the 8 ratings in all three observed sets (3.0 → "Defined"; "Managed" is the next band). Top 3 gaps = lowest ratings (ties in dimension order); 90-day priority targets the two lowest. Other band thresholds and the full gap-closure plan (via the agent) are still open (AI-gated). | [54](screenshots/54-qms-champion-summary-all-3.png), [56](screenshots/56-qms-champion-summary-mixed.png), [57](screenshots/57-qms-champion-summary-leadership-1.png) |
+| OQ-10 Records sample vs user-created records | Still open — not observable | Records still shows only the 6 sample records; whether user-created module records appear there was not observed. | [35](screenshots/35-records-status-board.png) |
+| OQ-11 Dashboard "items need attention" | Answered | 8 = the 8 Needs attention items: 3 training (2 expired, 1 due soon), 3 calibration (1 overdue, 2 due soon), 2 supplier re-evaluations due soon. These match the tiles (Supplier 2, Training 3, the 3 non-Active of 5 instruments). | [37](screenshots/37-workspace-demo-utilities-menu.png) |
+| OQ-12 FAI Form 1 errors | Answered | "Part Number is required." / "Part Name is required." under red-outlined fields, "Fill in the highlighted fields to continue: Part Number, Part Name." and a toast "Please fill in: Part Number, Part Name." | [40](screenshots/40-fai-form1-validation-errors.png) |
+| OQ-13 Controlled-data confirmation in audit trail | Still open — not observable | The audit trails seen (SQ) show stage advances only; no paste flow was run (AI-gated). | [39](screenshots/39-sq-wizard-step5-approval-gated.png) |
+| OQ-14 ASL gate integration / roadmap timeline | Still open — not observable | SQ approval adds the supplier to the ASL, but the PO ASL gate is still roadmap and no timeline is published. | [39](screenshots/39-sq-wizard-step5-approval-gated.png) |
+| OQ-15 Training auto-assignment live vs seeded | Partially answered | Rows carry "Auto-assigned · CAPA-2026-0031 / NCMR-2026-0082 / PO clause-check finding", and the matrix says "3 auto-generated from CAPAs or PO findings", while "CAPA-driven training assignment" is still badged ROADMAP. Whether new records generate assignments was not observable. | [50](screenshots/50-training-matrix-baseline-rivera-row.png) |
+| OQ-16 What Mark complete records | Answered | A completion date ("Completed 2026-10-13"), status Current, an Undo action and KPI updates. No evidence reference or verifier is requested. (The date appears to be the UTC date; the capture was taken on the evening of Oct 12 CT.) | [51](screenshots/51-training-mark-complete-alvarez.png), [52](screenshots/52-training-mark-complete-brandt.png) |
+| OQ-17 Document lifecycle | Partially answered | Releasing needs a named approver, and "any earlier released revision of the same document is marked superseded automatically". Next review date is optional; reminders and revision linking were not observed. | [44](screenshots/44-document-new-released-approver-required.png), [46](screenshots/46-document-saved-edit-view.png) |
+| OQ-18 Escalation threshold / editable rules | Partially answered | Low-confidence threshold is 0.75 ("Drafts below 0.75 confidence (should escalate)"); 8.75% of exported tasks are below it. Escalated tasks in the CSV include confidences 0.76–0.85, so escalation is not solely confidence-based. Rule editing was not observed. | [58](screenshots/58-reliability-export-csv.png), [CSV](screenshots/58-reliability-task-log-export.csv) |
+| OQ-19 Export CSV contents / range | Answered | All 240 logged tasks, 11 columns (id, ts UTC, module, task, status, latency_ms, confidence, decision, reviewer, tokens, error_code), spanning about 28 h (2026-10-11 21:02Z → 2026-10-13 00:56Z) despite the "last 24h" label. Figures reconcile with the page KPIs (§4.17). | [CSV](screenshots/58-reliability-task-log-export.csv), [58](screenshots/58-reliability-export-csv.png) |
+| OQ-20 Demo utilities / ⌘K | Answered | Demo utilities: Send feedback, Reset demo (effect not executed). ⌘K: "Search records, modules, docs…" with a Modules list (Workspace, Records, Supply Chain, Purchase Controls, Training, QMS Champion, more on scroll). | [37](screenshots/37-workspace-demo-utilities-menu.png), [36](screenshots/36-cmdk-command-palette.png) |
+| OQ-21 Print view as controlled record | Still open — not observable | A "Print FAI" button exists on the FAI record; neither the CAPA nor the FAI print output was opened. | [41](screenshots/41-fai-record-created-form3.png) |
+| OQ-22 Industry filter beyond Aerospace | Partially answered | The FAQ says API Spec Q1/Q2 (oil & gas) and medical-device standards are in early access, but the workspace and the Records Industry filter still show only Aerospace. | [33](screenshots/33-home-faq-expanded.png), [35](screenshots/35-records-status-board.png) |
+| OQ-23 SCAR creation path | Partially answered | Sample NCMR-2026-0087 proposes "scrap + SCAR" and an action "Issue SCAR (AS9100D §8.7.2) with 30-day corrective action", which suggests SCARs originate from NCMRs. No SCAR create entry point was observed. | [34](screenshots/34-records-ncmr-2026-0087-detail.png) |
+| OQ-24 How it works / ROI / FAQ | Answered | How it works: a 3-step loop (describe → agent drafts → quality leader decides). ROI: records/month × manual minutes vs ~90 s; defaults 20 × 90 → 29.5 h/month, 354 h/yr, 44.3 days/yr; reviewer time not deducted. FAQ: does not replace the QM; standards coverage; public demo, do not paste ITAR/EAR data. See §4.2. | [31](screenshots/31-home-roi-calculator-default.png), [32](screenshots/32-home-how-it-works.png), [33](screenshots/33-home-faq-expanded.png) |
