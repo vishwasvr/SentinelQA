@@ -95,13 +95,24 @@ All SSM parameters under `/sentinelqa/<env>/` are read through one config loader
 
 Every failure logs `errorCode=config_unavailable` with the parameter **name** only, never its value (§4.1). It also emits the EMF metric `SentinelQA`/`ConfigErrors` {`Env`}, which goes into the existing 5xx/error alarm. Test hooks: unit tests feed the loader missing, unreadable and malformed values and check the status codes above.
 
+### 4.3 Item size limit for records and audit snapshots (architecture rule, QA-26)
+
+DynamoDB items can be at most 400 KB, and so can each item in a `TransactWriteItems` call. Free-text fields can be up to 32,768 characters, which is up to about 128 KB each in UTF-8, so a large record or its audit snapshot could go over the limit. The rules below stay within the existing tables and add no new infrastructure.
+
+1. **The snapshot holds only the change.** `snapshot` contains the fields this event changed, each as `{before, after}`, plus `version`. For a create, it holds the after-values only. A soft delete holds only `deletedAt` and the reason. The full current state stays on the Domain item, and the timeline is rebuilt by replaying the changes.
+2. **The snapshot is compressed.** It's stored as `snapshotGz`, which is gzip-compressed JSON in a DynamoDB Binary attribute, with `snapshotEncoding: "gzip+json"`. The API decompresses it before returning `snapshot`, so the API contract doesn't change.
+3. **Writes are measured before they're sent.** The loader works out each item's size with DynamoDB's own rules: attribute names plus values, UTF-8 for text and raw bytes for binary. A Domain item can be at most **350 KB**. A compressed audit item can be at most **350 KB**. That leaves about 50 KB for keys, index attributes and metadata.
+4. **Anything too big is rejected with nothing written.** If either item is over its cap, the request returns 413 `item_too_large` with a `field` hint naming the largest field. Because the record write and its audit entry go in one `TransactWriteItems` call, a record can never change without its audit entry, and an audit entry can never be partly written. Nothing is cut short, moved elsewhere or split across items, which keeps the audit trail complete for BR-08 and AS9100 §7.5.3.
+5. **What this means in practice.** With the BR field limits (§5), a normal record is a few KB, and a worst case of several full 32 KB free-text fields still fits once compressed. In practice a 413 can only come from extreme non-ASCII free text. It logs `errorCode=item_too_large` with the entity type and byte count only, never the content (§4.1).
+6. **Test hooks.** A unit test runs the size calculation against known item sizes. A boundary test checks that 349 KB passes and 351 KB gets a 413. An integration test confirms that after a 413, neither the Domain item nor any AuditLog item was written.
+
 ## 5. Data model (BRD §6)
 Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (tenancy seam). **No TTL**. Prod retained ≥ 7 years (D-03, amended: prod only, O-08). Prod may also hold labelled sample records (BR-31). Dev/stage hold synthetic or labelled sample data only, never real customer records (BR-45).
 
 | BRD entity | PK / SK | Notes |
 |---|---|---|
 | Quality record (CAPA/NCMR/SCAR) | `WS#ws` / `QR#<id>` | type, title, description, severity, stage, clause, dueDate, needByDate, reviewerName, disposition, independentApprover, sourceRecordId (OQ-23). GSI1 stage/severityRank#openedAt (BR-14), GSI2 dueDate (due / overdue), GSI3 needByDate (BR-15) |
-| Audit event | `AuditLog`: `WS#ws#ENT#<id>` / `<ts>#<ulid>` | actor {name, userId:null}, eventType, snapshot, controlledDataAttested, prevHash (optional tamper signal) |
+| Audit event | `AuditLog`: `WS#ws#ENT#<id>` / `<ts>#<ulid>` | actor {name, userId:null}, eventType, snapshotGz (diff, gzip; §4.3), controlledDataAttested, prevHash (optional tamper signal) |
 | Supplier | `WS#ws` / `SUP#<id>` | onTimePct, openScarCount, criticality, certRenewalDate. Score computed from SSM weights (D-07) |
 | Supplier qualification | `WS#ws` / `SQ#<id>` | stage, scope, approverName, approvalDate, reevalDate (GSI2) |
 | PO clause check | `WS#ws` / `PO#<id>` | findings[] entered manually (AI check deferred) |
