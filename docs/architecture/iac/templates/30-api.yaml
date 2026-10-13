@@ -140,19 +140,411 @@ Resources:
       IntegrationType: AWS_PROXY
       IntegrationUri: !GetAtt ReportsApiFn.Arn
       PayloadFormatVersion: '2.0'
-  RecordsRoute:
+  # BEGIN GENERATED ROUTES (iac/tools/gen-routes.py from api/openapi.yaml; do not edit)
+  RouteGetQualityRecords:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref HttpApi
-      RouteKey: ANY /api/records/{proxy+}   # TODO: explicit routes per module
+      RouteKey: GET /api/quality-records
       Target: !Sub integrations/${RecordsIntegration}
-  ReportsRoute:
+  RoutePostQualityRecords:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref HttpApi
-      RouteKey: GET /api/reports/{proxy+}
+      RouteKey: POST /api/quality-records
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetQualityRecordsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/quality-records/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePatchQualityRecordsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PATCH /api/quality-records/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteDeleteQualityRecordsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /api/quality-records/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostQualityRecordsIdTransitions:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/quality-records/{id}/transitions
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetSuppliers:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/suppliers
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostSuppliers:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/suppliers
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetSuppliersId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/suppliers/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePatchSuppliersId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PATCH /api/suppliers/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteDeleteSuppliersId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /api/suppliers/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetSupplierQualifications:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/supplier-qualifications
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostSupplierQualifications:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/supplier-qualifications
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetSupplierQualificationsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/supplier-qualifications/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePatchSupplierQualificationsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PATCH /api/supplier-qualifications/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteDeleteSupplierQualificationsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /api/supplier-qualifications/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostSupplierQualificationsIdTransitions:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/supplier-qualifications/{id}/transitions
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetPoChecks:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/po-checks
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostPoChecks:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/po-checks
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetPoChecksId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/po-checks/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePatchPoChecksId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PATCH /api/po-checks/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteDeletePoChecksId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /api/po-checks/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetFai:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/fai
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostFai:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/fai
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetFaiId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/fai/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePatchFaiId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PATCH /api/fai/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteDeleteFaiId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /api/fai/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostFaiIdSignatures:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/fai/{id}/signatures
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetFaiIdCharacteristics:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/fai/{id}/characteristics
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostFaiIdCharacteristics:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/fai/{id}/characteristics
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePatchFaiIdCharacteristicsCharid:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PATCH /api/fai/{id}/characteristics/{charId}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteDeleteFaiIdCharacteristicsCharid:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /api/fai/{id}/characteristics/{charId}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetCalibration:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/calibration
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostCalibration:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/calibration
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetCalibrationId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/calibration/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePatchCalibrationId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PATCH /api/calibration/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteDeleteCalibrationId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /api/calibration/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetTraining:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/training
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostTraining:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/training
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetTrainingId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/training/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePatchTrainingId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PATCH /api/training/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteDeleteTrainingId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /api/training/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostTrainingIdComplete:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/training/{id}/complete
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostTrainingIdUndoComplete:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/training/{id}/undo-complete
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetDocuments:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/documents
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostDocuments:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/documents
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetDocumentsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/documents/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePatchDocumentsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PATCH /api/documents/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteDeleteDocumentsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /api/documents/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetApprovalRoles:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/approval-roles
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostApprovalRoles:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/approval-roles
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetApprovalRolesId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/approval-roles/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePatchApprovalRolesId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PATCH /api/approval-roles/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteDeleteApprovalRolesId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /api/approval-roles/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetQmsAssessments:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/qms-assessments
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePostQmsAssessments:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /api/qms-assessments
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetQmsAssessmentsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/qms-assessments/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RoutePatchQmsAssessmentsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PATCH /api/qms-assessments/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteDeleteQmsAssessmentsId:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /api/qms-assessments/{id}
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetAuditEntitytypeEntityidEvents:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/audit/{entityType}/{entityId}/events
+      Target: !Sub integrations/${RecordsIntegration}
+  RouteGetReportsDashboard:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/reports/dashboard
       Target: !Sub integrations/${ReportsIntegration}
-  # Deferred (D-01): no /api/ai/* route.
+  RouteGetReportsReviewQueue:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/reports/review-queue
+      Target: !Sub integrations/${ReportsIntegration}
+  RouteGetReportsThreatensDelivery:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/reports/threatens-delivery
+      Target: !Sub integrations/${ReportsIntegration}
+  RouteGetReportsDue:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/reports/due
+      Target: !Sub integrations/${ReportsIntegration}
+  RouteGetReportsTrends:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/reports/trends
+      Target: !Sub integrations/${ReportsIntegration}
+  RouteGetReportsSupplierRisk:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/reports/supplier-risk
+      Target: !Sub integrations/${ReportsIntegration}
+  RouteGetConfig:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /api/config
+      Target: !Sub integrations/${ReportsIntegration}
+  # END GENERATED ROUTES
+  # Deferred (D-01): no /api/ai/* route. No /api/search (US-41 client-side). No catch-all route.
   DefaultStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:

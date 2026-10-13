@@ -1,0 +1,2733 @@
+openapi: 3.1.0
+info:
+  title: SentinelQA API
+  version: 0.5.0
+  description: 'Source of truth for the records-api / reports-api routes (architecture v0.5, BRD v1.4). Skeleton contract: only BRD-backed fields; anything pending a decision is marked `x-tbd: DP-nn`.
+
+
+    Conventions:
+
+    - **Origin**: every request must carry the CloudFront-injected `X-Origin-Verify` header, checked before anything else (403 forbidden_origin, ADR-0015).
+
+    - **Errors**: `application/problem+json` (`Problem`).
+
+    - **Pagination**: `?limit` (1–100, default 25) + opaque `?cursor`; response `{items, nextCursor}`.
+
+    - **Idempotency**: `Idempotency-Key` (UUID) required on every POST; 24 h dedupe record in the Domain table plus `ClientRequestToken` on TransactWriteItems.
+
+    - **Concurrency**: `version` attribute; responses carry `ETag`; PATCH/DELETE/actions need `If-Match` (428 if missing, 412 if stale). Stage moves are additionally conditional on `fromStage` (409).
+
+    - **Soft delete**: DELETE sets `deletedAt` and appends a DELETED audit event; lists exclude deleted unless `includeDeleted=true` (BRD §13.1).
+
+    - **Controlled-data gate (BR-44)**: free-text fields (`x-free-text`) require `controlledDataAttestation=true` (else 400 `gate:attestation_required`); a marker hit (whole-word, case-insensitive, list
+    in SSM) → 422 `gate:controlled_marker`; nothing persisted, no audit event, text never logged.
+
+    - **Audit**: every successful write appends one AuditLog event in the same transaction (BR-08, BR-46).
+
+    - **Sample data (BR-31)**: seed items carry `isSample=true` in every env.
+
+    - **Not routed**: `/api/ai/*` (reserved AI seam, BRD §12 #1). No `/api/search`: ⌘K is client-side over loaded lists (US-41 decision; scope DP-15). No CSV export route: the only observed CSV (agent task
+    log, US-39) is deferred with AI.'
+servers:
+- url: /
+  description: Via CloudFront only
+paths:
+  /api/quality-records:
+    x-sentinelqa-function: records-api
+    get:
+      tags:
+      - Quality records
+      operationId: listQualityRecord
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/IncludeDeleted'
+      - name: type
+        in: query
+        schema:
+          type: string
+          enum:
+          - CAPA
+          - NCMR
+          - SCAR
+      - name: severity
+        in: query
+        schema: &id001
+          type: string
+      - name: stage
+        in: query
+        schema: *id001
+      - name: standard
+        in: query
+        schema: *id001
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/QualityRecord'
+        '403': &id002
+          $ref: '#/components/responses/Forbidden'
+        '429': &id003
+          $ref: '#/components/responses/TooMany'
+    post:
+      tags:
+      - Quality records
+      operationId: createQualityRecord
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QualityRecord'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QualityRecord'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/quality-records/{id}:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    get:
+      tags:
+      - Quality records
+      operationId: getQualityRecord
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QualityRecord'
+          headers:
+            ETag:
+              schema: *id001
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403': *id002
+        '429': *id003
+    patch:
+      tags:
+      - Quality records
+      operationId: updateQualityRecord
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/QualityRecord'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QualityRecord'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+    delete:
+      tags:
+      - Quality records
+      operationId: deleteQualityRecord
+      description: 'Soft delete: sets deletedAt and appends a DELETED audit event (BRD §13.1). No DynamoDB DeleteItem (denied in every env).'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - name: actorName
+        in: query
+        required: true
+        schema: *id001
+      responses:
+        '204':
+          description: Soft-deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+  /api/quality-records/{id}/transitions:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    post:
+      tags:
+      - Quality records
+      operationId: transitionQualityRecord
+      description: Stage advance (BR-13). Rules TBD (DP-02).
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Transition'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/suppliers:
+    x-sentinelqa-function: records-api
+    get:
+      tags:
+      - Suppliers
+      operationId: listSupplier
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/IncludeDeleted'
+      - name: standard
+        in: query
+        schema: *id001
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Supplier'
+        '403': *id002
+        '429': *id003
+    post:
+      tags:
+      - Suppliers
+      operationId: createSupplier
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/suppliers/{id}:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    get:
+      tags:
+      - Suppliers
+      operationId: getSupplier
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          headers:
+            ETag:
+              schema: *id001
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403': *id002
+        '429': *id003
+    patch:
+      tags:
+      - Suppliers
+      operationId: updateSupplier
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Supplier'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+    delete:
+      tags:
+      - Suppliers
+      operationId: deleteSupplier
+      description: 'Soft delete: sets deletedAt and appends a DELETED audit event (BRD §13.1). No DynamoDB DeleteItem (denied in every env).'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - name: actorName
+        in: query
+        required: true
+        schema: *id001
+      responses:
+        '204':
+          description: Soft-deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+  /api/supplier-qualifications:
+    x-sentinelqa-function: records-api
+    get:
+      tags:
+      - Supplier qualification
+      operationId: listSupplierQualification
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/IncludeDeleted'
+      - name: stage
+        in: query
+        schema: *id001
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/SupplierQualification'
+        '403': *id002
+        '429': *id003
+    post:
+      tags:
+      - Supplier qualification
+      operationId: createSupplierQualification
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplierQualification'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierQualification'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/supplier-qualifications/{id}:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    get:
+      tags:
+      - Supplier qualification
+      operationId: getSupplierQualification
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierQualification'
+          headers:
+            ETag:
+              schema: *id001
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403': *id002
+        '429': *id003
+    patch:
+      tags:
+      - Supplier qualification
+      operationId: updateSupplierQualification
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/SupplierQualification'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupplierQualification'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+    delete:
+      tags:
+      - Supplier qualification
+      operationId: deleteSupplierQualification
+      description: 'Soft delete: sets deletedAt and appends a DELETED audit event (BRD §13.1). No DynamoDB DeleteItem (denied in every env).'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - name: actorName
+        in: query
+        required: true
+        schema: *id001
+      responses:
+        '204':
+          description: Soft-deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+  /api/supplier-qualifications/{id}/transitions:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    post:
+      tags:
+      - Supplier qualification
+      operationId: transitionSupplierQualification
+      description: Step advance (BR-36). To Active on ASL requires approverName (BR-35).
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Transition'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/po-checks:
+    x-sentinelqa-function: records-api
+    get:
+      tags:
+      - Purchase controls
+      operationId: listPoCheck
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/IncludeDeleted'
+      - name: status
+        in: query
+        schema: *id001
+      - name: clause
+        in: query
+        schema: *id001
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/PoCheck'
+        '403': *id002
+        '429': *id003
+    post:
+      tags:
+      - Purchase controls
+      operationId: createPoCheck
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PoCheck'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PoCheck'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/po-checks/{id}:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    get:
+      tags:
+      - Purchase controls
+      operationId: getPoCheck
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PoCheck'
+          headers:
+            ETag:
+              schema: *id001
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403': *id002
+        '429': *id003
+    patch:
+      tags:
+      - Purchase controls
+      operationId: updatePoCheck
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/PoCheck'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PoCheck'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+    delete:
+      tags:
+      - Purchase controls
+      operationId: deletePoCheck
+      description: 'Soft delete: sets deletedAt and appends a DELETED audit event (BRD §13.1). No DynamoDB DeleteItem (denied in every env).'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - name: actorName
+        in: query
+        required: true
+        schema: *id001
+      responses:
+        '204':
+          description: Soft-deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+  /api/fai:
+    x-sentinelqa-function: records-api
+    get:
+      tags:
+      - FAI
+      operationId: listFai
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/IncludeDeleted'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Fai'
+        '403': *id002
+        '429': *id003
+    post:
+      tags:
+      - FAI
+      operationId: createFai
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Fai'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fai'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/fai/{id}:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    get:
+      tags:
+      - FAI
+      operationId: getFai
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fai'
+          headers:
+            ETag:
+              schema: *id001
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403': *id002
+        '429': *id003
+    patch:
+      tags:
+      - FAI
+      operationId: updateFai
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/Fai'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fai'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+    delete:
+      tags:
+      - FAI
+      operationId: deleteFai
+      description: 'Soft delete: sets deletedAt and appends a DELETED audit event (BRD §13.1). No DynamoDB DeleteItem (denied in every env).'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - name: actorName
+        in: query
+        required: true
+        schema: *id001
+      responses:
+        '204':
+          description: Soft-deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+  /api/fai/{id}/signatures:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    post:
+      tags:
+      - FAI
+      operationId: signFai
+      description: Sign as preparer/evaluator (BR-33).
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FaiSignature'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/fai/{id}/characteristics:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    get:
+      tags:
+      - FAI
+      operationId: listFaiCharacteristics
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/FaiCharacteristic'
+        '403': *id002
+        '429': *id003
+    post:
+      tags:
+      - FAI
+      operationId: createFaiCharacteristic
+      description: One row per request (row + audit event in one transaction).
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FaiCharacteristic'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FaiCharacteristic'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/fai/{id}/characteristics/{charId}:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    - name: charId
+      in: path
+      required: true
+      schema: *id001
+    patch:
+      tags:
+      - FAI
+      operationId: updateFaiCharacteristic
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/FaiCharacteristic'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FaiCharacteristic'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+    delete:
+      tags:
+      - FAI
+      operationId: deleteFaiCharacteristic
+      description: Soft delete of a Form 3 row (US-36, §13.1).
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - name: actorName
+        in: query
+        required: true
+        schema: *id001
+      responses:
+        '204':
+          description: Soft-deleted
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '403': *id002
+        '429': *id003
+  /api/calibration:
+    x-sentinelqa-function: records-api
+    get:
+      tags:
+      - Calibration
+      operationId: listCalibration
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/IncludeDeleted'
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - Active
+          - Due soon
+          - Overdue
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Calibration'
+        '403': *id002
+        '429': *id003
+    post:
+      tags:
+      - Calibration
+      operationId: createCalibration
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Calibration'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Calibration'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/calibration/{id}:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    get:
+      tags:
+      - Calibration
+      operationId: getCalibration
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Calibration'
+          headers:
+            ETag:
+              schema: *id001
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403': *id002
+        '429': *id003
+    patch:
+      tags:
+      - Calibration
+      operationId: updateCalibration
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/Calibration'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Calibration'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+    delete:
+      tags:
+      - Calibration
+      operationId: deleteCalibration
+      description: 'Soft delete: sets deletedAt and appends a DELETED audit event (BRD §13.1). No DynamoDB DeleteItem (denied in every env).'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - name: actorName
+        in: query
+        required: true
+        schema: *id001
+      responses:
+        '204':
+          description: Soft-deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+  /api/training:
+    x-sentinelqa-function: records-api
+    get:
+      tags:
+      - Training
+      operationId: listTraining
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/IncludeDeleted'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Training'
+        '403': *id002
+        '429': *id003
+    post:
+      tags:
+      - Training
+      operationId: createTraining
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Training'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Training'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/training/{id}:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    get:
+      tags:
+      - Training
+      operationId: getTraining
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Training'
+          headers:
+            ETag:
+              schema: *id001
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403': *id002
+        '429': *id003
+    patch:
+      tags:
+      - Training
+      operationId: updateTraining
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/Training'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Training'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+    delete:
+      tags:
+      - Training
+      operationId: deleteTraining
+      description: 'Soft delete: sets deletedAt and appends a DELETED audit event (BRD §13.1). No DynamoDB DeleteItem (denied in every env).'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - name: actorName
+        in: query
+        required: true
+        schema: *id001
+      responses:
+        '204':
+          description: Soft-deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+  /api/training/{id}/complete:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    post:
+      tags:
+      - Training
+      operationId: completeTraining
+      description: 'Mark complete (BR-40): sets completedDate, status Current, COMPLETED event.'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WriteCommon'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/training/{id}/undo-complete:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    post:
+      tags:
+      - Training
+      operationId: undoCompleteTraining
+      description: 'Undo (BR-40) as a reversal: COMPLETION_UNDONE event (§13.1).'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WriteCommon'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/documents:
+    x-sentinelqa-function: records-api
+    get:
+      tags:
+      - Document control
+      operationId: listDocument
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/IncludeDeleted'
+      - name: status
+        in: query
+        schema: *id001
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Document'
+        '403': *id002
+        '429': *id003
+    post:
+      tags:
+      - Document control
+      operationId: createDocument
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Document'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/documents/{id}:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    get:
+      tags:
+      - Document control
+      operationId: getDocument
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          headers:
+            ETag:
+              schema: *id001
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403': *id002
+        '429': *id003
+    patch:
+      tags:
+      - Document control
+      operationId: updateDocument
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/Document'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+    delete:
+      tags:
+      - Document control
+      operationId: deleteDocument
+      description: 'Soft delete: sets deletedAt and appends a DELETED audit event (BRD §13.1). No DynamoDB DeleteItem (denied in every env).'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - name: actorName
+        in: query
+        required: true
+        schema: *id001
+      responses:
+        '204':
+          description: Soft-deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+  /api/approval-roles:
+    x-sentinelqa-function: records-api
+    get:
+      tags:
+      - Approval roles
+      operationId: listApprovalRole
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/IncludeDeleted'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ApprovalRole'
+        '403': *id002
+        '429': *id003
+    post:
+      tags:
+      - Approval roles
+      operationId: createApprovalRole
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRole'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRole'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/approval-roles/{id}:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    get:
+      tags:
+      - Approval roles
+      operationId: getApprovalRole
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRole'
+          headers:
+            ETag:
+              schema: *id001
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403': *id002
+        '429': *id003
+    patch:
+      tags:
+      - Approval roles
+      operationId: updateApprovalRole
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRole'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRole'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+    delete:
+      tags:
+      - Approval roles
+      operationId: deleteApprovalRole
+      description: 'Soft delete: sets deletedAt and appends a DELETED audit event (BRD §13.1). No DynamoDB DeleteItem (denied in every env).'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - name: actorName
+        in: query
+        required: true
+        schema: *id001
+      responses:
+        '204':
+          description: Soft-deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+  /api/qms-assessments:
+    x-sentinelqa-function: records-api
+    get:
+      tags:
+      - QMS Champion
+      operationId: listQmsAssessment
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/IncludeDeleted'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/QmsAssessment'
+        '403': *id002
+        '429': *id003
+    post:
+      tags:
+      - QMS Champion
+      operationId: createQmsAssessment
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QmsAssessment'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QmsAssessment'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '403': *id002
+        '429': *id003
+  /api/qms-assessments/{id}:
+    x-sentinelqa-function: records-api
+    parameters:
+    - $ref: '#/components/parameters/Id'
+    get:
+      tags:
+      - QMS Champion
+      operationId: getQmsAssessment
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QmsAssessment'
+          headers:
+            ETag:
+              schema: *id001
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403': *id002
+        '429': *id003
+    patch:
+      tags:
+      - QMS Champion
+      operationId: updateQmsAssessment
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/QmsAssessment'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QmsAssessment'
+          headers:
+            ETag:
+              schema: *id001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+    delete:
+      tags:
+      - QMS Champion
+      operationId: deleteQmsAssessment
+      description: 'Soft delete: sets deletedAt and appends a DELETED audit event (BRD §13.1). No DynamoDB DeleteItem (denied in every env).'
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - name: actorName
+        in: query
+        required: true
+        schema: *id001
+      responses:
+        '204':
+          description: Soft-deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '403': *id002
+        '429': *id003
+  /api/audit/{entityType}/{entityId}/events:
+    x-sentinelqa-function: records-api
+    parameters:
+    - name: entityType
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+        - quality-records
+        - suppliers
+        - supplier-qualifications
+        - po-checks
+        - fai
+        - calibration
+        - training
+        - documents
+        - approval-roles
+        - qms-assessments
+    - name: entityId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Audit
+      operationId: listAuditEvents
+      description: Timeline (US-03, BR-08, BR-36), oldest first. Read-only Query on AuditLog.
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/AuditEvent'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403': *id002
+        '429': *id003
+  /api/reports/dashboard:
+    x-sentinelqa-function: reports-api
+    get:
+      tags:
+      - Reports
+      operationId: getDashboard
+      description: Tiles and "items need attention" count (BR-42). Sources for "FAI sign-off pending"/"Effectiveness checks due" TBD (DP-17).
+      parameters: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+        '403': *id002
+        '429': *id003
+  /api/reports/review-queue:
+    x-sentinelqa-function: reports-api
+    get:
+      tags:
+      - Reports
+      operationId: getReviewQueue
+      description: Awaiting your review, severity then age (BR-14). Age direction/basis TBD (DP-13).
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/QualityRecord'
+        '403': *id002
+        '429': *id003
+  /api/reports/threatens-delivery:
+    x-sentinelqa-function: reports-api
+    get:
+      tags:
+      - Reports
+      operationId: getThreatensDelivery
+      description: Open CAPA/NCMR with need-by ≤ 14 days (BR-15). Day counting TBD (DP-12).
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/QualityRecord'
+        '403': *id002
+        '429': *id003
+  /api/reports/due:
+    x-sentinelqa-function: reports-api
+    get:
+      tags:
+      - Reports
+      operationId: getDueItems
+      description: Due-soon/overdue items per entity via GSI2 (BR-18, BR-25, training).
+      parameters:
+      - name: entityType
+        in: query
+        schema:
+          type: string
+          enum:
+          - quality-records
+          - supplier-qualifications
+          - calibration
+          - training
+          - documents
+      - name: before
+        in: query
+        schema: &id004
+          type: string
+          format: date
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+        '403': *id002
+        '429': *id003
+  /api/reports/trends:
+    x-sentinelqa-function: reports-api
+    get:
+      tags:
+      - Reports
+      operationId: getTrends
+      description: Opened vs closed 12 weeks, severity mix, by standard, clause Pareto (US-12). Definitions TBD (DP-14).
+      parameters: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+        '403': *id002
+        '429': *id003
+  /api/reports/supplier-risk:
+    x-sentinelqa-function: reports-api
+    get:
+      tags:
+      - Reports
+      operationId: getSupplierRisk
+      description: Suppliers ranked by ascending score (BR-16, US-18). Tie-break TBD (DP-13).
+      parameters:
+      - name: standard
+        in: query
+        schema: *id001
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/Page'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Supplier'
+        '403': *id002
+        '429': *id003
+  /api/config:
+    x-sentinelqa-function: reports-api
+    get:
+      tags:
+      - Config
+      operationId: getConfig
+      description: Read-only BR-47 configuration. Values are changed by an operator in SSM, not via the API.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Config'
+        '403': *id002
+        '429': *id003
+components:
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem+json. `code` is stable and machine-readable.
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          format: uri
+        title: *id001
+        status:
+          type: integer
+        detail: *id001
+        instance: *id001
+        code:
+          type: string
+          enum:
+          - validation_failed
+          - gate:attestation_required
+          - gate:controlled_marker
+          - not_found
+          - version_conflict
+          - precondition_required
+          - stage_conflict
+          - sod_violation
+          - idempotency_conflict
+          - forbidden_origin
+          - rate_limited
+          - internal
+        fields:
+          type: array
+          items:
+            type: object
+            properties:
+              name: *id001
+              message: *id001
+        markerId:
+          type: string
+          description: 'TBD (DP-03): whether the matched marker id is returned to the user is pending. Matched text is never returned or logged.'
+          x-tbd: DP-03
+    Meta:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 'TBD (DP-01): record ID/number format per entity (prefix, year scope, suffix).'
+          x-tbd: DP-01
+          readOnly: true
+        version:
+          type: integer
+          description: Optimistic-concurrency counter, returned as ETag "W/\"<version>\""
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        deletedAt:
+          type: string
+          format: date-time
+          description: Soft delete (BRD §13.1). Removed items are excluded from lists, counts and pickers.
+          readOnly: true
+        isSample:
+          type: boolean
+          description: 'BR-31: true for the illustrative seed set (labelled "ILLUSTRATIVE — SAMPLE RECORDS"). Allowed in every env.'
+          readOnly: true
+        draft:
+          type:
+          - object
+          - 'null'
+          description: 'Reserved AI seam (BRD §12 #1). Always null in this build.'
+          readOnly: true
+        aiAssisted:
+          type: boolean
+          const: false
+          readOnly: true
+    WriteCommon:
+      type: object
+      required:
+      - actorName
+      properties:
+        actorName:
+          type: string
+          description: Self-asserted actor/reviewer name (BR-11). No identity yet (ADR-0008). Limits TBD (DP-04).
+        controlledDataAttestation:
+          type: boolean
+          description: Required true on every request that persists free text (BR-44). Missing/false → 400 gate:attestation_required. Whether writes without free text also need it is TBD (DP-03).
+    Page:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items: {}
+        nextCursor:
+          type:
+          - string
+          - 'null'
+          description: Opaque; pass as ?cursor=. Absent on the last page.
+    AuditEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+          readOnly: true
+        at:
+          type: string
+          format: date-time
+          readOnly: true
+        actorName:
+          type: string
+          readOnly: true
+        eventType:
+          type: string
+          enum:
+          - CREATED
+          - UPDATED
+          - STAGE_CHANGED
+          - DELETED
+          - RESTORED
+          - SIGNED
+          - COMPLETED
+          - COMPLETION_UNDONE
+          - RELEASED
+          - SUPERSEDED
+          - REVIEWER_DECISION
+          - AI_DRAFT_ACCEPTED
+          - AI_DRAFT_MODIFIED
+          - AI_DRAFT_REJECTED
+          readOnly: true
+        fromStage:
+          type: string
+          readOnly: true
+        toStage:
+          type: string
+          readOnly: true
+        controlledDataAttested:
+          type: boolean
+          readOnly: true
+        snapshot:
+          type: object
+          readOnly: true
+      description: Append-only (BR-08, BR-46). AI_DRAFT_* are reserved and never emitted in this build.
+    Transition:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/WriteCommon'
+      required:
+      - fromStage
+      - toStage
+      properties:
+        fromStage: *id001
+        toStage: *id001
+        comment:
+          type: string
+          description: 'Optional note. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+      description: Generic stage advance; writes STAGE_CHANGED (BR-36). Conditional on current stage = fromStage (409 stage_conflict). Allowed moves (backward, skip, who closes) TBD (DP-02).
+    QualityRecord:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Meta'
+      - $ref: '#/components/schemas/WriteCommon'
+      required:
+      - type
+      - title
+      - severity
+      properties:
+        type:
+          type: string
+          enum:
+          - CAPA
+          - NCMR
+          - SCAR
+        title:
+          type: string
+          description: 'Short title. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        description:
+          type: string
+          description: 'Event description. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        severity:
+          type: string
+          enum:
+          - Critical
+          - Major
+          - Minor
+        stage:
+          type: string
+          enum:
+          - New
+          - Containment
+          - Investigation
+          - Draft Ready
+          - QM Review
+          - Closed
+          readOnly: true
+        clause:
+          type: string
+          description: Standard/clause reference
+        dueDate: *id004
+        needByDate:
+          type: string
+          format: date
+          description: Need-by date (BR-15, delivery details optional)
+        deliveryDetails:
+          type: string
+          description: 'Optional. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        reviewerName:
+          type: string
+          description: BR-11
+        disposition:
+          type: string
+          enum:
+          - Use as is
+          - Rework
+          - Repair
+          - Scrap
+          - Return to supplier
+        independentApprover:
+          type: string
+          description: Required for Use as is / Repair (BR-10). Meaning of "independent" and block vs warn TBD (DP-08).
+        sourceRecordId:
+          type: string
+          description: e.g. NCMR that raised a SCAR (OQ-23)
+        stepFields:
+          type: object
+          description: 'TBD (DP-02): CAPA/NCMR steps 2–6 field specs are not observed (BRD §13.2a).'
+          x-tbd: DP-02
+    Supplier:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Meta'
+      - $ref: '#/components/schemas/WriteCommon'
+      description: Create/edit story and entered-vs-derived fields TBD (DP-10).
+      properties:
+        name: *id001
+        commodity: *id001
+        criticality:
+          type: string
+          enum:
+          - Critical
+          - Standard
+        onTimePct:
+          type: number
+          description: 'TBD (DP-10): entered or derived'
+          x-tbd: DP-10
+        openScarCount:
+          type: integer
+          description: 'TBD (DP-10): entered or derived'
+          x-tbd: DP-10
+        certRenewalDate: *id004
+        standards:
+          type: array
+          items:
+            type: string
+            enum:
+            - AMS 2750
+            - AS6174
+            - AS9100D
+            - AS9102
+            - NADCAP
+            - NAS 410
+        score:
+          type: number
+          description: 0–100 from BR-47 weights (PLACEHOLDER values, DP-16)
+          readOnly: true
+        band:
+          type: string
+          readOnly: true
+        flags:
+          type: array
+          items: *id001
+          description: 'TBD (DP-10): deterministic flags and next step'
+          x-tbd: DP-10
+          readOnly: true
+    SupplierQualification:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Meta'
+      - $ref: '#/components/schemas/WriteCommon'
+      required:
+      - supplierName
+      properties:
+        supplierName:
+          type: string
+          description: Required to continue (BR-17)
+        scopeRequested:
+          type: string
+          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        approvedScope:
+          type: string
+          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        stage:
+          type: string
+          enum:
+          - Request
+          - Docs & certs
+          - Risk
+          - Evaluation
+          - Approval
+          - Active on ASL
+          readOnly: true
+        docsReviewNotes:
+          type: string
+          description: 'Step 2 documentation & certification review. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        approverName:
+          type: string
+          description: Required to approve & add to ASL (BR-35, BR-38)
+        approvalDate: *id004
+        reevalDate:
+          type: string
+          format: date
+          description: Validation vs approval date TBD (DP-19)
+        reviewerName: *id001
+        stepFields:
+          type: object
+          description: 'TBD (DP-02): SQ steps 3 (Risk), 4 (Evaluation), 6 (Active on ASL) not observed.'
+          x-tbd: DP-02
+    PoFinding:
+      type: object
+      properties:
+        rowId:
+          type: string
+          readOnly: true
+        requirement:
+          type: string
+          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        clause:
+          type: string
+          enum:
+          - AS9100D §8.4.3
+          - AS9102
+        status:
+          type: string
+          enum:
+          - Missing
+          - Weak
+          - Present
+          - Not captured
+        suggestedWording:
+          type: string
+          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        whyCitation:
+          type: string
+          description: '"Why this citation" note. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+    PoCheck:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Meta'
+      - $ref: '#/components/schemas/WriteCommon'
+      description: Manual entry, observed fields only (BRD §13.2). Types/lengths/required flags TBD (DP-04).
+      properties:
+        poNumber: *id001
+        supplier: *id001
+        part: *id001
+        quantity: *id001
+        revision:
+          type: string
+          description: 'Observed as free text. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/PoFinding'
+        summaryCounts:
+          type: object
+          description: Derived count per status
+          additionalProperties:
+            type: integer
+          readOnly: true
+    Fai:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Meta'
+      - $ref: '#/components/schemas/WriteCommon'
+      required:
+      - partNumber
+      - partName
+      properties:
+        partNumber:
+          type: string
+          description: Required (BR-22)
+        partName:
+          type: string
+          description: Required (BR-22)
+        partRevision:
+          type: string
+          description: N/A if blank
+        faiReportNumber:
+          type: string
+          description: 'TBD (DP-01): auto, observed FAIR-2026-xxxxxxxx'
+          x-tbd: DP-01
+          readOnly: true
+        partType:
+          type: string
+          enum:
+          - Detail
+          - Sub-Assembly
+          - Assembly
+          - COTS
+          - Software
+        faiType:
+          type: string
+          enum:
+          - Full
+          - Partial
+          - Delta
+        reason:
+          type: string
+          description: 'Reason for FAI. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        routingNumber: *id001
+        status:
+          type: string
+          readOnly: true
+        preparerSignature:
+          type: object
+          properties:
+            name: *id001
+            at: &id005
+              type: string
+              format: date-time
+          readOnly: true
+        evaluatorSignature:
+          type: object
+          properties:
+            name: *id001
+            at: *id005
+          readOnly: true
+        form2:
+          type: object
+          description: 'TBD (OQ-08): Form 2 not observed.'
+          x-tbd: OQ-08
+    FaiSignature:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/WriteCommon'
+      required:
+      - role
+      properties:
+        role:
+          type: string
+          enum:
+          - preparer
+          - evaluator
+      description: 'BR-33: evaluator ≠ preparer, preparer signs first (409 sod_violation). Name comparison and edits/un-sign after sign-off TBD (DP-08, DP-09).'
+    FaiCharacteristic:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Meta'
+      - $ref: '#/components/schemas/WriteCommon'
+      properties:
+        charNo:
+          type: integer
+        refLocation: *id001
+        designator:
+          type: string
+          default: None
+        requirement:
+          type: string
+          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        result:
+          type: string
+          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        equipment: *id001
+        passFail:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+          default: PASS
+        ncrDisposition:
+          type: string
+          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        checks:
+          type: array
+          items: *id001
+          description: Advisory completeness checks (BR-34)
+          readOnly: true
+    Calibration:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Meta'
+      - $ref: '#/components/schemas/WriteCommon'
+      required:
+      - equipmentName
+      properties:
+        equipmentName:
+          type: string
+          description: Required (BR-23)
+        equipmentId:
+          type: string
+          description: Blank → auto ID (BR-39, format DP-01; uniqueness DP-01)
+        type:
+          type: string
+          enum:
+          - Caliper
+          - Micrometer
+          - Gauge
+          - Height gauge
+          - CMM
+          - Torque wrench
+          - Surface plate
+          - Test equipment
+          - Other
+        certificateRef: *id001
+        lastCalibrationDate: *id004
+        nextDueDate:
+          type: string
+          format: date
+          description: +6/+12/+24 months helper; end-of-month rule TBD (DP-12)
+        calibratedBy: *id001
+        nistStatement:
+          type: string
+          description: 'NIST traceability statement. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        status:
+          type: string
+          enum:
+          - Active
+          - Due soon
+          - Overdue
+          readOnly: true
+    Training:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Meta'
+      - $ref: '#/components/schemas/WriteCommon'
+      properties:
+        role: *id001
+        person: *id001
+        course: *id001
+        sourceRecordId: *id001
+        standardOrSop: *id001
+        dueDate: *id004
+        completedDate:
+          type: string
+          format: date
+          readOnly: true
+        status:
+          type: string
+          enum:
+          - Current
+          - Due soon
+          - Overdue
+          - Not started
+          readOnly: true
+        recurrence:
+          type: object
+          description: 'TBD (DP-07): recurrence interval and Not started/start-by rule'
+          x-tbd: DP-07
+    Document:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Meta'
+      - $ref: '#/components/schemas/WriteCommon'
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          description: Required (BR-26)
+        documentNumber: *id001
+        revision: *id001
+        type:
+          type: string
+          enum:
+          - Work Instruction
+          - Procedure
+          - Drawing
+          - Quality Manual section
+          - Form
+          - Specification
+          - Other
+        location:
+          type: string
+          description: 'Link or description (BR-07, references only). Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          x-free-text: true
+        effectiveDate: *id004
+        nextReviewDate: *id004
+        status:
+          type: string
+          enum:
+          - Draft
+          - Under review
+          - Released
+          - Superseded
+          description: Superseded is set by the server only (BR-37). Edit/re-release semantics TBD (DP-11).
+        approvedBy:
+          type: string
+          description: Required when Released (BR-37, BR-38)
+    ApprovalRole:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Meta'
+      - $ref: '#/components/schemas/WriteCommon'
+      description: Convenience only, not access control (BR-19).
+      properties:
+        roleName: *id001
+        people:
+          type: array
+          items: *id001
+        defaultFor:
+          type: array
+          items:
+            type: string
+            enum:
+            - Supplier Qualification
+            - CAPA
+            - NCMR
+            - Document
+            - FAI
+            - Purchase Order
+    QmsAssessment:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/Meta'
+      - $ref: '#/components/schemas/WriteCommon'
+      properties:
+        ratings:
+          type: array
+          minItems: 8
+          maxItems: 8
+          items:
+            type:
+            - integer
+            - 'null'
+            minimum: 1
+            maximum: 5
+        overallScore:
+          type: number
+          description: Mean of 8 ratings (BR-41); rounding and < 8 answers TBD (DP-06)
+          readOnly: true
+        band:
+          type: string
+          description: 'TBD (DP-06): bands other than Defined'
+          x-tbd: DP-06
+          readOnly: true
+        topGaps:
+          type: array
+          items: *id001
+          readOnly: true
+    Config:
+      type: object
+      description: BR-47 values from SSM. **PLACEHOLDER** defaults until Vishwas tunes them (DP-16). The controlled-data marker list is never exposed.
+      properties:
+        status:
+          type: string
+          const: PLACEHOLDER
+          readOnly: true
+        supplierRisk:
+          type: object
+          readOnly: true
+        dueSoonDays:
+          type: object
+          readOnly: true
+        timezone:
+          type: string
+          description: 'TBD (DP-12): workspace timezone'
+          x-tbd: DP-12
+          readOnly: true
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: *id001
+    Cursor:
+      name: cursor
+      in: query
+      schema: *id001
+      description: Opaque cursor from nextCursor
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    IncludeDeleted:
+      name: includeDeleted
+      in: query
+      schema:
+        type: boolean
+        default: false
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Required on every POST. Same key + same body within 24 h returns the original response; same key + different body → 409 idempotency_conflict.
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema: *id001
+      description: ETag from the last GET. Missing → 428 precondition_required; stale → 412 version_conflict.
+  responses:
+    BadRequest:
+      description: Validation error or gate:attestation_required (BR-44)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unprocessable:
+      description: gate:controlled_marker (BR-44). Nothing persisted, no audit event. User message and input retention TBD (DP-03).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Not found (or soft-deleted)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: stage_conflict, sod_violation or idempotency_conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionFailed:
+      description: version_conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionRequired:
+      description: If-Match missing
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: 'forbidden_origin: request did not come through CloudFront (ADR-0015)'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooMany:
+      description: rate_limited (API Gateway throttle)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
