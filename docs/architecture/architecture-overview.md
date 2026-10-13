@@ -2,165 +2,128 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed (draft v0.1)**. Nothing deployed and no AWS resources created |
-| Date | 2026-10-13 |
+| Status | **v0.2: decisions D-01..D-14 resolved (2026-10-13).** Nothing deployed and no AWS resources created |
 | Basis | [BRD v1.1](../requirements/BRD.md) (approved), screenshots 01–58, reliability CSV |
-| Diagrams | [diagrams.md](diagrams.md) |
-| Decisions | [adr/](adr/) · IaC outline: [iac/README.md](iac/README.md) |
+| Diagrams | [diagrams.md](diagrams.md) · Decisions: [adr/](adr/) · IaC: [iac/README.md](iac/README.md) (CloudFormation) |
 
-> Scope rule: this design covers only behavior in the BRD. Roadmap items (weekly digest, certificate watch, ASL gate on POs, incoming inspection triage, etc.) are **not designed**. Where the design leaves room for them, it says so. Authentication, logins and multi-tenancy are out of scope (BRD §1.1), but the design keeps seams for them ([ADR-0008](adr/0008-auth-and-tenancy-ready-seams.md)).
+> Scope: only BRD-observed behavior. **AI features are deferred (D-01)**. The current build has no model provider. An `ai` seam is reserved (§6). Auth, logins and multi-tenancy are out of scope, with seams kept ([ADR-0008](adr/0008-auth-and-tenancy-ready-seams.md)). Roadmap items are not designed.
 
-## 1. Goals and constraints from the BRD
-| Driver | BRD source | Architectural consequence |
+## 1. Drivers from the BRD
+| Driver | BRD | Consequence |
 |---|---|---|
-| AI drafts, human is reviewer of record | §1, BR-09, US-01 | AI never changes a record's state. It returns a *draft* that a named person accepts, modifies or rejects. The decision is logged |
-| Controlled-data gate (no ITAR/EAR/CUI) | BR-04/05, US-02/15, §9 | Gate is enforced on the **server**, not only in the UI ([ADR-0005](adr/0005-controlled-data-gate-enforcement.md)) |
-| Pasted text not retained | BR-06, §9 | Prompt text is not persisted by default. Logs are redacted and the model provider gets no data retention. Conflicts with the home-page "output audit trail retains prompt" claim, see D-04 |
-| No file storage, references only | BR-07, §4.10, §4.13 | No upload endpoint and no S3 bucket for user documents ([ADR-0007](adr/0007-references-only-no-file-storage.md)) |
-| Immutable audit trail with actor + snapshot | BR-08, BR-36, §9 | Append-only audit store with deny-update/delete IAM, plus an optional WORM archive ([ADR-0006](adr/0006-immutable-audit-log.md)) |
-| Segregation of duties by named individual | BR-10, BR-20, BR-33, BR-35, BR-37 | Enforced in domain logic on named-person fields. No real identity until auth exists (OQ-03) |
-| Clause citations, hypothesis prefix, "clause reference to confirm" | BR-01..03 | Structured model output (JSON schema) plus a server-side validator. A violation is reported as `SCHEMA_MISMATCH` |
-| Agent reliability KPIs, alerts, CSV export | §4.17, BR-29/30/43, US-32/39 | An `AgentTask` row per AI call, CloudWatch metrics/alarms, CSV export from the API |
-| 30 s timeout, ~3 s average latency | BR-43, §4.17 | Synchronous Lambda path with a 30 s budget (API Gateway HTTP API limit is 30 s) |
-| Low volume (single pilot) | §1 Pricing | Serverless, pay-per-use, scale to near zero |
+| Human is reviewer of record | BR-09 | Records carry named reviewer/approver fields. All state changes are human-initiated |
+| Controlled-data gate | BR-04/05, US-15 | Kept server-side on every free-text write (attestation + keyword block, [ADR-0005](adr/0005-controlled-data-gate-enforcement.md)) |
+| Server-side persistence, 7-year retention | D-03 (overrides demo browser-only, OQ-04) | DynamoDB with no TTL on records/audit, deletion protection, RETAIN policies |
+| No file storage | BR-07 | References only ([ADR-0007](adr/0007-references-only-no-file-storage.md)) |
+| Immutable audit trail | BR-08, BR-36 | Append-only DynamoDB + IAM explicit deny (D-05). No WORM archive |
+| Segregation of duties by named person | BR-10/20/33/35/37 | Domain-logic checks. Advisory until auth exists |
+| Configurable thresholds | D-07, OQ-01/02 | SSM parameters, values TBD |
 
-## 2. Services (proposed)
+## 2. In scope for the current build vs deferred
+| Module (BRD §4) | Current build | Deferred (AI, D-01) |
+|---|---|---|
+| Records / CAPA / NCMR / SCAR | Create forms, 6-stage workflow, disposition + independent approver, timeline, filters, status board, review queue sort, trends | "Start my CAPA" paste-to-draft, "Continue drafting in the agent" |
+| Supply Chain | Scorecard with **deterministic** score from configurable weights (D-07) | AI risk narrative |
+| Supplier Qualification | 6-step wizard, approver gate, ASL, re-eval tracking | AI risk hypotheses |
+| Purchase Controls | Stored PO check records (manual entry) | "Check clauses" AI check |
+| FAI | Form 1, Form 3 grid, preparer/evaluator sign-off | "Build my FAI record" |
+| Calibration, Training, Document Control, Approval Roles | Full CRUD and rules per BRD | — |
+| QMS Champion | Ratings, mean score, top gaps (deterministic, BR-41) | "Ask the agent … gap-closure plan" |
+| Dashboard | Needs-attention aggregation (BR-42) | — |
+| Ask the agent, /demo, /try-your-document, Agent reliability | — (hidden or static "coming later") | Entire modules, AgentTask table, reliability alarms (BR-29/30/43) |
+
+## 3. Services
 | Layer | Service | Purpose |
 |---|---|---|
-| Edge | **CloudFront** + **AWS WAF** | Serves the SPA and routes `/api/*`. WAF applies managed rules and rate limiting (the public /demo and /try-your-document are unauthenticated) |
-| Static web | **S3** (private, OAC) | SPA build (marketing + workspace) |
-| API | **API Gateway HTTP API** | REST endpoints, 30 s integration timeout, throttling |
-| Compute | **Lambda** (Node.js/TypeScript or Python, see D-09) | `records-api` (CRUD + workflow/SoD rules), `ai-gateway` (gate + Bedrock + validation), `audit-writer`, `reports-api` (reliability KPIs/CSV) |
-| Data | **DynamoDB** (on-demand, PITR, KMS CMK) | Domain records (single table) + `AuditLog` table (append-only) + `AgentTask` table |
-| Audit archive (optional) | **S3 Object Lock** (compliance mode) via DynamoDB Streams → Lambda/Firehose | WORM copy of audit events (D-05) |
-| AI | **Amazon Bedrock** (proposed, D-01) + **Bedrock Guardrails** | Drafting with model invocation logging **off** for payloads |
-| Data screening | Regex/keyword controlled-data screen in `ai-gateway`; optional **Amazon Comprehend** PII detection | Second line of the controlled-data gate |
-| Secrets/keys | **KMS** CMKs per environment; **Secrets Manager** only if a non-Bedrock provider is chosen | Encryption and third-party API key |
-| Observability | **CloudWatch** Logs (redacted), metrics (EMF), alarms, dashboards; **X-Ray** | BR-30 rules; channels via **SNS** → Email; Slack/PagerDuty through **AWS Chatbot**/HTTPS subscription (D-10) |
-| Governance | **CloudTrail**, **AWS Config**, **IAM Access Analyzer**, **Budgets** | Account baseline |
-| Future (not built) | Cognito / IAM Identity Center, EventBridge Scheduler + SES for the digest | Seams only |
+| Edge | CloudFront (+ WAF **deferred**, D-11) | SPA + `/api/*` routing. Baseline: API Gateway throttling only |
+| Static | S3 (private, OAC, Block Public Access) | SPA bundle |
+| API | API Gateway HTTP API | REST endpoints, stage throttling |
+| Compute | Lambda, **Node.js/TypeScript** (D-06, D-09) | `records-api` (CRUD, workflow, SoD, controlled-data gate), `reports-api` (dashboard aggregates, trends) |
+| Data | DynamoDB on-demand, PITR, KMS CMK, deletion protection | `Domain` table + `AuditLog` table |
+| Config | SSM Parameter Store | Risk weights/bands, due-soon thresholds, controlled-data marker list |
+| Observability | CloudWatch Logs/metrics/alarms → **SNS email** (D-10) | Lambda errors, API 5xx, throttles, DynamoDB errors |
+| Governance | CloudTrail, Budgets | Account baseline |
+| CI/CD | GitHub Actions + OIDC → deploy role (D-12) | `cfn-lint`, change sets, manual approval for prod |
+| Deferred | Bedrock, Cognito, WAF, digest (EventBridge/SES) | Seams only |
 
-## 3. Data flow
-See [diagrams.md](diagrams.md) for the mermaid versions.
+## 4. Data flow (current build)
+1. The SPA calls e.g. `POST /api/quality-records` with `{ ..., controlledDataAttestation: true, actorName }`.
+2. `records-api` middleware: resolve workspace (`aerospace`), then **controlled-data gate** on endpoints that accept free text. A missing attestation → 400. A marker hit → 422 (block, D-14). Neither the text nor the matched substring is logged. Only the marker id is logged.
+3. Domain validation (BR-17/22/23/26/35/37, SoD).
+4. `TransactWriteItems`: the record put/update plus an `AuditLog` put (`attribute_not_exists`) holding actor, event, from/to stage, snapshot and `controlledDataAttested`.
+5. Reads compute derived status (calibration BR-25, training, re-eval buckets) from dates and SSM thresholds.
 
-**A. Non-AI CRUD (e.g. register an instrument, BR-23..25)**
-1. The SPA calls `POST /api/calibration-instruments`.
-2. `records-api` validates (required fields, BR-23) and computes the derived ID (BR-39).
-3. It writes the item and an audit event in one DynamoDB `TransactWriteItems` (record + `AuditLog` put with `attribute_not_exists`).
-4. Derived status (Overdue/Due soon/Active) is **computed on read** from `nextDue` (BR-25), not stored, so it is never stale.
+## 5. Data model (BRD §6)
+Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (tenancy seam). **No TTL**, retained ≥ 7 years (D-03).
 
-**B. AI draft (e.g. Start my CAPA, Check clauses)**
-1. The SPA sends `{ module, taskType, text, controlledDataAttestation: true, actorName }`.
-2. `ai-gateway`, **gate step 1**: reject with 400 if the attestation is missing or false (BR-04/05 server-side).
-3. **Gate step 2**: deterministic screen for export-control/CUI markers (e.g. "ITAR", "EAR99", "ECCN", "CUI", "NOFORN", "Distribution Statement", "22 CFR 120", "export controlled"). Configurable list. A hit blocks the call with an explanation. No text is stored.
-4. **Gate step 3**: Bedrock Guardrails (denied topics/word filters, PII masking) on input.
-5. The model is invoked with a system prompt that enforces BR-01..03 and a JSON output schema.
-6. **Output validation**: every claim has `clause` + `whyCitation`; ungrounded facts are prefixed `AI hypothesis — confirm:`; an unknown clause becomes `clause reference to confirm`. Failure → `SCHEMA_MISMATCH` (retry once).
-7. Confidence below 0.75 or other escalation rules → status `escalated` (BR-29, OQ-18).
-8. Write an `AgentTask` row (metadata only: module, task, status, latency, confidence, tokens, error_code, **no prompt text** unless D-04 decides otherwise).
-9. Return the draft. It stays in the client or is saved as `draft` on the record. Prompt text is discarded.
-10. The human accepts, modifies or rejects → `PATCH` the record → audit event `AI_DRAFT_ACCEPTED/MODIFIED/REJECTED` with actor + snapshot. The `AgentTask.decision` is updated (§4.17).
+| BRD entity | PK / SK | Notes |
+|---|---|---|
+| Quality record (CAPA/NCMR/SCAR) | `WS#ws` / `QR#<id>` | type, title, description, severity, stage, clause, dueDate, needByDate, reviewerName, disposition, independentApprover, sourceRecordId (OQ-23). GSI1 stage/severityRank#openedAt (BR-14), GSI2 dueDate (BR-15) |
+| Audit event | `AuditLog`: `WS#ws#ENT#<id>` / `<ts>#<ulid>` | actor {name, userId:null}, eventType, snapshot, controlledDataAttested, prevHash (optional tamper signal) |
+| Supplier | `WS#ws` / `SUP#<id>` | onTimePct, openScarCount, criticality, certRenewalDate. Score computed from SSM weights (D-07) |
+| Supplier qualification | `WS#ws` / `SQ#<id>` | stage, scope, approverName, approvalDate, reevalDate (GSI2) |
+| PO clause check | `WS#ws` / `PO#<id>` | findings[] entered manually (AI check deferred) |
+| FAI Form 1 / Form 3 | `WS#ws` / `FAI#<uuid>`, `FAI#<uuid>#CH#<n>` | preparer ≠ evaluator (BR-33) |
+| Calibration instrument | `WS#ws` / `CAL#<id>` | certRef*, nistStatement*, nextDue (GSI2) |
+| Training assignment | `WS#ws` / `TRN#<id>` | sourceRecordId, dueDate, completedDate |
+| Controlled document | `WS#ws` / `DOC#<docNo>#REV#<rev>` | supersede in the same transaction (BR-37) |
+| Approval role | `WS#ws` / `ROLE#<id>` | not authz (BR-19) |
+| Maturity assessment | `WS#ws` / `QMS#<id>` | ratings[8], mean (BR-41) |
+| Agent task, alert rule | **Deferred** with AI | Table not created |
 
-**C. Reliability (§4.17)**: `ai-gateway` emits EMF metrics (Tasks, Failures, Timeouts, LatencyMs, LowConfidence, Rejections). CloudWatch alarms implement the BR-30 rules. `reports-api` serves KPIs and `GET /api/agent-tasks.csv` (11 columns, US-39).
+## 6. AI seam (deferred, D-01)
+- Reserved API path `/api/ai/*` (not routed). Reserved package `src/ai/` with a `DraftProvider` interface (`draft(taskType, text) → {draft, citations[], confidence}`) and no implementation.
+- Domain records already allow `draft` and `aiAssisted:false` fields, and the audit log reserves event types `AI_DRAFT_ACCEPTED/MODIFIED/REJECTED`.
+- When AI is re-enabled, re-open [ADR-0004](adr/0004-ai-provider.md) (provider) and D-04 (prompt retention), and add the `AgentTask` table plus the BR-30 alarms.
 
-## 4. Data model mapped to BRD §6
-Single-table DynamoDB design (`SentinelQA-<env>-Domain`). Every key is prefixed with `WS#<workspaceId>` so tenancy can be added without migration ([ADR-0008](adr/0008-auth-and-tenancy-ready-seams.md)). Today there is one workspace, `aerospace`.
+## 7. Security / IAM (single account, D-08)
+- Environments are separated **by name prefix** `SentinelQA-<env>-*`. Every IAM policy is scoped to ARNs containing its own env prefix. Resources are tagged `env`, and deploy roles carry an `aws:ResourceTag/env` condition where supported.
+- `records-api` role: Get/Query/PutItem/UpdateItem/ConditionCheckItem/TransactWrite on its own Domain table + indexes. PutItem only on its AuditLog. **Explicit deny** of `UpdateItem/DeleteItem/BatchWriteItem` on AuditLog, and of `DeleteItem` on Domain in prod. `ssm:GetParameter(s)` on `/sentinelqa/<env>/*`. `kms:Decrypt/GenerateDataKey` on its env key.
+- `reports-api`: read-only on its env Domain table.
+- GitHub OIDC deploy role per env: trust restricted to `repo:<org>/SentinelQA:environment:<env>`. Permission to manage only `SentinelQA-<env>-*` stacks.
+- **Single-account risk:** a principal with admin rights can affect all envs. Mitigation is a naming/tag discipline and separate deploy roles. Revisit before handling real customer data (open item O-03).
+- TLS only, KMS CMK per env, S3 Block Public Access, CloudTrail on.
+- No user identity yet: `actorName` is self-asserted (BR-11). SoD is advisory.
 
-| BRD entity | PK / SK | Key attributes (from BRD) | GSIs / notes |
+## 8. Retention (D-03)
+- Records and audit events: kept **≥ 7 years**. No TTL, `DeletionProtectionEnabled`, `DeletionPolicy/UpdateReplacePolicy: Retain` on tables and the KMS key in all envs except dev.
+- PITR covers 35 days only. Long-term backup (AWS Backup vault with 7-year rule, or periodic S3 export) is **not decided** (O-01).
+- CloudWatch Logs retention: proposed 90 days (logs contain no record content). O-02.
+
+## 9. Cost drivers
+Near zero at pilot volume: Lambda, API GW, DynamoDB on-demand, S3/CloudFront. Fixed: KMS CMKs (one per env), CloudWatch alarms. DynamoDB storage grows linearly over 7 years (small). Bedrock and WAF costs are gone for now.
+
+## 10. Environments
+dev / stage / prod as stack sets in **one AWS account, us-east-1**. Stack names `SentinelQA-<env>-<Stack>`, parameters per env file (`iac/params/<env>.json`). GitHub Actions: lint → create change set → manual approval (stage/prod) → execute.
+
+## 11. Assumptions
+A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as PII. A-04 single workspace. A-06 free-text payloads ≤ 32 KB. A-07 English, US users. A-10 (new) the AI-dependent public pages (/demo, /try-your-document) are hidden or static in this build.
+
+## 12. Decisions (resolved 2026-10-13)
+| ID | Decision | Resolved value | ADR |
 |---|---|---|---|
-| Quality record (CAPA/NCMR/SCAR) | `WS#ws` / `QR#<id>` | type, title, description, severity, stage, standard/clause, dueDate, needByDate, reviewerName, disposition (NCMR), independentApprover, draft, sourceRecordId (SCAR←NCMR, OQ-23) | GSI1 `WS#ws#QR#stage` / `severityRank#openedAt` (BR-14 sort); GSI2 needByDate (BR-15) |
-| Audit timeline event | `AuditLog` table: `WS#ws#ENT#<entityId>` / `<ts>#<ulid>` | actor, eventType, fromStage, toStage, snapshot (JSON), controlledDataAttested (OQ-13) | Append-only (ADR-0006) |
-| Supplier (risk scorecard) | `WS#ws` / `SUP#<id>` | name, commodity, criticality, onTimePct, openScarCount, certRenewalDate, standards[], narrative (AI draft), flags[], nextStep | Score computed in code. Weights are **unknown** (OQ-01, D-07) |
-| Supplier qualification | `WS#ws` / `SQ#<id>` | supplierId, scopeRequested, approvedScope, stage, docReviewNotes, approverName, approvalDate, reevalDate | GSI reevalDate (BR-18) |
-| PO clause check | `WS#ws` / `PO#<id>` | poNumber, supplier, part, qty, revision, findings[] {requirement,status,clause,suggestedWording,why}, counts | Stores the **result**, not the pasted PO text (BR-06) |
-| FAI (Form 1) | `WS#ws` / `FAI#<uuid>` | partNumber*, partName*, revision, reportNumber, partType, faiType, reason, routingNo, status, preparerSig, evaluatorSig | BR-33 enforced (evaluator ≠ preparer) |
-| FAI characteristic (Form 3) | `WS#ws` / `FAI#<uuid>#CH#<charNo>` | refLocation, designator, requirement, result, equipment, passFail, ncr | Form 2 not modeled (OQ-08) |
-| Calibration instrument | `WS#ws` / `CAL#<id>` | name, assetNo, type, certRef*, lastCal, nextDue, calibratedBy, nistStatement* | Status derived (BR-25, OQ-02) |
-| Training assignment | `WS#ws` / `TRN#<id>` | role, person, course, sourceRecordId, standard, dueDate, completedDate | Evidence/verifier not captured (BR-40) |
-| Controlled document | `WS#ws` / `DOC#<docNo>#REV#<rev>` | name, type, location (link/text), effectiveDate, nextReview, status, releaseApprover | Supersede earlier released revs in one transaction (BR-37) |
-| Approval role | `WS#ws` / `ROLE#<id>` | roleName, people[], defaultFor[] | Convenience only, **not** authz (BR-19) |
-| Maturity assessment | `WS#ws` / `QMS#<id>` | ratings[8], overall (mean, BR-41), band, gaps | Persist or session-only: D-03 |
-| Agent task | `AgentTask` table `WS#ws` / `<ts>#T-<id>` | module, task, status, latencyMs, confidence, decision, reviewer, tokens, errorCode | TTL per D-03. CSV export |
-| Alert rule | Config (IaC/SSM parameters) + CloudWatch alarms | name, threshold, window, channel, enabled | Rule editing not observed (OQ-18) |
+| D-01 | AI provider | **Deferred**. AI features out of scope. Seam kept | [0004](adr/0004-ai-provider.md) (Deferred) |
+| D-02 | Region | **us-east-1 commercial** | [0009](adr/0009-region-and-accounts.md) |
+| D-03 | Persistence/retention | **Server-side; 7 years for records and audit** | [0003](adr/0003-datastore.md) |
+| D-04 | Prompt retention | **N/A** (AI deferred) | [0004](adr/0004-ai-provider.md) |
+| D-05 | Audit immutability | **DynamoDB append-only + IAM deny; no Object Lock** | [0006](adr/0006-immutable-audit-log.md) |
+| D-06 | Compute | **Lambda** | [0002](adr/0002-serverless-compute.md) |
+| D-07 | Weights/thresholds | **Configurable (SSM); values later** | overview §1 |
+| D-08 | Accounts | **Single account; envs by stack/naming** | [0009](adr/0009-region-and-accounts.md) |
+| D-09 | Runtime | **TypeScript (Node.js)** | [0002](adr/0002-serverless-compute.md) |
+| D-10 | Alerts | **Email only (SNS)** | — |
+| D-11 | WAF/CAPTCHA | **Deferred** | [0011](adr/0011-edge-protection-deferred.md) |
+| D-12 | CI/CD | **GitHub Actions with OIDC** | [0012](adr/0012-ci-cd-github-actions-oidc.md) |
+| D-13 | IaC | **Plain CloudFormation (YAML)**. CDK superseded | [0010](adr/0010-iac-cloudformation.md) supersedes [0001](adr/0001-iac-tool.md) |
+| D-14 | Gate hit | **Block**. Attestation + keyword block kept server-side | [0005](adr/0005-controlled-data-gate-enforcement.md) |
 
-Sample/illustrative data (BR-31) is loaded by a seed script in dev/stage only and carries `isSample=true`.
+**D-14 note:** the gate is *more* relevant without AI, not less. Free text (event descriptions, review notes, scope, PO findings) is now persisted for 7 years, and BR-04/05 already apply to the CAPA/NCMR create form. It applies to all free-text write endpoints.
 
-## 5. Security and IAM (least privilege)
-- **One role per Lambda**, scoped to its own tables and actions:
-  - `records-api`: `dynamodb:GetItem/Query/PutItem/UpdateItem/TransactWriteItems` on the Domain table and its GSIs. `PutItem` only on AuditLog (condition `attribute_not_exists`). **No** `DeleteItem` anywhere in prod.
-  - `ai-gateway`: `bedrock:InvokeModel` / `ApplyGuardrail` on **specific model/inference-profile ARNs and the guardrail ARN** only. `PutItem/UpdateItem` on AgentTask. `cloudwatch:PutMetricData` with a namespace condition.
-  - `audit-archiver`: `dynamodb:GetRecords` on the AuditLog stream. `s3:PutObject` on the archive bucket only.
-  - `reports-api`: read-only on AgentTask.
-- An **explicit deny** on `dynamodb:UpdateItem/DeleteItem/BatchWriteItem` against AuditLog, applied in the role policy, plus an SCP in prod if AWS Organizations is used (D-08).
-- KMS CMK per environment. Key policy limits use to the service roles. S3 Block Public Access, TLS-only bucket policies.
-- No secrets in code. Bedrock uses IAM (no API key).
-- WAF: AWS managed common/known-bad-inputs rule sets, IP rate limit on `/api/ai/*` (D-11 sets the limit). Body size cap, e.g. 32 KB (assumption A-06).
-- CloudTrail (management events) in all environments. Data events on the audit bucket in prod.
-- **Not provided yet:** no user identity. Every `actorName` is self-asserted as in the demo (BR-11). SoD is advisory until auth exists, and the docs must say so.
-
-## 6. AI integration and data-handling controls
-| Control | Implementation |
-|---|---|
-| Provider | Amazon Bedrock, proposed ([ADR-0004](adr/0004-ai-provider.md)). Decision **D-01** |
-| No training on / retention of inputs | Bedrock does not use inputs to train models and does not store prompts. Keep **model invocation logging disabled**, or enabled to S3 with metadata only (D-04) |
-| Data residency | Region us-east-1 proposed (D-02). Cross-region inference profiles may route within US regions; use them only if acceptable (D-02) |
-| Controlled-data gate | 3 layers: (1) attestation required server-side, (2) deterministic marker screen, (3) Guardrails. Gate outcomes are logged as metadata (`gate=blocked:marker:ITAR`), never with the text. The UI checkbox stays as is (BR-04/05) |
-| Output governance | JSON-schema output + validator for BR-01..03. Low confidence → escalate (BR-29). Draft label in the UI (BR-09) |
-| Prompt/log hygiene | Lambda logs never contain request bodies (a structured logger with allow-listed fields) |
-| Prompt management | Versioned system prompts in the repo (or Bedrock Prompt Management). `promptVersion` is recorded on each AgentTask |
-| Timeouts | Model call budget 25 s, Lambda 29 s, API 30 s → `TIMEOUT_30S` (BR-43) |
-| Errors | Map to BR error codes: `MODEL_5XX`, `RATE_LIMIT` (throttling), `TOOL_ERROR`, `SCHEMA_MISMATCH`, `TIMEOUT_30S` |
-
-**Limits to be honest about:** a keyword screen cannot prove absence of controlled data. The gate lowers risk. The user's attestation stays the primary control, as on the current site. If SentinelQA must ever *accept* CUI/ITAR, this architecture is **not** sufficient: that would need GovCloud, US-person access controls and a different provider posture (D-02).
-
-## 7. Cost drivers (indicative, not quoted)
-| Driver | Notes |
-|---|---|
-| Bedrock tokens | Dominant variable cost. The BRD CSV has a `tokens` column per task. Cost scales with records/month × tokens × model price. Model choice (D-01) matters most |
-| WAF | Fixed ~monthly per web ACL + rules + requests. Notable at pilot scale |
-| CloudFront / S3 / API GW / Lambda / DynamoDB on-demand | Near zero at pilot volume |
-| KMS CMKs | Fixed per key per month (×3 environments) |
-| CloudWatch | Logs ingestion and alarms. Keep log retention short (D-03) |
-| Guardrails / Comprehend | Per text unit. Optional layers |
-| S3 Object Lock archive | Small, grows with audit volume and retention |
-Use AWS Pricing Calculator after D-01/D-03. Budgets alarms per account.
-
-## 8. Environments
-| Env | Account (proposed) | Purpose | Differences |
-|---|---|---|---|
-| dev | separate AWS account | Developer iteration | Sample data seeded, cheaper/smaller model allowed, deletes allowed, short log retention |
-| stage | separate account | Pre-prod, pilot rehearsal, validation evidence | Prod-like config, seeded sample data, synthetic data only |
-| prod | separate account | Pilot customer | PITR, deletion protection, Object Lock, no delete IAM, WAF strict, alarms to real channels |
-CI/CD (not built): GitHub Actions with OIDC → per-account deploy role, `cdk diff` on PR, manual approval for prod (D-12).
-
-## 9. Assumptions (explicit)
-- **A-01** Volume is small (single pilot, order of tens to hundreds of AI tasks/day, consistent with 240 tasks/~28 h in the CSV).
-- **A-02** The SPA can be built as a static bundle (current site appears to be a client-rendered app). Hosting the existing front-end is assumed, not verified.
-- **A-03** No PII beyond person names (reviewer/approver/trainee) is stored.
-- **A-04** One workspace ("Aerospace AS9100D") until tenancy is in scope.
-- **A-05** Synchronous AI calls fit the 30 s budget (average ~3 s observed).
-- **A-06** Paste payloads are text up to ~32 KB.
-- **A-07** English only. US-based users.
-- **A-08** Alert channels (PagerDuty/Slack/Email) are integrations to wire later. Email via SNS is enough at first.
-- **A-09** Server-side persistence of records is wanted at all. The current demo is browser-only (BR-06, OQ-04). See D-03.
-
-## 10. Decisions needed from Vishwas
-| ID | Decision | Options | Recommendation |
-|---|---|---|---|
-| D-01 | AI provider/model (OQ-05) | Bedrock (Anthropic Claude / Amazon Nova / others) · direct Anthropic/OpenAI API · Azure OpenAI | Bedrock: IAM auth, no key management, data stays in AWS, Guardrails ([ADR-0004](adr/0004-ai-provider.md)). Model availability in us-east-1 **not verified**: the AWS CLI session had expired |
-| D-02 | Region and partition | us-east-1 · us-east-2/us-west-2 · AWS GovCloud (US) | us-east-1 commercial, since controlled data is excluded. GovCloud only if CUI/ITAR will ever be accepted ([ADR-0009](adr/0009-region-and-accounts.md)) |
-| D-03 | Persistence and retention (OQ-04) | Browser-only like the demo · server-side persistence · hybrid; retention for records, audit log, AgentTask, logs | Server-side records. Audit retention aligned with customer record-retention policy (AS9100 customers often require multi-year). **Needs your number** |
-| D-04 | Prompt retention | Never store (BR-06) · store prompt+output for audit (home page "Output audit trail") · store hash only | Store output + SHA-256 of prompt, never raw prompt, until clarified |
-| D-05 | Audit immutability strength | DynamoDB append-only + IAM deny · + S3 Object Lock WORM · QLDB-like ledger (QLDB is discontinued) | IAM deny now; Object Lock in prod |
-| D-06 | Compute style | Lambda (proposed) · ECS Fargate · App Runner | Lambda ([ADR-0002](adr/0002-serverless-compute.md)) |
-| D-07 | Supplier score weights/bands, "due soon" thresholds (OQ-01, OQ-02) | Product inputs, not observable | Make them configurable. You supply values |
-| D-08 | AWS account structure | single account · Organizations with dev/stage/prod accounts | 3 accounts under Organizations |
-| D-09 | Runtime language | TypeScript (same as CDK) · Python | TypeScript |
-| D-10 | Alert channels | Email only · + Slack (AWS Chatbot) · + PagerDuty | Email first |
-| D-11 | Public demo abuse limits | WAF rate limit value, CAPTCHA | Your call on throttling vs friction |
-| D-12 | CI/CD and repo hosting for deploys | GitHub Actions OIDC · CodePipeline | GitHub Actions OIDC |
-| D-13 | IaC tool | CDK · SAM · CloudFormation | CDK TypeScript ([ADR-0001](adr/0001-iac-tool.md)) |
-| D-14 | Controlled-data screen list and behavior on hit | block · warn-and-confirm | Block |
-
-## 11. BRD open questions that this design does not resolve
-OQ-01/02 (configurable, D-07), OQ-03 (SoD is advisory until auth), OQ-04 (D-03), OQ-05 (D-01), OQ-06/07/08 (step contents unknown, so the schema is open with `draft` maps), OQ-10, OQ-13 (we *propose* logging the attestation flag on audit events), OQ-14 (ASL gate not built), OQ-15, OQ-17, OQ-18 (escalation rule set configurable), OQ-21 (print view = client-side render of the record; controlled-record status undecided), OQ-22 (single industry), OQ-23 (`sourceRecordId` link only).
+## 13. Open items
+- **O-01** Long-term backup for 7-year retention beyond PITR's 35 days (AWS Backup vs S3 export). Note: an S3 export is a "copy", not a WORM archive, so it is consistent with D-05.
+- **O-02** CloudWatch Logs retention (90 days proposed).
+- **O-03** Single-account blast radius. Revisit before production customer data.
+- **O-04** Values for D-07 (weights, bands, due-soon windows) and the controlled-data marker list (D-14).
+- **O-05** Without WAF (D-11), public endpoints rely on API Gateway throttling. Set the throttle values.
+- **O-06** Whether hidden AI modules show a "coming later" state or are removed from navigation (UX).
+- **O-07** BRD OQs unresolved by design: OQ-03, 06, 07, 08, 10, 13 (we log attestation), 14, 15, 17, 18, 21, 22, 23.

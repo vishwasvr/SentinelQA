@@ -1,72 +1,61 @@
 # SentinelQA — Architecture Diagrams
-Status: Proposed. See [architecture-overview.md](architecture-overview.md).
+Status: v0.2 (decisions resolved 2026-10-13). See [architecture-overview.md](architecture-overview.md).
 
-## Component view
+## Component view (current build)
 ```mermaid
 flowchart LR
-  U[Browser SPA<br/>marketing + workspace] -->|HTTPS| CF[CloudFront + WAF]
+  U[Browser SPA] -->|HTTPS| CF[CloudFront]
   CF -->|/*| S3W[(S3 static site<br/>private, OAC)]
-  CF -->|/api/*| API[API Gateway HTTP API<br/>30s timeout]
-  API --> RA[Lambda records-api<br/>validation, workflow, SoD]
-  API --> AG[Lambda ai-gateway<br/>controlled-data gate]
-  API --> RP[Lambda reports-api<br/>KPIs + CSV]
-  RA --> DDB[(DynamoDB Domain<br/>single table, WS# keys)]
-  RA -->|append only| AL[(DynamoDB AuditLog)]
-  AG -->|1 attestation<br/>2 marker screen| AG
-  AG -->|3 ApplyGuardrail + InvokeModel| BR[Amazon Bedrock<br/>+ Guardrails]
-  AG --> AT[(DynamoDB AgentTask<br/>metadata only)]
-  RP --> AT
-  AL -->|Streams| ARC[Lambda audit-archiver]
-  ARC --> OL[(S3 Object Lock<br/>WORM archive, prod)]
-  AG -->|EMF metrics| CW[CloudWatch metrics/alarms]
-  CW --> SNS[SNS -> Email / Slack / PagerDuty]
-  KMS[KMS CMK] -.encrypts.-> DDB & AL & AT & OL
-  subgraph Future[Future seams - not built]
-    COG[Cognito / Identity Center]
-    SCH[EventBridge Scheduler + SES digest]
+  CF -->|/api/*| API[API Gateway HTTP API<br/>throttling]
+  API --> RA[Lambda records-api TS<br/>controlled-data gate,<br/>workflow, SoD]
+  API --> RP[Lambda reports-api TS<br/>dashboard, trends]
+  RA --> DDB[(DynamoDB Domain<br/>WS# keys, 7y, no TTL)]
+  RA -->|append only<br/>IAM deny update/delete| AL[(DynamoDB AuditLog<br/>7y)]
+  RP --> DDB
+  RA & RP --> SSM[SSM params<br/>weights, thresholds, markers]
+  RA & RP --> CW[CloudWatch alarms] --> SNS[SNS -> Email]
+  KMS[KMS CMK per env] -.encrypts.-> DDB & AL
+  subgraph Deferred[Deferred - not built]
+    BR[Bedrock AI /api/ai/*]
+    COG[Cognito authorizer]
+    WAF[WAF / CAPTCHA]
   end
-  COG -.JWT authorizer.-> API
+  BR -.seam.-> API
+  COG -.seam.-> API
+  WAF -.seam.-> CF
 ```
 
-## AI draft sequence (controlled-data gate)
+## Write with controlled-data gate
 ```mermaid
 sequenceDiagram
-  actor QL as Quality lead
+  actor U as User
   participant SPA
-  participant AG as ai-gateway
-  participant GR as Bedrock Guardrails
-  participant M as Bedrock model
-  participant AT as AgentTask
   participant RA as records-api
+  participant DDB as Domain
   participant AL as AuditLog
-  QL->>SPA: paste text, tick "no controlled data"
-  SPA->>AG: POST /api/ai/draft {text, attestation:true}
+  U->>SPA: enter description, tick "no controlled data"
+  SPA->>RA: POST /api/quality-records {text, attestation:true, actorName}
   alt attestation missing
-    AG-->>SPA: 400 gate:attestation_required
+    RA-->>SPA: 400 gate:attestation_required
+  else keyword marker hit (ITAR/EAR/CUI...)
+    RA-->>SPA: 422 gate:controlled_marker (blocked, text not logged)
+  else ok
+    RA->>RA: validate + SoD rules
+    RA->>DDB: TransactWrite record
+    RA->>AL: + conditional Put event (actor, snapshot, attested)
+    RA-->>SPA: 201
   end
-  AG->>AG: marker screen (ITAR/EAR/CUI...)
-  alt marker hit
-    AG->>AT: status=blocked (no text)
-    AG-->>SPA: 422 gate:controlled_marker
-  end
-  AG->>GR: ApplyGuardrail(input)
-  AG->>M: InvokeModel(system prompt + JSON schema)
-  M-->>AG: draft JSON
-  AG->>AG: validate citations / hypothesis prefix / confidence
-  AG->>AT: task metadata (latency, tokens, confidence, status)
-  AG-->>SPA: draft (text discarded server-side)
-  QL->>SPA: accept / modify / reject
-  SPA->>RA: PATCH record {decision, actorName}
-  RA->>AL: append event + snapshot
 ```
 
-## Environments
+## Environments (single account, us-east-1)
 ```mermaid
 flowchart TB
-  ORG[AWS Organizations - proposed] --> DEV[dev account]
-  ORG --> STG[stage account]
-  ORG --> PRD[prod account]
-  GH[GitHub Actions OIDC] -->|cdk deploy| DEV
-  GH -->|cdk deploy| STG
-  GH -->|manual approval| PRD
+  GH[GitHub Actions OIDC] --> R1[deploy role dev] --> D[SentinelQA-dev-* stacks]
+  GH --> R2[deploy role stage] --> S[SentinelQA-stage-* stacks]
+  GH -->|manual approval| R3[deploy role prod] --> P[SentinelQA-prod-* stacks]
+  subgraph ACC[One AWS account - us-east-1]
+    D
+    S
+    P
+  end
 ```
