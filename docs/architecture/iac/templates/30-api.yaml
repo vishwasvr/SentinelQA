@@ -111,6 +111,7 @@ Resources:
           DOMAIN_TABLE: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableName' }
           AUDIT_TABLE: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AuditLogTableName' }
           CONTROLLED_GATE_MODE: block       # D-14
+          ORIGIN_VERIFY_PARAM: !Sub /sentinelqa/${EnvName}/edge/origin-verify   # ADR-0015 SecureString, cached 5 min
       TracingConfig: { Mode: !If [IsStrict, Active, PassThrough] }
   ReportsApiFn:
     Type: AWS::Lambda::Function
@@ -128,6 +129,7 @@ Resources:
         Variables:
           ENV_NAME: !Ref EnvName
           DOMAIN_TABLE: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-DomainTableName' }
+          ORIGIN_VERIFY_PARAM: !Sub /sentinelqa/${EnvName}/edge/origin-verify
       TracingConfig: { Mode: PassThrough }
   RecordsLogs:
     Type: AWS::Logs::LogGroup

@@ -4,6 +4,13 @@ Parameters:
   EnvName:
     Type: String
     AllowedValues: [dev, stage, prod]
+  OriginVerifySecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: >-
+      Value(s) of SSM SecureString /sentinelqa/<env>/edge/origin-verify, read by the pipeline at deploy time
+      (CloudFormation cannot resolve ssm-secure in CloudFront). Never stored in params files (ADR-0015)
   WebACLArn:
     Type: String
     Default: ''          # D-11 deferred: leave empty
@@ -40,6 +47,8 @@ Resources:
           - Id: api
             DomainName: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-ApiDomain' }
             CustomOriginConfig: { OriginProtocolPolicy: https-only }
+            OriginCustomHeaders:          # ADR-0015: records/reports-api reject requests without it (403) before any auth
+              - { HeaderName: X-Origin-Verify, HeaderValue: !Ref OriginVerifySecret }
         DefaultCacheBehavior:
           TargetOriginId: site
           ViewerProtocolPolicy: redirect-to-https
@@ -71,3 +80,4 @@ Resources:
 Outputs:
   DistributionDomain:
     Value: !GetAtt Distribution.DomainName
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-DistributionDomain' }
