@@ -11,6 +11,7 @@ Parameters:
     Description: lean = non-prod (dev/stage), strict = prod (ADR-0013)
 Conditions:
   IsStrict: !Equals [!Ref EnvProfile, strict]
+  IsProd: !Equals [!Ref EnvName, prod]
 Resources:
   DomainTable:
     Type: AWS::DynamoDB::Table
@@ -110,6 +111,28 @@ Resources:
       Type: String
       Description: BR-44 / D-14 CFR range markers. Gate finds citations (title, CFR, optional Part or section sign, part, optional .section) and checks the part in code. Marker id = R<list position>
       Value: '[{"title":22,"partFrom":120,"partTo":130},{"title":15,"partFrom":730,"partTo":774}]'
+  SeedRunsLogGroup:   # QA-45 / Guard 1 (QA-44): prod seed run records, kept like the audit data
+    Type: AWS::Logs::LogGroup
+    Condition: IsProd
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /sentinelqa/prod/seed-runs
+      RetentionInDays: 2557   # 7 years, matches AuditLog retention
+      Tags: [{ Key: env, Value: !Ref EnvName }]
+  SeedRunsWritePolicy:   # QA-45: attached to the prod seed operator's Identity Center permission set (aws login). Write only, this log group only.
+    Type: AWS::IAM::ManagedPolicy
+    Condition: IsProd
+    Properties:
+      ManagedPolicyName: SentinelQA-prod-seed-runs-write
+      Description: Lets the prod seed operator write run records to /sentinelqa/prod/seed-runs only. No read, delete or retention change.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: WriteSeedRunRecords
+            Effect: Allow
+            Action: [logs:CreateLogStream, logs:PutLogEvents]
+            Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/sentinelqa/prod/seed-runs:log-stream:*'
 Outputs:
   DomainTableArn:
     Value: !GetAtt DomainTable.Arn
@@ -123,3 +146,11 @@ Outputs:
   AuditLogTableName:
     Value: !Ref AuditLogTable
     Export: { Name: !Sub 'SentinelQA-${EnvName}-AuditLogTableName' }
+  SeedRunsLogGroupName:
+    Condition: IsProd
+    Value: !Ref SeedRunsLogGroup
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-SeedRunsLogGroupName' }
+  SeedRunsWritePolicyArn:
+    Condition: IsProd
+    Value: !Ref SeedRunsWritePolicy
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-SeedRunsWritePolicyArn' }
