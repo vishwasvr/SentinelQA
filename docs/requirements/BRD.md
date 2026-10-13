@@ -4,7 +4,7 @@
 |---|---|
 | Product | Sentinel QA — "AI Quality Manager" for AS9100D aerospace suppliers |
 | Source | https://sentinel-qa.lovable.app/ (public, unauthenticated exploration) |
-| Version / date | 1.2.1 — 2026-10-13 (v1.1 + scope decisions from architecture, see §12 and §13; observed findings unchanged) |
+| Version / date | 1.2.2 — 2026-10-13 (v1.1 + scope decisions from architecture, see §12 and §13; observed findings unchanged) |
 | Basis | Observed behavior only (as-built BRD). No features are invented; roadmap items are marked **[ROADMAP – not live]**. |
 | Evidence | [screenshots/](screenshots/README.md) |
 | Architecture | [architecture-overview.md](../architecture/architecture-overview.md) v0.4, [ADRs](../architecture/adr/) |
@@ -324,7 +324,7 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **BR-43** Low-confidence drift counts drafts below 0.75 confidence; a timeout is a task exceeding 30 s (TIMEOUT_30S). **[Deferred v1.2: AI out of scope]**
 - **BR-44** **[New v1.2]** Controlled-data gate on all free-text saves: every endpoint that persists free text requires `controlledDataAttestation=true` (missing → rejected, HTTP 400), and a hit on the configurable controlled-data keyword/marker list **blocks the save** (HTTP 422). Neither the text nor the matched substring is logged; only the marker id. The attestation is recorded on the audit event (`controlledDataAttested`). Marker list values TBD (overview O-04). Source: D-14, [ADR-0005](../architecture/adr/0005-controlled-data-gate-enforcement.md), overview §4.
 - **BR-45** **[New v1.2]** Persistence is server-side. In prod, records and audit events are retained for at least 7 years. Dev/stage hold synthetic data only and carry no retention obligation; real customer records must never be loaded there. Source: D-03 as amended by O-08, [ADR-0003](../architecture/adr/0003-datastore.md), [ADR-0013](../architecture/adr/0013-environment-profiles.md), overview §8.
-- **BR-46** **[New v1.2]** The audit log is append-only: events are only ever added (conditional put), never updated or deleted (IAM explicit deny); corrections are new events. No WORM/Object Lock archive. Source: D-05, [ADR-0006](../architecture/adr/0006-immutable-audit-log.md).
+- **BR-46** **[New v1.2, amended v1.2.2]** The audit log is append-only as application behavior: the app only ever adds events (conditional put) and corrections are new events. Single-event updates and deletes are denied in every environment (IAM explicit deny). Prod is strictly append-only. In dev/stage only, admins may perform full table resets (synthetic data only, BR-45). No WORM/Object Lock archive. Source: D-05, [ADR-0006](../architecture/adr/0006-immutable-audit-log.md); decision C-1 (Vishwas, 2026-10-13).
 - **BR-47** **[New v1.2]** Supplier risk weights and score bands (BR-16) and due-soon thresholds (BR-18, BR-25, training) are configurable (SSM parameters), not hard-coded. Values TBD from Vishwas (overview O-04). Source: D-07, overview §1/§3.
 - **BR-31** Records sample data is labelled "ILLUSTRATIVE — SAMPLE RECORDS".
 - **BR-32** Disabled-in-demo actions: none observed beyond the validation gates. AI generate actions were not exercised (user request); Reset demo was not executed.
@@ -492,3 +492,4 @@ Still open OQs: OQ-03, 06, 07, 08, 09, 10, 14, 15, 17, 18, 21, 22, 23 (consisten
 | 1.1 | 2026-10-12 | Second pass of non-AI workspace flows (screenshots 31–58, reliability CSV); OQ statuses updated. |
 | 1.2 | 2026-10-13 | Architecture scope decisions (§12): AI generate/draft flows deferred with `/api/ai/*` seam; server-side persistence with prod-only 7-year retention; controlled-data keyword hit blocks all free-text saves (BR-44); configurable risk weights/bands and due-soon thresholds (BR-47); append-only audit log (BR-46); OQ-04 closed, OQ-05/OQ-13 deferred, OQ-01/OQ-02 resolved as configurable. Observed findings unchanged. |
 | 1.2.1 | 2026-10-13 | OQ-13 changed from Deferred to Closed: the build logs `controlledDataAttested` on audit events for all free-text saves (architecture-overview §4, ADR-0005, BR-44). |
+| 1.2.2 | 2026-10-13 | BR-46 amended per decision C-1: append-only covers app behavior; single-event updates/deletes denied everywhere; prod strictly append-only; dev/stage admins may do full table resets. OQ-13 citation corrected to architecture-overview §4 / ADR-0005. |
