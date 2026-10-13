@@ -3,7 +3,7 @@
 | Item | Value |
 |---|---|
 | Status | **v0.4: D-01..D-14 (D-03 amended by O-08) + environment profiles ([ADR-0013](adr/0013-environment-profiles.md), accepted). O-01/O-08/O-09 resolved 2026-10-13.** Nothing deployed and no AWS resources created |
-| Basis | [BRD v1.2](../requirements/BRD.md) (commit 7c017d3; current file v1.2.1, e9e88b5), incl. new rules BR-44..BR-47; screenshots 01–58, reliability CSV |
+| Basis | [BRD v1.2.2](../requirements/BRD.md) (commit 9836af2; BR-46 amended per C-1), incl. rules BR-44..BR-47; screenshots 01–58, reliability CSV |
 | Diagrams | [diagrams.md](diagrams.md) · Decisions: [adr/](adr/) · IaC: [iac/README.md](iac/README.md) (CloudFormation) · Cost: [cost-estimate.md](cost-estimate.md) |
 
 > Scope: only BRD-observed behavior. **AI features are deferred (D-01)**. The current build has no model provider. An `ai` seam is reserved (§6). Auth, logins and multi-tenancy are out of scope, with seams kept ([ADR-0008](adr/0008-auth-and-tenancy-ready-seams.md)). Roadmap items are not designed.
@@ -98,7 +98,7 @@ Detailed estimate with sources, split by prod and non-prod: **[cost-estimate.md]
 Near zero at pilot volume: Lambda, API GW, DynamoDB on-demand, S3/CloudFront. Fixed: CloudWatch alarms (8 total, within 10 free), CI minutes. No KMS key fees (O-09). DynamoDB storage grows linearly over 7 years (small). Bedrock and WAF costs are gone for now.
 
 ## 10. Environments
-Profiles per [ADR-0013](adr/0013-environment-profiles.md): `EnvProfile=lean` for dev/stage (synthetic data only, AWS owned keys, no PITR/backup, 7-day logs, 1 alarm) and `EnvProfile=strict` for prod (AWS managed key, PITR, deletion protection, 7-year retention, 90-day logs, 5 alarms + export-errors alarm, monthly incremental export backup).
+Profiles per [ADR-0013](adr/0013-environment-profiles.md): `EnvProfile=lean` for dev/stage (synthetic data only, **admin full-table resets allowed** per BR-46 v1.2.2 / C-1; item-level audit update/delete still denied; AWS owned keys, no PITR/backup, 7-day logs, 1 alarm) and `EnvProfile=strict` for prod (AWS managed key, PITR, deletion protection, 7-year retention, 90-day logs, 5 alarms + export-errors alarm, monthly incremental export backup).
 
 dev / stage / prod as stack sets in **one AWS account, us-east-1**. Stack names `SentinelQA-<env>-<Stack>`, parameters per env file (`iac/params/<env>.json`). GitHub Actions: lint → create change set → manual approval (stage/prod) → execute.
 
@@ -135,7 +135,7 @@ A-01 pilot-scale volume. A-02 SPA is a static bundle. A-03 only person names as 
 - **O-04** Values for D-07 (weights, bands, due-soon windows) and the controlled-data marker list (D-14).
 - **O-05** Without WAF (D-11), public endpoints rely on API Gateway throttling. Set the throttle values.
 - **O-06** Whether hidden AI modules show a "coming later" state or are removed from navigation (UX).
-- **O-07** BRD OQs unresolved by design: OQ-03, 06, 07, 08, 10, 13 (we log attestation), 14, 15, 17, 18, 21, 22, 23.
+- **O-07** BRD OQs still open (aligned with BRD v1.2.2 §12): OQ-03, 06, 07, 08, 09, 10, 14, 15, 17, 18, 21, 22, 23. OQ-05 is deferred with AI. OQ-13 is **closed** (attestation logged on audit events, §4 step 4 / ADR-0005). OQ-01/02/04 are resolved (BR-47 / BR-45).
 
 ## 14. Pre-go-live checklist (prod)
 Complete before the prod go-live. Items deferred by Vishwas on 2026-10-13.
@@ -150,9 +150,9 @@ Complete before the prod go-live. Items deferred by Vishwas on 2026-10-13.
 |---|---|---|
 | BR-44 gate on all free-text saves (400 / 422, marker id only logged, `controlledDataAttested` on audit event) | §4 data flow, [ADR-0005](adr/0005-controlled-data-gate-enforcement.md), `CONTROLLED_GATE_MODE: block`, SSM marker list | Consistent. Marker values pending (O-04) |
 | BR-45 server-side persistence; prod ≥ 7 y; dev/stage synthetic only | §8, [ADR-0003](adr/0003-datastore.md), [ADR-0013](adr/0013-environment-profiles.md), 20-data Retain/no TTL, 25-backup | Consistent |
-| BR-46 audit log append-only, IAM deny, corrections as new events, no WORM | §7 IAM, [ADR-0006](adr/0006-immutable-audit-log.md), 30-api deny statements (all profiles) | Consistent. **Clarification flagged (C-1)** |
+| BR-46 audit log append-only, IAM deny, corrections as new events, no WORM | §7 IAM, [ADR-0006](adr/0006-immutable-audit-log.md), 30-api deny statements (all profiles) | Consistent. C-1 **resolved** (BRD v1.2.2: covers app behaviour; prod strictly append-only; dev/stage full resets allowed) |
 | BR-47 weights/bands and due-soon thresholds configurable (SSM) | §3 Config, 20-data SSM params (`supplier-risk/weights`, `due-soon-days` incl. training) | Consistent. Values pending (O-04) |
 
-**C-1 (minor tension, needs Vishwas):** BR-46 says the audit log is append-only "in every environment", but the lean profile allows dev/stage tables to be **purged** (synthetic data, no deletion protection; overview §8, cost-estimate). Item-level update/delete is denied in all profiles, so there's no conflict at the API level. Dropping or recreating a whole non-prod table is an admin action outside the app. Proposed reading: BR-46 governs application behaviour; non-prod table resets are allowed. Confirm or amend.
+**C-1: Resolved (2026-10-13, BRD v1.2.2, commit 9836af2).** Vishwas approved: BR-46 covers application behaviour. Single-event updates/deletes are denied in every environment (IAM explicit deny). Prod is strictly append-only (deletion protection + Retain). In dev/stage only, admins may do full table resets (synthetic data, BR-45).
 
-**C-2 (label mismatch, no design impact):** BRD v1.2.1 cites "architecture O-07" for logging the attestation. In this overview O-07 is the list of unresolved BRD OQs, which notes OQ-13 "(we log attestation)". The behaviour is specified in BR-44 / §4 step 4. Suggest the BRD cite §4 / ADR-0005 instead.
+**C-2: Resolved (BRD v1.2.1 fix, commit 281c2c2).** OQ-13 now cites architecture-overview §4 / ADR-0005.

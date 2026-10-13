@@ -9,7 +9,7 @@
 | AWS GovCloud (US) | ITAR/CUI-eligible | Smaller Bedrock catalog, US-person ops, higher cost. Contradicts the "no controlled data" product stance |
 Accounts: single account vs **Organizations with dev/stage/prod accounts** (blast radius, SCPs for audit-delete deny).
 ## Decision (proposed)
-us-east-1, three accounts.
+> **Superseded in part by the Resolution below (D-08):** single account, not three. Kept for history: ~~us-east-1, three accounts.~~
 ## Consequences
 Revisit if any customer requires controlled-data handling.
 

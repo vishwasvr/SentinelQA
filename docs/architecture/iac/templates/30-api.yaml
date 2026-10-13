@@ -32,7 +32,10 @@ Resources:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement: [{ Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }]
-      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole']
+      ManagedPolicyArns: !If
+        - IsStrict
+        - [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole', !Sub 'arn:${AWS::Partition}:iam::aws:policy/AWSXRayDaemonWriteAccess']   # X-Ray Active in strict
+        - [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole']
       Policies:
         - PolicyName: least-privilege
           PolicyDocument:
@@ -172,6 +175,9 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*
 Outputs:
+  ApiId:
+    Value: !Ref HttpApi
+    Export: { Name: !Sub 'SentinelQA-${EnvName}-ApiId' }
   ApiDomain:
     Value: !Sub ${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
     Export: { Name: !Sub 'SentinelQA-${EnvName}-ApiDomain' }

@@ -23,7 +23,7 @@ CloudFormation parameter `EnvProfile` (`lean` for dev/stage, `strict` for prod) 
 | Deletion protection | off | on. Retain policies |
 | Long-term backup (O-01) | none | **Monthly job → daily-window incremental DynamoDB exports → S3 → Glacier Flexible, 7-year expiry** (`25-backup.yaml`, EventBridge Scheduler + Lambda) |
 | Retention (D-03 amended, O-08) | **not applied: synthetic data only** | 7 years for records and audit |
-| Audit immutability (D-05) | append-only + IAM deny (kept, free) | same |
+| Audit immutability (D-05, BR-46) | append-only + IAM deny on items; **admin full-table resets allowed** (C-1) | strictly append-only; deletion protection + Retain |
 | Controlled-data gate (D-14) | on | on |
 | Log retention | 7 days | 90 days (O-02) |
 | X-Ray | off (PassThrough) | Active |
@@ -37,3 +37,4 @@ Rejected for now: Lambda Function URLs (lose throttling and the JWT authorizer s
 - **Former decision #4 (stage not exercising KMS permissions): moot.** With no CMKs (O-09), no environment needs `kms:*` IAM permissions or key policies. The remaining prod-only path is PITR + export (`25-backup`), which is covered by prod change-set review and a post-deploy export test.
 - **AWS managed key trade-offs (O-09):** no custom key policy or grants, no customer-controlled rotation (AWS rotates automatically), the key can't be disabled or scheduled for deletion (no crypto-shred), and it can't be used cross-account. CloudTrail still records its use. No monthly key fee, but KMS requests to `aws/dynamodb` are billed at $0.03/10k after the account-wide 20k/month free (≈ 20k/month at 20 users, ≈ 99k at 100 users ≈ $0.24).
 - **Pre-go-live (deferred 2026-10-13):** O-10 restore runbook, O-11 small-object lifecycle check, O-12 export-bucket delete protection, and the one-time full baseline export. See overview §14.
+- **C-1 resolved (BRD v1.2.2 BR-46):** lean profile permits admin full-table resets of dev/stage. Item-level audit update/delete stays denied in both profiles. Prod is strictly append-only.

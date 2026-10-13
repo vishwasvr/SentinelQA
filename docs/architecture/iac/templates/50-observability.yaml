@@ -26,7 +26,7 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
       AlarmActions: [{ 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-AlarmTopicArn' }]
-  # strict-only alarms (TODO: export ApiId / table names from 30/20 and reference them)
+  # strict-only alarms
   ApiServerErrors:
     Type: AWS::CloudWatch::Alarm
     Condition: IsStrict
@@ -34,7 +34,7 @@ Resources:
       AlarmName: !Sub SentinelQA-${EnvName}-ApiServerErrors
       Namespace: AWS/ApiGateway
       MetricName: 5xx
-      Dimensions: [{ Name: ApiId, Value: TODO-ApiId }]
+      Dimensions: [{ Name: ApiId, Value: { 'Fn::ImportValue': !Sub 'SentinelQA-${EnvName}-ApiId' } }]
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1
