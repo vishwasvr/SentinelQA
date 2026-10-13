@@ -4,9 +4,10 @@
 |---|---|
 | Product | Sentinel QA — "AI Quality Manager" for AS9100D aerospace suppliers |
 | Source | https://sentinel-qa.lovable.app/ (public, unauthenticated exploration) |
-| Version / date | 1.1 — 2026-10-12 (v1.0 + second pass of non-AI workspace flows, screenshots 31–58 and a reliability CSV export) |
+| Version / date | 1.2 — 2026-10-13 (v1.1 + scope decisions from architecture, see §12 and §13; observed findings unchanged) |
 | Basis | Observed behavior only (as-built BRD). No features are invented; roadmap items are marked **[ROADMAP – not live]**. |
 | Evidence | [screenshots/](screenshots/README.md) |
+| Architecture | [architecture-overview.md](../architecture/architecture-overview.md) v0.4, [ADRs](../architecture/adr/) |
 
 ---
 
@@ -18,6 +19,8 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 
 ### 1.1 Scope
 **In scope (this BRD):** the marketing site (/, /compare, /pricing, /validation, /privacy, /terms, /security), the public tools (/demo, /try-your-document) and the demo workspace (/app/aerospace and its modules). That covers the dashboard, Records, NCMR, Corrective Actions, Supply Chain, Supplier Qualification, Purchase Controls, FAI, Calibration, Training, Document Control, Approval Roles, QMS Champion, Ask the agent and Agent reliability, plus the cross-cutting governance rules.
+
+> **v1.2 build scope:** this document still records observed behavior. For the build, AI generate/draft flows are out of scope and items tagged **[Deferred v1.2 …]** are not built; items tagged **[Changed v1.2]** carry a build rule that differs from the observed demo. See §12.
 
 **Out of scope:** authentication (/auth: Continue with Google, Sign in, Create an account), user accounts and multi-tenancy, billing, and server-side persistence for signed-in users. Also out of scope is any AI output content: at the user's request, AI generate flows (Try the agent prompts, Check clauses, Try a sample, Start my CAPA, Build my FAI record, "Ask about …", "Continue drafting in the agent", "Ask the agent to draft a full gap-closure plan") were deliberately not run in either pass (see §10). AI-labelled content quoted in this BRD is pre-seeded sample/demo content or locally computed summaries that appeared without triggering generation.
 
@@ -269,14 +272,14 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 | Alert rule | Name, current value, threshold, window, channel, enabled, state | Channel: PagerDuty, Slack, Email. Window: 1h, 24h, 7d |
 
 ## 7. Business rules and validations
-- **BR-01** Every AI claim carries a clause reference and a "Why this citation:" note.
-- **BR-02** AI content that is not grounded in user input is prefixed "AI hypothesis — confirm:".
-- **BR-03** Where the AI is uncertain about the applicable clause, the output says "clause reference to confirm".
-- **BR-04** Every paste-and-generate action shows "Do not paste ITAR, EAR, CUI or customer-confidential data" and a required checkbox "I confirm this text contains no controlled data". This covers Try your document, /demo, Start my CAPA, Check clauses, Build my FAI record and the CAPA/NCMR create form.
-- **BR-05** The action button stays disabled until the checkbox is ticked (and, where applicable, text is present). The CAPA/NCMR create form shows "Tick the controlled-data confirmation to continue."
-- **BR-06** Pasted text is sent to the server and the AI provider for processing and is not retained. Demo records are stored in the browser only.
+- **BR-01** Every AI claim carries a clause reference and a "Why this citation:" note. **[Deferred v1.2: AI out of scope]**
+- **BR-02** AI content that is not grounded in user input is prefixed "AI hypothesis — confirm:". **[Deferred v1.2: AI out of scope]**
+- **BR-03** Where the AI is uncertain about the applicable clause, the output says "clause reference to confirm". **[Deferred v1.2: AI out of scope]**
+- **BR-04** Every paste-and-generate action shows "Do not paste ITAR, EAR, CUI or customer-confidential data" and a required checkbox "I confirm this text contains no controlled data". This covers Try your document, /demo, Start my CAPA, Check clauses, Build my FAI record and the CAPA/NCMR create form. **[Changed v1.2]** *Build rule:* the attestation is enforced server-side on every free-text save, not only paste-and-generate actions (BR-44, ADR-0005).
+- **BR-05** The action button stays disabled until the checkbox is ticked (and, where applicable, text is present). The CAPA/NCMR create form shows "Tick the controlled-data confirmation to continue." **[Changed v1.2]** *Build rule:* the checkbox remains, and a server-side controlled-data keyword hit additionally blocks the save (BR-44).
+- **BR-06** Pasted text is sent to the server and the AI provider for processing and is not retained. Demo records are stored in the browser only. **[Changed v1.2]** *Build rule:* no text is sent to an AI provider (AI out of scope); records are persisted server-side, not in the browser (BR-45, D-03).
 - **BR-07** No files are stored. Certificates and documents are recorded as references or links only (e.g. "Where this document lives", calibration certificate reference).
-- **BR-08** Every record has an audit timeline: creation, stage changes, AI draft acceptances, reviewer decisions. When signed in, each event writes an immutable activity_log row with the actor and a snapshot.
+- **BR-08** Every record has an audit timeline: creation, stage changes, AI draft acceptances, reviewer decisions. When signed in, each event writes an immutable activity_log row with the actor and a snapshot. **[Changed v1.2]** *Build rule:* the audit log is append-only in every environment, independent of sign-in; corrections are new events (BR-46, D-05, ADR-0006). AI draft acceptance events are reserved but not emitted (AI deferred).
 - **BR-09** The human quality leader is the reviewer of record. AI outputs are drafts only.
 - **BR-10** Segregation of duties: the "Use as is" and "Repair" NCMR dispositions need an independent named approver.
 - **BR-11** CAPA/NCMR need a reviewer name ("Your name" + Save). The name is recorded on each step.
@@ -284,21 +287,21 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **BR-13** The CAPA/NCMR workflow has 6 steps through the stages New → Containment → Investigation → Draft Ready → QM Review → Closed. The Disposition field appears only for NCMR.
 - **BR-14** The "Awaiting your review" list sorts by severity (Critical > Major > Minor), then by age.
 - **BR-15** "Threatens delivery" lists open CAPA/NCMR with a need-by date within the next 14 days.
-- **BR-16** The supplier risk score blends open SCARs, on-time %, criticality and certificate freshness. Suppliers are ranked worst (lowest score) first.
+- **BR-16** The supplier risk score blends open SCARs, on-time %, criticality and certificate freshness. Suppliers are ranked worst (lowest score) first. **[Changed v1.2]** *Build rule:* score is deterministic from configurable weights; weights and band cut-offs are configurable, values TBD from Vishwas (BR-47, D-07).
 - **BR-17** The Supplier Qualification wizard cannot continue until the supplier name is entered ("Enter the supplier name to continue.").
-- **BR-18** The supplier re-evaluation date is tracked and bucketed as overdue / 0–30d / 31–60d / 61–90d on the dashboard.
+- **BR-18** The supplier re-evaluation date is tracked and bucketed as overdue / 0–30d / 31–60d / 61–90d on the dashboard. **[Changed v1.2]** *Build rule:* bucket windows are configurable, values TBD from Vishwas (BR-47).
 - **BR-19** Approval Roles are a convenience only, not an access-control mechanism.
 - **BR-20** Default approvers: Supplier Qualification, CAPA, NCMR and Document → Quality Manager; FAI → Engineering Lead; Purchase Order → Production Supervisor. The default is skipped if it would break segregation of duties.
-- **BR-21** The PO clause check evaluates the PO against AS9100D §8.4.3 (and AS9102 for FAI). Each requirement is classified Missing / Weak / Present (or not captured) and comes with suggested wording.
+- **BR-21** The PO clause check evaluates the PO against AS9100D §8.4.3 (and AS9102 for FAI). Each requirement is classified Missing / Weak / Present (or not captured) and comes with suggested wording. **[Deferred v1.2: AI out of scope]** PO check records are entered manually in the build; findings are not AI-generated (overview §2).
 - **BR-22** FAI Form 1 requires Part Number and Part Name. On Create FAI with them empty, each shows "<Field> is required.", plus "Fill in the highlighted fields to continue: Part Number, Part Name." and a toast "Please fill in: Part Number, Part Name." ([40](screenshots/40-fai-form1-validation-errors.png)). The FAI Report Number is generated automatically if left blank (FAIR-YYYY-xxxxxxxx). Reason for FAI defaults to initial FAI. A new FAI starts in status Draft.
 - **BR-23** Calibration "Save to the register" is disabled until an equipment name is entered ("Enter an equipment name."). Certificate reference and NIST traceability statement are required.
 - **BR-24** The +6/+12/+24-month next-due buttons stay disabled until a last calibration date is set. When used, they set next due = last date + N months.
-- **BR-25** Calibration status is computed from the next-due date: Overdue if past; Due soon inside a window (observed ≤30d, ≤60d and ≤90d buckets, with a 64-day item shown as Due soon); otherwise Active.
+- **BR-25** Calibration status is computed from the next-due date: Overdue if past; Due soon inside a window (observed ≤30d, ≤60d and ≤90d buckets, with a 64-day item shown as Due soon); otherwise Active. **[Changed v1.2]** *Build rule:* due-soon windows are configurable, values TBD from Vishwas (BR-47).
 - **BR-26** Document Control "Save" is disabled until a document name is entered ("Enter a document name.").
 - **BR-27** Training assignments can trace back to a source record (CAPA, NCMR, PO-check finding). Items past their due date show as overdue/expired. Mark complete updates the status.
 - **BR-28** The QMS Champion assessment takes a 1–5 rating on each of the 8 dimensions (progress "x/8 answered"). Results were observed only at 8/8; behavior with fewer answers was not captured.
-- **BR-29** Agent tasks below the confidence threshold are escalated (routed to a human reviewer), e.g. a confidence of 0.48.
-- **BR-30** An alert rule fires when its metric breaches the threshold over its window. Observed rules:
+- **BR-29** Agent tasks below the confidence threshold are escalated (routed to a human reviewer), e.g. a confidence of 0.48. **[Deferred v1.2: AI out of scope]** (Agent reliability module deferred, overview §2/§6.)
+- **BR-30** An alert rule fires when its metric breaches the threshold over its window. Observed rules: **[Deferred v1.2: AI out of scope]** (Agent reliability alarms deferred, overview §6.)
 
   | Rule | Current / threshold | Window | Channel | State |
   |---|---|---|---|---|
@@ -311,38 +314,42 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **BR-33** FAI sign-off follows AS9102 Rev C segregation: the evaluator must be a different person than the preparer; Sign as Evaluator is disabled until the preparer signs ("Preparer must sign first."). The demo simulates a second person with "Simulate second reviewer" ([41](screenshots/41-fai-record-created-form3.png)).
 - **BR-34** FAI Form 3 completeness checks are advisory only; entry and sign-off are not blocked. Empty Reference Location, Result and Equipment cells auto-fill "N/A". A row needs Char. no. and Requirement (and NCR if Fail).
 - **BR-35** A supplier cannot go active on the ASL without a named approver: "Approve & add to ASL" is disabled with "Name an approver to continue." ([39](screenshots/39-sq-wizard-step5-approval-gated.png)). Approval date and re-evaluation/expiry date are entered manually at step 5.
-- **BR-36** Every SQ step advance is written to the audit trail with timestamp, actor ("Reviewer" when no name is saved) and "Advanced <from> → <to>". Every risk rating is a hypothesis until confirmed.
+- **BR-36** Every SQ step advance is written to the audit trail with timestamp, actor ("Reviewer" when no name is saved) and "Advanced <from> → <to>". Every risk rating is a hypothesis until confirmed. **[Partially deferred v1.2: AI out of scope]** The audit-trail rule stays; AI risk hypotheses are deferred, so ratings are human-entered.
 - **BR-37** Releasing a document requires a named approver ("Name an approver to release." / "Pick who approved this release before saving."); saving a Released revision automatically marks any earlier released revision of the same document as Superseded ([44](screenshots/44-document-new-released-approver-required.png)).
 - **BR-38** Approver pickers (SQ, Document) list saved Approval Roles or accept a custom free-text name.
 - **BR-39** Calibration ID is auto-generated (CAL-DEMO-xxxxxxxx) when Equipment ID is blank; new entries are active immediately. Register KPIs: "Active instruments" = all non-overdue instruments; due-within-30/60/90 buckets are cumulative; Due soon status covers at least 25d and 64d, Active at 147d+ ([43](screenshots/43-calibration-register-after-save.png)).
 - **BR-40** Mark complete sets the training row to Current with "Completed <date>", replaces the action with Undo and updates the KPIs. No evidence or verifier is captured ([51](screenshots/51-training-mark-complete-alvarez.png)).
 - **BR-41** QMS Champion overall score equals the mean of the 8 ratings in all three observed cases (3.0 → band Defined). Top 3 gaps are the lowest-rated dimensions, with ties resolved in dimension order; the 90-day priority targets the two lowest ([54](screenshots/54-qms-champion-summary-all-3.png), [56](screenshots/56-qms-champion-summary-mixed.png), [57](screenshots/57-qms-champion-summary-leadership-1.png)). Ratings persist for the session; Reset clears them.
 - **BR-42** The dashboard "items need attention" count is the number of Needs attention items: overdue/expired or due-soon training, calibration and supplier re-evaluations (8 = 3 + 3 + 2).
-- **BR-43** Low-confidence drift counts drafts below 0.75 confidence; a timeout is a task exceeding 30 s (TIMEOUT_30S).
+- **BR-43** Low-confidence drift counts drafts below 0.75 confidence; a timeout is a task exceeding 30 s (TIMEOUT_30S). **[Deferred v1.2: AI out of scope]**
+- **BR-44** **[New v1.2]** Controlled-data gate on all free-text saves: every endpoint that persists free text requires `controlledDataAttestation=true` (missing → rejected, HTTP 400), and a hit on the configurable controlled-data keyword/marker list **blocks the save** (HTTP 422). Neither the text nor the matched substring is logged; only the marker id. The attestation is recorded on the audit event (`controlledDataAttested`). Marker list values TBD (overview O-04). Source: D-14, [ADR-0005](../architecture/adr/0005-controlled-data-gate-enforcement.md), overview §4.
+- **BR-45** **[New v1.2]** Persistence is server-side. In prod, records and audit events are retained for at least 7 years. Dev/stage hold synthetic data only and carry no retention obligation; real customer records must never be loaded there. Source: D-03 as amended by O-08, [ADR-0003](../architecture/adr/0003-datastore.md), [ADR-0013](../architecture/adr/0013-environment-profiles.md), overview §8.
+- **BR-46** **[New v1.2]** The audit log is append-only: events are only ever added (conditional put), never updated or deleted (IAM explicit deny); corrections are new events. No WORM/Object Lock archive. Source: D-05, [ADR-0006](../architecture/adr/0006-immutable-audit-log.md).
+- **BR-47** **[New v1.2]** Supplier risk weights and score bands (BR-16) and due-soon thresholds (BR-18, BR-25, training) are configurable (SSM parameters), not hard-coded. Values TBD from Vishwas (overview O-04). Source: D-07, overview §1/§3.
 - **BR-31** Records sample data is labelled "ILLUSTRATIVE — SAMPLE RECORDS".
 - **BR-32** Disabled-in-demo actions: none observed beyond the validation gates. AI generate actions were not exercised (user request); Reset demo was not executed.
 
 ## 8. User stories and acceptance criteria
 
 ### 8.1 Governance (cross-cutting)
-- **US-01** As a quality leader, I want every AI claim cited to a clause so I can verify it.
+- **US-01** As a quality leader, I want every AI claim cited to a clause so I can verify it. **[Deferred v1.2: AI out of scope]**
   - *Given* an AI-generated output, *When* it is displayed, *Then* each claim shows a clause reference and a "Why this citation:" note (BR-01).
   - *Given* content not present in my input, *Then* it is prefixed "AI hypothesis — confirm:" (BR-02).
-- **US-02** As a user, I must confirm that my pasted text has no controlled data before it is processed.
+- **US-02** As a user, I must confirm that my pasted text has no controlled data before it is processed. **[Changed v1.2]** Build: applies to every free-text save; a controlled-data keyword hit blocks the save even when the box is ticked (BR-44).
   - *Given* any paste-and-generate box, *When* the checkbox is unticked, *Then* the action button is disabled and the ITAR/EAR/CUI warning is visible.
   - *When* I tick it (and enter text), *Then* the button is enabled (BR-04/05).
-- **US-03** As an auditor, I want an audit timeline on every record.
+- **US-03** As an auditor, I want an audit timeline on every record. **[Changed v1.2]** Build: events are append-only (BR-46); AI draft acceptance events are reserved, not emitted.
   - *Given* a record is created, *Then* the timeline shows "Created · <reviewer> · stage: new" with a timestamp.
   - *When* the stage changes or an AI draft is accepted, *Then* a new event is appended (BR-08).
 
 ### 8.2 Marketing and public tools
 - **US-04** As a prospect, I want to compare Sentinel QA with competitors.
   - *Given* /compare, *Then* I see the 9 criteria × 7 products, with values Yes / Partial / No / Not verified.
-- **US-05** As a prospect, I want to try my own document.
+- **US-05** As a prospect, I want to try my own document. **[Deferred v1.2: AI out of scope]** (/try-your-document hidden or static, overview A-10.)
   - *Given* /try-your-document, *When* I pick a doc type, paste text and tick the confirmation, *Then* Check clauses is enabled.
   - *When* the box is unticked or the text is empty, *Then* the button is disabled.
 - **US-06** As a prospect, I want to start a pilot. *Given* /pricing, *Then* a single Pilot card (60–90 days) offers "Email us about a pilot".
-- **US-07** As a prospect, I want to chat with the agent. *Given* /demo, *Then* I see 4 prompt cards, Session history (0) and the ITAR/EAR warning.
+- **US-07** As a prospect, I want to chat with the agent. *Given* /demo, *Then* I see 4 prompt cards, Session history (0) and the ITAR/EAR warning. **[Deferred v1.2: AI out of scope]** (/demo hidden or static, overview A-10.)
 
 ### 8.3 Dashboard
 - **US-08** As a QM, I want one place showing what needs attention.
@@ -358,15 +365,15 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **US-13** As an inspector, I want to start an NCMR.
   - *Given* the NCMR list, *When* I click Start a new NCMR, *Then* /app/aerospace/capa/new?type=NCMR opens at "Step 1 of 6", with an auto ID NCMR-DEMO-xxxx and a Disposition selector.
 - **US-14** As a reviewer, I want my name recorded. *When* I enter "Your name" and Save, *Then* that name is attributed on each step and in the timeline.
-- **US-15** As a user, I cannot create a record without the controlled-data confirmation. *Given* the box is unticked, *Then* "Create record & continue →" is disabled and shows "Tick the controlled-data confirmation to continue."
+- **US-15** As a user, I cannot create a record without the controlled-data confirmation. *Given* the box is unticked, *Then* "Create record & continue →" is disabled and shows "Tick the controlled-data confirmation to continue." **[Changed v1.2]** Build: in addition, a controlled-data keyword hit blocks the save (BR-44).
 - **US-16** As a QM, I need independent approval for risky dispositions. *Given* the NCMR disposition is Use as is or Repair, *Then* an independent named approver is required (BR-10).
-- **US-17** As a quality engineer, I want to draft a CAPA from pasted text.
+- **US-17** As a quality engineer, I want to draft a CAPA from pasted text. **[Partially deferred v1.2: AI out of scope]** "Start my CAPA" paste-to-draft is deferred; Start a new CAPA form stays in scope.
   - *Given* Corrective Actions, *When* I paste text and confirm, *Then* Start my CAPA is enabled.
   - *Else* I can Start a new CAPA (CAPA-DEMO-xxxx).
 
 ### 8.6 Supply Chain
 - **US-18** As supplier quality, I want suppliers ranked by risk. *Then* the list is ordered by ascending score and can be filtered by standard.
-- **US-19** As supplier quality, I want a risk narrative. *When* I open a supplier, *Then* I see the score band, cert renewal days, flags (SCARs, FAI failures) and a recommended next step.
+- **US-19** As supplier quality, I want a risk narrative. *When* I open a supplier, *Then* I see the score band, cert renewal days, flags (SCARs, FAI failures) and a recommended next step. **[Partially deferred v1.2: AI out of scope]** The AI risk narrative is deferred; the deterministic score, band, cert days, flags and next step remain (BR-47).
 
 ### 8.7 Supplier Qualification
 - **US-20** As supplier quality, I want to see the ASL. *Given* the Active on ASL tab, *Then* approved suppliers are listed with scope and re-evaluation date (+ days remaining).
@@ -376,7 +383,7 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **US-38** As a QM, I want supplier approval to be explicit. *Given* step 5 Approval decision, *When* no named approver is selected, *Then* "Approve & add to ASL" is disabled with "Name an approver to continue."; each step advance is logged in the audit trail.
 
 ### 8.8 Purchase Controls
-- **US-22** As a buyer, I want a PO checked against §8.4.3.
+- **US-22** As a buyer, I want a PO checked against §8.4.3. **[Deferred v1.2: AI out of scope]** "Check clauses" AI check deferred; PO check findings are entered manually (overview §2).
   - *Given* pasted PO text and the confirmation, *When* I click Check clauses, *Then* I get summary counts (missing/weak/present) and findings with clause, suggested wording and why-citation.
   - Findings can be filtered by status and clause.
 
@@ -387,7 +394,7 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **US-34** As an inspector, I want the FAI record created from Form 1. *When* Create FAI succeeds, *Then* the record page shows the Form 1 summary (auto report number, status Draft), approval actions and an empty Form 3 grid.
 - **US-35** As a QM, I want preparer/evaluator segregation on FAI. *Given* the preparer has not signed, *Then* Sign as Evaluator is disabled with "Preparer must sign first.", and the evaluator must be a different person.
 - **US-36** As an inspector, I want to key in Form 3 characteristics quickly. *Then* the grid supports Tab/Enter keyboard entry, auto-fills N/A, and shows advisory completeness issues without blocking sign-off.
-- **US-24** As an inspector, I want to build an FAI from pasted text. *Then* Build my FAI record is disabled until the confirmation is ticked.
+- **US-24** As an inspector, I want to build an FAI from pasted text. *Then* Build my FAI record is disabled until the confirmation is ticked. **[Deferred v1.2: AI out of scope]**
 
 ### 8.10 Calibration
 - **US-25** As a metrology owner, I want overdue gauges surfaced. *Then* KPIs and the All / Due soon / Overdue tabs reflect the status computed from the next-due date.
@@ -411,14 +418,14 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
   - *Given* a default would make the author also the approver, *Then* the default is skipped.
 
 ### 8.14 QMS Champion
-- **US-31** As a QM, I want a maturity self-assessment. *When* I rate all 8 dimensions 1–5, *Then* I get an overall score with band, top 3 gaps with next steps, a heatmap and a 90-day priority, marked draft assistance (e.g. all 3s → 3.0 / 5 Defined).
+- **US-31** As a QM, I want a maturity self-assessment. *When* I rate all 8 dimensions 1–5, *Then* I get an overall score with band, top 3 gaps with next steps, a heatmap and a 90-day priority, marked draft assistance (e.g. all 3s → 3.0 / 5 Defined). **[Partially deferred v1.2: AI out of scope]** Deterministic score, gaps and heatmap stay (BR-41); "Ask the agent to draft a full gap-closure plan" is deferred.
 
 ### 8.15 Agent reliability
-- **US-32** As an ops owner, I want agent KPIs and alerts. *Then* I see 24h KPIs, firing alerts with their channel, a rules table and a filterable task log; Export CSV downloads the log.
-- **US-39** As an ops owner, I want to export the task log. *When* I click Export CSV, *Then* I get one row per logged task with id, UTC timestamp, module, task, status, latency_ms, confidence, decision, reviewer, tokens and error_code.
-- **US-40** As a QM, I want to open a sample record. *When* I click a record in Records, *Then* a drawer shows summary, AI-hypothesis root causes, actions and citations with "Why this citation".
+- **US-32** As an ops owner, I want agent KPIs and alerts. *Then* I see 24h KPIs, firing alerts with their channel, a rules table and a filterable task log; Export CSV downloads the log. **[Deferred v1.2: AI out of scope]**
+- **US-39** As an ops owner, I want to export the task log. *When* I click Export CSV, *Then* I get one row per logged task with id, UTC timestamp, module, task, status, latency_ms, confidence, decision, reviewer, tokens and error_code. **[Deferred v1.2: AI out of scope]**
+- **US-40** As a QM, I want to open a sample record. *When* I click a record in Records, *Then* a drawer shows summary, AI-hypothesis root causes, actions and citations with "Why this citation". **[Partially deferred v1.2: AI out of scope]** Drawer stays; "Continue drafting in the agent" is deferred.
 - **US-41** As any user, I want to jump anywhere. *When* I press ⌘K, *Then* a palette lets me search records, modules and docs.
-- **US-33** *Given* task confidence is below the threshold, *Then* the task is Escalated to a human and the reviewer's decision is logged.
+- **US-33** *Given* task confidence is below the threshold, *Then* the task is Escalated to a human and the reviewer's decision is logged. **[Deferred v1.2: AI out of scope]**
 
 ## 9. Non-functional and compliance notes (observed)
 - **Data protection:** ITAR/EAR/CUI warning plus a mandatory confirmation. Pasted text is not retained. Demo data lives in browser storage only. No file storage.
@@ -436,15 +443,15 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **Deliberately not run (user request):** all AI generate flows — /demo prompts, Check clauses, Try a sample, Start my CAPA, Build my FAI record, "Ask about <module>", "Continue drafting in the agent", "Ask the agent to draft a full gap-closure plan", "Try the agent". AI-labelled content in this BRD is sample data or a locally computed summary.
 - **Not reached / not captured:** the sign-in-gated workspace; CAPA/NCMR steps 2–6 and print view; SQ steps 3, 4 (contents) and 6; FAI Form 2, signing, and Print FAI; the Document Control register after save; the effect of Reset demo; Mark complete on the D. Rivera row; Precision Heat detail; session history; the full ⌘K list (it scrolls).
 ## 11. Open questions
-Status legend: **Answered** · **Partially answered** · **Still open** (with reason: AI-gated, login-gated, or not observable).
+Status legend: **Answered** · **Partially answered** · **Still open** (with reason: AI-gated, login-gated, or not observable) · v1.2: **Closed** / **Resolved — configurable** / **Deferred** (scope decisions, §12). Observed answers are unchanged.
 
 | OQ | Status | Answer / what is still missing | Evidence |
 |---|---|---|---|
-| OQ-01 Supplier risk score weighting and bands | Partially answered | Bands observed: At risk (48), Watch (62), Approved (84). Narratives cite on-time % and cert renewal days; flags cite open CAPAs and sub-tier ASL status. Weights and band cut-offs are not shown (not observable). | [48](screenshots/48-supply-chain-aerofast-detail.png), [49](screenshots/49-supply-chain-aerowire-detail.png), [12](screenshots/12-supply-chain.png) |
-| OQ-02 "Due soon" thresholds | Partially answered | Calibration: Due soon at 25d and 64d, Active at 147d+; register buckets are cumulative (≤90d = 2), consistent with a 90-day window. Supplier re-eval: Due soon at 18d and 53d. Training: Due soon at 12d, Current at 90d and 340d. Exact thresholds per module are not stated. | [43](screenshots/43-calibration-register-after-save.png), [37](screenshots/37-workspace-demo-utilities-menu.png), [50](screenshots/50-training-matrix-baseline-rivera-row.png) |
+| OQ-01 Supplier risk score weighting and bands | **Resolved v1.2 — configurable, values pending** | Bands observed: At risk (48), Watch (62), Approved (84). Narratives cite on-time % and cert renewal days; flags cite open CAPAs and sub-tier ASL status. Weights and band cut-offs are not shown (not observable). **v1.2:** Weights and band cut-offs are configurable (D-07, BR-47); values pending from Vishwas (overview O-04). | [48](screenshots/48-supply-chain-aerofast-detail.png), [49](screenshots/49-supply-chain-aerowire-detail.png), [12](screenshots/12-supply-chain.png) |
+| OQ-02 "Due soon" thresholds | **Resolved v1.2 — configurable, values pending** | Calibration: Due soon at 25d and 64d, Active at 147d+; register buckets are cumulative (≤90d = 2), consistent with a 90-day window. Supplier re-eval: Due soon at 18d and 53d. Training: Due soon at 12d, Current at 90d and 340d. Exact thresholds per module are not stated. **v1.2:** Due-soon thresholds are configurable per module (D-07, BR-47); values pending from Vishwas (overview O-04). | [43](screenshots/43-calibration-register-after-save.png), [37](screenshots/37-workspace-demo-utilities-menu.png), [50](screenshots/50-training-matrix-baseline-rivera-row.png) |
 | OQ-03 Segregation of duties | Partially answered | Additional SoD/approval points: FAI evaluator must differ from preparer (AS9102 Rev C), evaluator cannot sign before preparer; supplier needs a named approver before ASL; released documents need a named approver. Enforcement is by named individuals only (demo offers "Simulate second reviewer"; Approval Roles is not a permission system). Which roles count as independent and QM Review closure rules remain unobserved. | [41](screenshots/41-fai-record-created-form3.png), [39](screenshots/39-sq-wizard-step5-approval-gated.png), [44](screenshots/44-document-new-released-approver-required.png) |
-| OQ-04 Persistence model | Partially answered | Demo: "Saved in this browser for the demo", "Your name … Saved in this browser only", QMS ratings "Saved for this session", "Records you create stay in your browser". Signed-in: authenticated register writes immutable activity_log rows. Migration, export and retention are still open (login-gated). | [42](screenshots/42-calibration-new-instrument-plus24mo.png), [35](screenshots/35-records-status-board.png), [47](screenshots/47-validation-how-outputs-governed.png) |
-| OQ-05 AI provider / model / region | Still open — not observable | Only "pasted text is sent to an AI provider and not retained" is stated; no provider, terms or region shown. | [35](screenshots/35-records-status-board.png) |
+| OQ-04 Persistence model | **Closed v1.2** | Demo: "Saved in this browser for the demo", "Your name … Saved in this browser only", QMS ratings "Saved for this session", "Records you create stay in your browser". Signed-in: authenticated register writes immutable activity_log rows. Migration, export and retention are still open (login-gated). **v1.2:** Server-side persistence; 7-year retention in prod only; dev/stage synthetic only (D-03 amended by O-08, ADR-0003, ADR-0013, BR-45). | [42](screenshots/42-calibration-new-instrument-plus24mo.png), [35](screenshots/35-records-status-board.png), [47](screenshots/47-validation-how-outputs-governed.png) |
+| OQ-05 AI provider / model / region | **Deferred v1.2 (AI out of scope)** | Only "pasted text is sent to an AI provider and not retained" is stated; no provider, terms or region shown. **v1.2:** No AI provider in this build (D-01, ADR-0004 Deferred); reopen with AI. | [35](screenshots/35-records-status-board.png) |
 | OQ-06 CAPA/NCMR steps 2–6 | Partially answered | The sample NCMR-2026-0087 drawer shows the drafted content structure (summary with proposed disposition, AI-hypothesis root causes, actions, citations), and the status board shows one sample per stage. The step 2–6 screens and when drafting occurs were not captured (AI-gated). | [34](screenshots/34-records-ncmr-2026-0087-detail.png), [35](screenshots/35-records-status-board.png) |
 | OQ-07 Supplier Qualification steps 2–6 | Partially answered | Step 2: free-text documentation & certification review. Step 5: required named approver (saved role or custom name), approval scope, approval date and re-evaluation/expiry date entered manually; "Approve & add to ASL" gated on approver. Steps advance with audit-trail entries. Steps 3/4 contents and step 6 were not captured. | [38](screenshots/38-sq-wizard-step2-docs-certs.png), [39](screenshots/39-sq-wizard-step5-approval-gated.png) |
 | OQ-08 FAI Forms 2 and 3 | Partially answered | Form 3 (Characteristic accountability) is live on the FAI record page as an Excel-style grid with advisory completeness checks. Form 2 was not observed. | [41](screenshots/41-fai-record-created-form3.png) |
@@ -452,7 +459,7 @@ Status legend: **Answered** · **Partially answered** · **Still open** (with re
 | OQ-10 Records sample vs user-created records | Still open — not observable | Records still shows only the 6 sample records; whether user-created module records appear there was not observed. | [35](screenshots/35-records-status-board.png) |
 | OQ-11 Dashboard "items need attention" | Answered | 8 = the 8 Needs attention items: 3 training (2 expired, 1 due soon), 3 calibration (1 overdue, 2 due soon), 2 supplier re-evaluations due soon. These match the tiles (Supplier 2, Training 3, the 3 non-Active of 5 instruments). | [37](screenshots/37-workspace-demo-utilities-menu.png) |
 | OQ-12 FAI Form 1 errors | Answered | "Part Number is required." / "Part Name is required." under red-outlined fields, "Fill in the highlighted fields to continue: Part Number, Part Name." and a toast "Please fill in: Part Number, Part Name." | [40](screenshots/40-fai-form1-validation-errors.png) |
-| OQ-13 Controlled-data confirmation in audit trail | Still open — not observable | The audit trails seen (SQ) show stage advances only; no paste flow was run (AI-gated). | [39](screenshots/39-sq-wizard-step5-approval-gated.png) |
+| OQ-13 Controlled-data confirmation in audit trail | **Deferred v1.2 (with AI)** | The audit trails seen (SQ) show stage advances only; no paste flow was run (AI-gated). **v1.2:** AI paste flows deferred. Note: the build records `controlledDataAttested` on audit events for non-AI free-text saves (ADR-0005, overview §4; overview O-07 lists OQ-13 as "we log attestation"). | [39](screenshots/39-sq-wizard-step5-approval-gated.png) |
 | OQ-14 ASL gate integration / roadmap timeline | Still open — not observable | SQ approval adds the supplier to the ASL, but the PO ASL gate is still roadmap and no timeline is published. | [39](screenshots/39-sq-wizard-step5-approval-gated.png) |
 | OQ-15 Training auto-assignment live vs seeded | Partially answered | Rows carry "Auto-assigned · CAPA-2026-0031 / NCMR-2026-0082 / PO clause-check finding", and the matrix says "3 auto-generated from CAPAs or PO findings", while "CAPA-driven training assignment" is still badged ROADMAP. Whether new records generate assignments was not observable. | [50](screenshots/50-training-matrix-baseline-rivera-row.png) |
 | OQ-16 What Mark complete records | Answered | A completion date ("Completed 2026-10-13"), status Current, an Undo action and KPI updates. No evidence reference or verifier is requested. (The date appears to be the UTC date; the capture was taken on the evening of Oct 12 CT.) | [51](screenshots/51-training-mark-complete-alvarez.png), [52](screenshots/52-training-mark-complete-brandt.png) |
@@ -464,3 +471,23 @@ Status legend: **Answered** · **Partially answered** · **Still open** (with re
 | OQ-22 Industry filter beyond Aerospace | Partially answered | The FAQ says API Spec Q1/Q2 (oil & gas) and medical-device standards are in early access, but the workspace and the Records Industry filter still show only Aerospace. | [33](screenshots/33-home-faq-expanded.png), [35](screenshots/35-records-status-board.png) |
 | OQ-23 SCAR creation path | Partially answered | Sample NCMR-2026-0087 proposes "scrap + SCAR" and an action "Issue SCAR (AS9100D §8.7.2) with 30-day corrective action", which suggests SCARs originate from NCMRs. No SCAR create entry point was observed. | [34](screenshots/34-records-ncmr-2026-0087-detail.png) |
 | OQ-24 How it works / ROI / FAQ | Answered | How it works: a 3-step loop (describe → agent drafts → quality leader decides). ROI: records/month × manual minutes vs ~90 s; defaults 20 × 90 → 29.5 h/month, 354 h/yr, 44.3 days/yr; reviewer time not deducted. FAQ: does not replace the QM; standards coverage; public demo, do not paste ITAR/EAR data. See §4.2. | [31](screenshots/31-home-roi-calculator-default.png), [32](screenshots/32-home-how-it-works.png), [33](screenshots/33-home-faq-expanded.png) |
+
+## 12. v1.2 scope decisions
+Decided during architecture (2026-10-13). Sources: [architecture-overview.md](../architecture/architecture-overview.md) §2, §4, §6, §8, §12 and the cited ADRs. Observed findings in §1–§11 are unchanged; build rules are tagged inline.
+
+| # | Decision | Source | BRD effect |
+|---|---|---|---|
+| 1 | All AI generate/draft flows are **out of scope** for this build. An AI seam is reserved: `/api/ai/*` route (not routed), `src/ai/` `DraftProvider` interface with no implementation, `draft`/`aiAssisted:false` record fields and reserved audit event types `AI_DRAFT_ACCEPTED/MODIFIED/REJECTED`. /demo and /try-your-document are hidden or static | D-01, D-04, [ADR-0004](../architecture/adr/0004-ai-provider.md), overview §2, §6, A-10 | Deferred: BR-01, BR-02, BR-03, BR-21, BR-29, BR-30, BR-43; US-01, US-05, US-07, US-22, US-24, US-32, US-33, US-39. Partially deferred: BR-36; US-17, US-19, US-31, US-40. OQ-05, OQ-13 deferred |
+| 2 | Persistence is **server-side**. 7-year retention applies to **prod only**; dev/stage use synthetic data only | D-03 (amended by O-08), [ADR-0003](../architecture/adr/0003-datastore.md), [ADR-0013](../architecture/adr/0013-environment-profiles.md), overview §8 | New BR-45; changed BR-06; OQ-04 closed |
+| 3 | A controlled-data keyword hit **blocks the save on all free-text saves**, in addition to the confirmation checkbox (attestation enforced server-side) | D-14, [ADR-0005](../architecture/adr/0005-controlled-data-gate-enforcement.md), overview §4 | New BR-44; changed BR-04, BR-05, US-02, US-15 |
+| 4 | Supplier risk weights/bands and due-soon thresholds are **configurable**; values TBD from Vishwas | D-07, overview §1, §3, O-04 | New BR-47; changed BR-16, BR-18, BR-25; OQ-01/OQ-02 resolved as configurable |
+| 5 | The audit log is **append-only** (no update/delete; no WORM archive) | D-05, [ADR-0006](../architecture/adr/0006-immutable-audit-log.md) | New BR-46; changed BR-08, US-03 |
+
+Still open OQs: OQ-03, 06, 07, 08, 09, 10, 14, 15, 17, 18, 21, 22, 23 (consistent with overview O-07). Answered OQs (11, 12, 16, 19, 20, 24) are unchanged.
+
+## 13. Changelog
+| Version | Date | Summary |
+|---|---|---|
+| 1.0 | 2026-10-12 | Initial as-built BRD from the first exploration pass (screenshots 01–30). |
+| 1.1 | 2026-10-12 | Second pass of non-AI workspace flows (screenshots 31–58, reliability CSV); OQ statuses updated. |
+| 1.2 | 2026-10-13 | Architecture scope decisions (§12): AI generate/draft flows deferred with `/api/ai/*` seam; server-side persistence with prod-only 7-year retention; controlled-data keyword hit blocks all free-text saves (BR-44); configurable risk weights/bands and due-soon thresholds (BR-47); append-only audit log (BR-46); OQ-04 closed, OQ-05/OQ-13 deferred, OQ-01/OQ-02 resolved as configurable. Observed findings unchanged. |
