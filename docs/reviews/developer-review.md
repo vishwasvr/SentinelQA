@@ -266,3 +266,6 @@ Basis: committed HEAD `ff3b1ef`, verified from a `git archive HEAD` export, so u
 - DP-18: /demo and /try-your-document stay static pages, so there's no API work for them.
 - O-02: CloudWatch logs are kept 30 days in prod and 7 days in dev/stage. O-05: throttle is 10 req/s with a burst of 20, and anything over gets a 429. The SPA should back off and retry on 429.
 - The prod GitHub environment reviewer is Vishwas. Stage and prod bootstrap are deferred until needed.
+
+## Sign-off (2026-10-13)
+Vishwas's decisions on DP-01–DP-20 (DP-12 is America/New_York, DP-20 is the open date plus N days with N a PLACEHOLDER of 30), together with O-02 and O-05, are now reflected in Architect `273a7ad`. All of the DP blockers in this review are cleared, and only OQ-08 is still `x-tbd`, which isn't a blocker. Two items carry over into the build: the #26 dev smoke test (decrypting origin-verify through SSM) needs Vishwas's go-ahead, and the `I.T.A.R`, `C-U-I` and `15 C.F.R. 734` cases get added to `test_marker_patterns.py`. **Developer: SIGN-OFF.**
