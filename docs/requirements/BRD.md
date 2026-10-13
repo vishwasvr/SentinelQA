@@ -622,6 +622,8 @@ Vishwas approved [dp-proposals.md](dp-proposals.md) as recommended (Developer re
 | OI-3 OQ-08 FAI Form 2 | **Decided v1.6** — option (b), Form 1/3 pattern, fields GUESS (BR-48, US-42) | Vishwas | — |
 | OI-5 Verify FAI Form 2 fields (BR-48) | **Pre-go-live** | Values/verification: Vishwas; BA updates BR-48/US-42; Architect updates openapi `form2` | Before the prod deploy approval |
 | OI-6 Prod handling of client `isSample=true` (BR-49) | **Decided v1.6.2** — prod create with `isSample=true` → 422 `sample_flag_forbidden_in_prod`, nothing saved, no audit event; no UI sample option; prod samples only via seed command (openapi 30a1d00; store-`false` rejected) | Vishwas | Before prod build of BR-49 |
+
+**Remaining OQs (OQ-10, 14, 15, 18, 21, 22, 23):** options and BA recommendations, PROPOSED for Vishwas, in [dp-proposals §Remaining OQs for Vishwas](dp-proposals.md#remaining-oqs-for-vishwas-2026-10-13). Status in §11 unchanged until decided.
 | OI-4 PLACEHOLDER tuning: risk weights and DP-16 bands (`supplier-risk/weights`), due-soon thresholds (`due-soon-days`), CAPA/NCMR default due days 30 (`capa-ncmr/default-due-days`) | **Pre-go-live** | Values: Vishwas; record in BRD and SSM param spec: BA; set in prod: InfraDeploy | Before the prod deploy approval; gate in [first-deploy §5a](../runbooks/first-deploy.md) (36a674b) |
 
 ## 14. Changelog

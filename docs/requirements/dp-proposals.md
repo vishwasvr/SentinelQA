@@ -255,3 +255,78 @@ Effectiveness check (dashboard tile, DP-17) is **not** specified here: no entity
 | Sets the parameters in prod | InfraDeploy |
 
 **Trigger:** before the prod deploy approval (Vishwas is the required prod reviewer, first-deploy §5). Proposed gate in the [first-deploy runbook](../runbooks/first-deploy.md): "Prod: confirm no SSM parameter is still labelled PLACEHOLDER" — that runbook is InfraDeploy's; the gate was added as first-deploy §5a (36a674b).
+
+---
+
+## Remaining OQs for Vishwas (2026-10-13)
+**Status: PROPOSED — needs Vishwas's decision.** The OQs still open after BRD v1.6.2. Each one has the BRD §11 evidence, options and a BA recommendation. Anything not grounded in the BRD or site evidence is marked **GUESS**.
+
+### OQ-10 — Do records created in modules show up in Records?
+**Evidence:** Records shows only the 6 sample records; whether user-created records appear was not observed ([35](screenshots/35-records-status-board.png)). Sample records are allowed in every env, labelled (BR-31, BR-45). Records tabs: CAPA/NCMR/SCAR, FAI, Supplier Qualification, Calibration, Document Control (§4.5).
+| Option | Trade-offs |
+|---|---|
+| **(a) Records lists every record, sample and user-created, with the sample label on sample items (recommended)** | One cross-module view, which matches the observed tabs and "Your records" on the dashboard (§4.4). Needs list queries per type, which the existing indexes support (GSI1, overview §5) |
+| (b) Records shows sample records only; user records live in their own modules | Matches exactly what was seen; the Records page becomes a demo-only page and the "Awaiting your review" queue (BR-14) would never show real work |
+| (c) Records shows user-created records only; samples hidden there | Clean for prod users; drops the observed sample board |
+
+**Recommendation:** (a). Confidence: Inferred (the tabs and the review queue only make sense with real records).
+
+### OQ-14 — Should a PO be blocked when the supplier isn't on the ASL?
+**Evidence:** SQ approval adds the supplier to the ASL ([39](screenshots/39-sq-wizard-step5-approval-gated.png)); the PO "ASL gate" is badged **ROADMAP – not live** (§4.9); no timeline.
+| Option | Trade-offs |
+|---|---|
+| **(a) Out of the build, stays roadmap (recommended)** | Matches the observed site; no new rule. Purchase Controls stays manual entry (BR-21) |
+| (b) Advisory warning on the PO check when the supplier has no active ASL entry | Small, useful; needs a PO → Supplier link (DP-10 `supplierId`), which PO checks don't carry today (§13.2). New behaviour, **GUESS** |
+| (c) Hard block | Not observed anywhere; biggest scope and risk |
+
+**Recommendation:** (a). Confidence: Observed (roadmap badge).
+
+### OQ-15 — Should new CAPAs/NCMRs/PO findings create training assignments automatically?
+**Evidence:** sample rows say "Auto-assigned · CAPA-2026-0031 / NCMR-2026-0082 / PO clause-check finding" and "3 auto-generated from CAPAs or PO findings", but "CAPA-driven training assignment" is badged **ROADMAP** ([50](screenshots/50-training-matrix-baseline-rivera-row.png), §4.12).
+| Option | Trade-offs |
+|---|---|
+| **(a) No automation; the source link is kept as a field and shown on seeded/manual rows (recommended)** | Matches the ROADMAP badge; the "Auto-assigned · <record>" text stays possible from sample data (BR-27) |
+| (b) Manual "Assign training" action on a CAPA/NCMR that creates a linked assignment | Gives traceability without automation rules; new UI, **GUESS** |
+| (c) Automatic assignment on record events | The roadmap feature; needs rules (which course, which role) that were never observed |
+
+**Recommendation:** (a). Confidence: Observed (ROADMAP badge); how a training assignment is created without automation (manual entry) is not observed — **GUESS**.
+
+### OQ-18 — What escalation thresholds and rules does Agent reliability use, and can users edit them?
+**Evidence:** "Drafts below 0.75 confidence (should escalate)"; escalated tasks in the CSV include 0.76–0.85 ([58](screenshots/58-reliability-export-csv.png), CSV); rule editing not observed. The whole Agent reliability module is **deferred** with AI (BR-29, BR-30, BR-43, §12 #1).
+| Option | Trade-offs |
+|---|---|
+| **(a) Close as deferred with AI (recommended)** | No agent tasks exist in this build, so there is nothing to escalate; reopen with AI |
+| (b) Record the observed 0.75 threshold as a config default for the future module | Keeps the observation; no build effect now |
+| (c) Specify editable rules now | Nothing observed to base them on; all **GUESS** |
+
+**Recommendation:** (a), recording 0.75 as the observed value in the deferred BR-43. Confidence: Observed.
+
+### OQ-21 — Is the print view a controlled record, and is it in the build?
+**Evidence:** CAPA/NCMR create form has a Print link (`/capa/<id>/print`, §4.6); the FAI record has "Print FAI" ([41](screenshots/41-fai-record-created-form3.png)); neither output was opened.
+| Option | Trade-offs |
+|---|---|
+| **(a) Browser print of the record page with header (ID, revision/status, printed date, printed by) and a footer "Uncontrolled when printed" (recommended)** | Small; stays consistent with "references only, no files" (ADR-0007). Header/footer content is **GUESS** |
+| (b) Print views omitted from the build | Least work; drops two observed buttons |
+| (c) Generated PDF stored as the controlled record | Contradicts the no-file-storage rule (ADR-0007); not observed |
+
+**Recommendation:** (a). Confidence: buttons Observed; print content **GUESS**.
+
+### OQ-22 — Does the build support industries other than Aerospace?
+**Evidence:** FAQ says API Spec Q1/Q2 and medical-device standards are in early access ([33](screenshots/33-home-faq-expanded.png)); the workspace and Records Industry filter show only Aerospace ([35](screenshots/35-records-status-board.png)); assumption A-04 single workspace.
+| Option | Trade-offs |
+|---|---|
+| **(a) Aerospace only; keep the Industry filter with the single value (recommended)** | Matches what is live; no new standards content |
+| (b) Aerospace only and hide the Industry filter | Simpler UI; differs from the observed page |
+| (c) Add oil & gas / medical | Content and clause sets not observed; large scope, **GUESS** |
+
+**Recommendation:** (a). Confidence: Observed.
+
+### OQ-23 — How is a SCAR created?
+**Evidence:** NCMR-2026-0087 proposes "scrap + SCAR" and "Issue SCAR (AS9100D §8.7.2) with 30-day corrective action" ([34](screenshots/34-records-ncmr-2026-0087-detail.png)); no SCAR create entry point was observed; SCAR is a quality-record type with `SCAR-` IDs (BR-12, §6); the data model has `sourceRecordId` (overview §5, OQ-23).
+| Option | Trade-offs |
+|---|---|
+| **(a) "Issue SCAR" action on an NCMR (and CAPA), creating a SCAR with `sourceRecordId` and the supplier linked (DP-10) (recommended)** | Matches the observed sample flow and the existing data field; new button, placement is **GUESS** |
+| (b) A standalone "Start a new SCAR" form like NCMR/CAPA | Simple and consistent with §4.6; loses the NCMR link unless entered by hand |
+| (c) No SCAR creation; SCARs are sample-only | Least work; Supply Chain SCAR counts (DP-10) stay at zero for real data |
+
+**Recommendation:** (a). Confidence: Inferred (from the sample action text and `sourceRecordId`).
