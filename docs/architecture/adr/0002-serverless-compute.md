@@ -1,5 +1,5 @@
 # ADR-0002: Compute model
-- Status: Proposed (D-06)
+- Status: **Accepted** (D-06, D-09)
 - Date: 2026-10-13
 ## Context
 Pilot-scale, bursty traffic (A-01). AI calls average ~3 s with a 30 s ceiling (BR-43). Cost should scale to near zero.
@@ -13,3 +13,6 @@ Pilot-scale, bursty traffic (A-01). AI calls average ~3 s with a 30 s ceiling (B
 Lambda behind HTTP API. If streaming responses or >30 s drafts are needed, add Lambda response streaming via Function URL behind CloudFront, or move `ai-gateway` to Fargate.
 ## Consequences
 Strict per-function roles are easy. Long-running drafts need a redesign (async job + polling).
+
+## Resolution (2026-10-13)
+Lambda accepted. Runtime is Node.js with TypeScript (D-09). With AI deferred, the 30 s timeout concern goes away for now. Functions: `records-api`, `reports-api`.

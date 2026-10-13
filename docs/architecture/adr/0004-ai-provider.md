@@ -1,5 +1,5 @@
 # ADR-0004: AI provider
-- Status: **Proposed, needs Vishwas (D-01)**. BRD OQ-05 still open
+- Status: **Deferred** (D-01, D-04)
 - Date: 2026-10-13
 ## Context
 The AI drafts CAPA/NCMR/SCAR/FAI/supplier narratives/PO checks with clause citations (BR-01..03). Pasted text must not be retained (BR-06). Controlled data is excluded by policy but could leak by mistake.
@@ -17,3 +17,6 @@ Read-only check of us-east-1 model availability was attempted on 2026-10-13. **I
 `aws bedrock list-foundation-models --region us-east-1` and `aws bedrock list-inference-profiles --region us-east-1`.
 ## Consequences
 IAM is pinned to the chosen model ARNs. If a cross-region inference profile is used, the allowed destination regions must be accepted (D-02).
+
+## Resolution (2026-10-13)
+AI features are out of scope for the current build. Bedrock and Guardrails are removed from the design and IaC. Seam: reserved `/api/ai/*` route, `DraftProvider` interface, and reserved draft fields/audit event types. D-04 (prompt retention) is N/A until reopened. The options analysis above stays as input for a future decision.

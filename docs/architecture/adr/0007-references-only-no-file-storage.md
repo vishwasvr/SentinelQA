@@ -1,5 +1,5 @@
 # ADR-0007: References only, no file storage
-- Status: Proposed (follows BR-07)
+- Status: **Accepted**
 - Date: 2026-10-13
 ## Context
 The BRD states that certificates, drawings and documents are stored as references/links only.
@@ -9,3 +9,6 @@ No upload (references only) **vs** S3 uploads with malware scanning.
 No upload endpoints and no user-content buckets. Location fields are validated text/URLs.
 ## Consequences
 Lower controlled-data risk (drawings are often ITAR). Any future upload feature needs a new ADR.
+
+## Resolution (2026-10-13)
+Unchanged. Follows BR-07.

@@ -1,5 +1,5 @@
 # ADR-0009: Region, partition and accounts
-- Status: **Proposed, needs Vishwas (D-02, D-08)**
+- Status: **Accepted** (D-02); account option amended (D-08)
 - Date: 2026-10-13
 ## Options
 | Option | Pros | Cons |
@@ -12,3 +12,6 @@ Accounts: single account vs **Organizations with dev/stage/prod accounts** (blas
 us-east-1, three accounts.
 ## Consequences
 Revisit if any customer requires controlled-data handling.
+
+## Resolution (2026-10-13)
+Region **us-east-1 commercial** accepted. Accounts: **single AWS account** chosen; the three-account Organizations option is **rejected for now**. Environments are separated by stack names/prefixes `SentinelQA-<env>-*`, env-scoped IAM resource ARNs, `env` tags and per-env OIDC deploy roles. Single-account blast radius is open item O-03.

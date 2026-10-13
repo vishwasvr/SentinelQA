@@ -1,5 +1,5 @@
 # ADR-0008: Auth and tenancy readiness (not implemented)
-- Status: Proposed
+- Status: **Accepted** (seams only; auth deferred)
 - Date: 2026-10-13
 ## Context
 Auth, login and multi-tenancy are out of scope (BRD §1.1) but should be addable without rework.
@@ -13,3 +13,6 @@ Auth, login and multi-tenancy are out of scope (BRD §1.1) but should be addable
 Seams only. Later: Cognito user pool (Google federation matches the /auth screen) + HTTP API JWT authorizer. Tenant from token claims. Optional DynamoDB `LeadingKeys` IAM condition for tenant isolation.
 ## Consequences
 Until auth exists, SoD (BR-10/33/35/37) relies on self-asserted names and must be labelled advisory.
+
+## Resolution (2026-10-13)
+Seams are kept as described. Cognito/JWT authorizer is deferred.

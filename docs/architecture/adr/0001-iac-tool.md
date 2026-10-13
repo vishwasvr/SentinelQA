@@ -1,5 +1,5 @@
 # ADR-0001: Infrastructure as Code tool
-- Status: Proposed (decision D-13)
+- Status: **Superseded** by [ADR-0010](0010-iac-cloudformation.md) (D-13)
 - Date: 2026-10-13
 ## Context
 We need repeatable dev/stage/prod stacks with least-privilege IAM, KMS, WAF and alarms. The team is small. The application code will likely be TypeScript.
@@ -14,3 +14,6 @@ We need repeatable dev/stage/prod stacks with least-privilege IAM, KMS, WAF and 
 Use **CDK v2 in TypeScript**, with **cdk-nag** (AwsSolutions pack) in CI and reviewed `cdk diff` output. Skeleton in [../iac/](../iac/README.md).
 ## Consequences
 CloudFormation stays the deploy engine (drift detection, rollback). Engineers need to know CDK. Generated IAM must be reviewed in the synthesized template.
+
+## Resolution (2026-10-13)
+Vishwas chose plain CloudFormation (YAML). The CDK option recommended here was rejected. The CDK skeleton was removed.

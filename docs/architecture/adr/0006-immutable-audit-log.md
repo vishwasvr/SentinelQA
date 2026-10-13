@@ -1,5 +1,5 @@
 # ADR-0006: Immutable audit log
-- Status: Proposed (D-05)
+- Status: **Accepted** (D-05), Object Lock option rejected
 - Date: 2026-10-13
 ## Context
 BR-08/§9: every event writes an immutable activity_log row with actor and snapshot.
@@ -14,3 +14,6 @@ BR-08/§9: every event writes an immutable activity_log row with actor and snaps
 Append-only table + deny policy in all envs. Object Lock archive in prod, with a hash chain field (`prevHash`) as a cheap tamper signal.
 ## Consequences
 Corrections are new events, never edits. Object Lock retention cannot be shortened later.
+
+## Resolution (2026-10-13)
+DynamoDB append-only (conditional put) + IAM explicit deny on Update/Delete/BatchWrite. **No S3 Object Lock / WORM archive**: the archive option and the `audit-archiver` stream consumer are removed. The optional `prevHash` field is kept as a cheap tamper signal. Residual risk: an account admin could alter the table. Accepted for now.
