@@ -100,7 +100,7 @@ Author: QA, 2026-10-13. Sources: [qa-review.md](../reviews/qa-review.md) §3 and
 | Option | Scheme |
 |---|---|
 | A | Commit SHA only. |
-| **B (recommended)** | One monorepo version: SemVer tags `vX.Y.Z` on main create a GitHub Release with notes. Artifacts (Lambda zips, SPA bundle, packaged templates) go to the artifacts bucket under `<version>/<sha>/` and are immutable. Each env records the deployed version in an SSM parameter `/sentinelqa/<env>/version`. App and IaC always ship together from the same tag. |
+| **B (DECIDED by Vishwas, decision 4, 2026-10-13)** | One monorepo version: SemVer tags `vX.Y.Z` on main create a GitHub Release with notes. Artifacts (Lambda zips, SPA bundle, packaged templates) go to the artifacts bucket under `<version>/<sha>/` and are immutable. Each env records the deployed version in an SSM parameter `/sentinelqa/<env>/version`. App and IaC always ship together from the same tag. |
 | C | Separate version numbers for app and IaC. Adds drift risk; not recommended. |
 
 **Rollback:** redeploy the previous tag's stored artifact through the same pipeline. CloudFormation rolls back automatically if a change set fails. DynamoDB data is never rolled back by deploys: schema changes stay additive, and prod has backups (O-01). A hotfix is a `fix/…` branch, then a PR, then a patch tag.
@@ -115,4 +115,4 @@ Author: QA, 2026-10-13. Sources: [qa-review.md](../reviews/qa-review.md) §3 and
 1. DECIDED (2026-10-13): bootstrap stage as the test environment. It's created only once building opens, using Vishwas's admin session, with step-by-step approval (§1a).
 2. DECIDED (2026-10-13): PR flow with branch protection on main and the §2a required checks. The stage reviewer is the Developer, per decision 3.
 3. DECIDED (2026-10-13): unit tests and a coverage gate must pass before the dev deploy. The Developer approves stage after checking dev, with no Vishwas approval. Vishwas approves prod. The QA-36 check still runs before stage. Coverage gate: 90% overall (option C, decided). **Still open: whether the 100% safety-critical floor and the 1-point drop rule also apply (§3b).**
-4. Single SemVer tags with immutable SHA artifacts and rollback by redeploying the previous tag (B)? PROPOSAL.
+4. DECIDED (2026-10-13): SemVer tags `vX.Y.Z` cover app and IaC together. Each build is immutable: it's built once and the same artifact is promoted from dev to stage to prod. Rollback means redeploying the previous tag (§4).
