@@ -19,6 +19,7 @@ Decision needed: approve bootstrapping stage (a new AWS create that InfraDeploy 
 **Stage data rule (BR-49 / US-43, BR-45):** stage accepts sample data only. The API rejects any create without `isSample=true` with 422 `non_sample_data_forbidden` (nothing saved, no audit event; [ci-and-data-guards.md](iac/ci-and-data-guards.md) §3.1 guard 2). Stage test data comes from `scripts/seed` (repo fixtures, `isSample: true`, gated by the controlled-data check) or from the UI, and **never** from copies of prod data: there is no prod-to-nonprod restore/import path (guard 4), and after the O-03 split no cross-account trust exists ([prod-account-split.md](../runbooks/prod-account-split.md) §6).
 
 ### 1a. Stage bootstrap steps (InfraDeploy; PLAN ONLY, needs Vishwas's explicit approval before anything is created)
+Runnable, step-by-step version with commands, verification, rollback and per-step approval lines: [stage-bootstrap.md](../runbooks/stage-bootstrap.md).
 Same templates and stack order as dev ([first-deploy.md](../runbooks/first-deploy.md) §3), in the shared account 723940054516, us-east-1, with `iac/params/stage.json` (`EnvName=stage`, `EnvProfile=lean`, `GitHubEnvironment=stage`).
 0. `SentinelQA-Account-OIDC`: already exists in this account (shared with dev). Nothing to do.
 1. [CREATE, Vishwas's admin session] `SentinelQA-stage-Bootstrap` (00-bootstrap, `EnvName=stage`). Outputs the stage deploy role (trust `repo:vishwasvr/SentinelQA:environment:stage`), `SentinelQA-stage-cfn-exec`, the boundary and `sentinelqa-stage-artifacts-<account>`.
