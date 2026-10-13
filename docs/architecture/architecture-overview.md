@@ -119,6 +119,12 @@ DynamoDB items can be at most 400 KB, and so can each item in a `TransactWriteIt
 - **OQ-18:** closed as deferred with AI. The observed 0.75 is recorded in the BRD; nothing is built.
 - **/compare:** SPA-only static table. Row 1 "Clause-level citation" says "Not in this build", and row 8 keeps "SaaS + API".
 
+### 4.6 How the SPA sets isSample (architecture rule, QA-43)
+- There's no UI control for isSample in any env (BR-49). The SPA reads `env` from its build-time config (`config.json`, written at deploy per env).
+- **dev/stage:** the SPA's API client adds `isSample: true` to every create body. Users can't change it, and PATCH never sends it.
+- **prod:** the SPA never sends isSample, so the server stores `false`.
+- UI end-to-end tests in dev/stage therefore need no extra step. A test that omits the flag through the API directly should get 422 `non_sample_data_forbidden`.
+
 ## 5. Data model (BRD §6)
 Single table `SentinelQA-<env>-Domain`, every PK prefixed `WS#<workspaceId>` (tenancy seam). **No TTL**. Prod retained ≥ 7 years (D-03, amended: prod only, O-08). Prod may also hold labelled sample records (BR-31). Dev/stage hold synthetic or labelled sample data only, never real customer records (BR-45).
 

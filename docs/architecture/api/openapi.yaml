@@ -82,6 +82,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '429': &id003
           $ref: '#/components/responses/TooMany'
+        '503': &id004
+          $ref: '#/components/responses/ServiceUnavailable'
     post:
       tags:
       - Quality records
@@ -108,10 +110,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/quality-records/{id}:
     x-sentinelqa-function: records-api
     parameters:
@@ -134,6 +139,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403': *id002
         '429': *id003
+        '503': *id004
     patch:
       tags:
       - Quality records
@@ -164,12 +170,15 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
     delete:
       tags:
       - Quality records
@@ -192,6 +201,7 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/quality-records/{id}/transitions:
     x-sentinelqa-function: records-api
     parameters:
@@ -228,10 +238,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/quality-records/{id}/scar:
     x-sentinelqa-function: records-api
     parameters:
@@ -240,7 +253,7 @@ paths:
       tags:
       - Quality records
       operationId: issueScar
-      description: 'Issue SCAR (OQ-23) from an NCMR or CAPA. 422 if the source is a SCAR or Closed. UI: action-bar button next to stage advance, hidden when Closed (approved).'
+      description: 'Issue SCAR (OQ-23) from an NCMR or CAPA. 422 scar_source_invalid if the source is a SCAR or Closed. UI: action-bar button next to stage advance, hidden when Closed (approved).'
       parameters:
       - $ref: '#/components/parameters/IdempotencyKey'
       - $ref: '#/components/parameters/IfMatch'
@@ -268,10 +281,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/quality-records/{id}/training:
     x-sentinelqa-function: records-api
     parameters:
@@ -280,7 +296,7 @@ paths:
       tags:
       - Training
       operationId: assignTrainingFromQualityRecord
-      description: Assign training from a CAPA/NCMR (OQ-15). 422 for SCAR.
+      description: Assign training from a CAPA/NCMR (OQ-15). 422 training_source_invalid for a SCAR.
       parameters:
       - $ref: '#/components/parameters/IdempotencyKey'
       - $ref: '#/components/parameters/IfMatch'
@@ -308,10 +324,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/suppliers:
     x-sentinelqa-function: records-api
     get:
@@ -341,6 +360,7 @@ paths:
                         $ref: '#/components/schemas/Supplier'
         '403': *id002
         '429': *id003
+        '503': *id004
     post:
       tags:
       - Suppliers
@@ -367,10 +387,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/suppliers/{id}:
     x-sentinelqa-function: records-api
     parameters:
@@ -393,6 +416,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403': *id002
         '429': *id003
+        '503': *id004
     patch:
       tags:
       - Suppliers
@@ -423,12 +447,15 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
     delete:
       tags:
       - Suppliers
@@ -451,6 +478,7 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/supplier-qualifications:
     x-sentinelqa-function: records-api
     get:
@@ -480,6 +508,7 @@ paths:
                         $ref: '#/components/schemas/SupplierQualification'
         '403': *id002
         '429': *id003
+        '503': *id004
     post:
       tags:
       - Supplier qualification
@@ -506,10 +535,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/supplier-qualifications/{id}:
     x-sentinelqa-function: records-api
     parameters:
@@ -532,6 +564,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403': *id002
         '429': *id003
+        '503': *id004
     patch:
       tags:
       - Supplier qualification
@@ -562,12 +595,15 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
     delete:
       tags:
       - Supplier qualification
@@ -590,6 +626,7 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/supplier-qualifications/{id}/transitions:
     x-sentinelqa-function: records-api
     parameters:
@@ -626,10 +663,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/po-checks:
     x-sentinelqa-function: records-api
     get:
@@ -662,6 +702,7 @@ paths:
                         $ref: '#/components/schemas/PoCheck'
         '403': *id002
         '429': *id003
+        '503': *id004
     post:
       tags:
       - Purchase controls
@@ -688,10 +729,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/po-checks/{id}:
     x-sentinelqa-function: records-api
     parameters:
@@ -714,6 +758,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403': *id002
         '429': *id003
+        '503': *id004
     patch:
       tags:
       - Purchase controls
@@ -744,12 +789,15 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
     delete:
       tags:
       - Purchase controls
@@ -772,6 +820,7 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/po-checks/{id}/training:
     x-sentinelqa-function: records-api
     parameters:
@@ -808,10 +857,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/fai:
     x-sentinelqa-function: records-api
     get:
@@ -838,6 +890,7 @@ paths:
                         $ref: '#/components/schemas/Fai'
         '403': *id002
         '429': *id003
+        '503': *id004
     post:
       tags:
       - FAI
@@ -864,10 +917,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/fai/{id}:
     x-sentinelqa-function: records-api
     parameters:
@@ -890,6 +946,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403': *id002
         '429': *id003
+        '503': *id004
     patch:
       tags:
       - FAI
@@ -920,12 +977,15 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
     delete:
       tags:
       - FAI
@@ -948,6 +1008,7 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/fai/{id}/signatures:
     x-sentinelqa-function: records-api
     parameters:
@@ -984,10 +1045,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/fai/{id}/characteristics:
     x-sentinelqa-function: records-api
     parameters:
@@ -1015,6 +1079,7 @@ paths:
                         $ref: '#/components/schemas/FaiCharacteristic'
         '403': *id002
         '429': *id003
+        '503': *id004
     post:
       tags:
       - FAI
@@ -1040,10 +1105,13 @@ paths:
               schema: *id001
         '400':
           $ref: '#/components/responses/BadRequest'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/fai/{id}/characteristics/{charId}:
     x-sentinelqa-function: records-api
     parameters:
@@ -1078,10 +1146,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
     delete:
       tags:
       - FAI
@@ -1100,6 +1171,7 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/calibration:
     x-sentinelqa-function: records-api
     get:
@@ -1134,6 +1206,7 @@ paths:
                         $ref: '#/components/schemas/Calibration'
         '403': *id002
         '429': *id003
+        '503': *id004
     post:
       tags:
       - Calibration
@@ -1160,10 +1233,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/calibration/{id}:
     x-sentinelqa-function: records-api
     parameters:
@@ -1186,6 +1262,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403': *id002
         '429': *id003
+        '503': *id004
     patch:
       tags:
       - Calibration
@@ -1216,12 +1293,15 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
     delete:
       tags:
       - Calibration
@@ -1244,6 +1324,7 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/training:
     x-sentinelqa-function: records-api
     get:
@@ -1270,6 +1351,7 @@ paths:
                         $ref: '#/components/schemas/Training'
         '403': *id002
         '429': *id003
+        '503': *id004
     post:
       tags:
       - Training
@@ -1296,10 +1378,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/training/{id}:
     x-sentinelqa-function: records-api
     parameters:
@@ -1322,6 +1407,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403': *id002
         '429': *id003
+        '503': *id004
     patch:
       tags:
       - Training
@@ -1352,12 +1438,15 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
     delete:
       tags:
       - Training
@@ -1380,6 +1469,7 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/training/{id}/complete:
     x-sentinelqa-function: records-api
     parameters:
@@ -1416,10 +1506,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/training/{id}/undo-complete:
     x-sentinelqa-function: records-api
     parameters:
@@ -1456,10 +1549,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/documents:
     x-sentinelqa-function: records-api
     get:
@@ -1489,6 +1585,7 @@ paths:
                         $ref: '#/components/schemas/Document'
         '403': *id002
         '429': *id003
+        '503': *id004
     post:
       tags:
       - Document control
@@ -1515,10 +1612,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/documents/{id}:
     x-sentinelqa-function: records-api
     parameters:
@@ -1541,6 +1641,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403': *id002
         '429': *id003
+        '503': *id004
     patch:
       tags:
       - Document control
@@ -1571,12 +1672,15 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
     delete:
       tags:
       - Document control
@@ -1599,6 +1703,7 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/approval-roles:
     x-sentinelqa-function: records-api
     get:
@@ -1625,6 +1730,7 @@ paths:
                         $ref: '#/components/schemas/ApprovalRole'
         '403': *id002
         '429': *id003
+        '503': *id004
     post:
       tags:
       - Approval roles
@@ -1651,10 +1757,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/approval-roles/{id}:
     x-sentinelqa-function: records-api
     parameters:
@@ -1677,6 +1786,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403': *id002
         '429': *id003
+        '503': *id004
     patch:
       tags:
       - Approval roles
@@ -1707,12 +1817,15 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
     delete:
       tags:
       - Approval roles
@@ -1735,6 +1848,7 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/qms-assessments:
     x-sentinelqa-function: records-api
     get:
@@ -1761,6 +1875,7 @@ paths:
                         $ref: '#/components/schemas/QmsAssessment'
         '403': *id002
         '429': *id003
+        '503': *id004
     post:
       tags:
       - QMS Champion
@@ -1787,10 +1902,13 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/qms-assessments/{id}:
     x-sentinelqa-function: records-api
     parameters:
@@ -1813,6 +1931,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403': *id002
         '429': *id003
+        '503': *id004
     patch:
       tags:
       - QMS Champion
@@ -1843,12 +1962,15 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/Unprocessable'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
     delete:
       tags:
       - QMS Champion
@@ -1871,6 +1993,7 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/audit/{entityType}/{entityId}/events:
     x-sentinelqa-function: records-api
     parameters:
@@ -1920,6 +2043,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/reports/dashboard:
     x-sentinelqa-function: reports-api
     get:
@@ -1938,6 +2062,7 @@ paths:
                 type: object
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/reports/review-queue:
     x-sentinelqa-function: reports-api
     get:
@@ -1964,6 +2089,7 @@ paths:
                         $ref: '#/components/schemas/QualityRecord'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/reports/threatens-delivery:
     x-sentinelqa-function: reports-api
     get:
@@ -1990,6 +2116,7 @@ paths:
                         $ref: '#/components/schemas/QualityRecord'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/reports/due:
     x-sentinelqa-function: reports-api
     get:
@@ -2010,7 +2137,7 @@ paths:
           - documents
       - name: before
         in: query
-        schema: &id004
+        schema: &id005
           type: string
           format: date
       - $ref: '#/components/parameters/Cursor'
@@ -2024,6 +2151,7 @@ paths:
                 type: object
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/reports/trends:
     x-sentinelqa-function: reports-api
     get:
@@ -2041,6 +2169,7 @@ paths:
                 type: object
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/reports/supplier-risk:
     x-sentinelqa-function: reports-api
     get:
@@ -2070,6 +2199,7 @@ paths:
                         $ref: '#/components/schemas/Supplier'
         '403': *id002
         '429': *id003
+        '503': *id004
   /api/config:
     x-sentinelqa-function: reports-api
     get:
@@ -2086,6 +2216,7 @@ paths:
                 $ref: '#/components/schemas/Config'
         '403': *id002
         '429': *id003
+        '503': *id004
 components:
   schemas:
     Problem:
@@ -2120,6 +2251,13 @@ components:
           - forbidden_origin
           - rate_limited
           - internal
+          - non_sample_data_forbidden
+          - sample_flag_forbidden_in_prod
+          - sample_flag_immutable
+          - item_too_large
+          - config_unavailable
+          - scar_source_invalid
+          - training_source_invalid
         fields:
           type: array
           items:
@@ -2305,7 +2443,7 @@ components:
         clause:
           type: string
           description: Standard/clause reference
-        dueDate: *id004
+        dueDate: *id005
         needByDate:
           type: string
           format: date
@@ -2364,7 +2502,7 @@ components:
           description: Derived from SCAR records linked by supplierId (Decided DP-10, 2026-10-13; see dp-proposals.md)
           x-decision: DP-10
           readOnly: true
-        certRenewalDate: *id004
+        certRenewalDate: *id005
         standards:
           type: array
           items:
@@ -2428,7 +2566,7 @@ components:
         approverName:
           type: string
           description: Required to approve & add to ASL (BR-35, BR-38)
-        approvalDate: *id004
+        approvalDate: *id005
         reevalDate:
           type: string
           format: date
@@ -2554,7 +2692,7 @@ components:
           type: object
           properties:
             name: *id001
-            at: &id005
+            at: &id006
               type: string
               format: date-time
           readOnly: true
@@ -2562,7 +2700,7 @@ components:
           type: object
           properties:
             name: *id001
-            at: *id005
+            at: *id006
           readOnly: true
         form2:
           type: object
@@ -2691,7 +2829,7 @@ components:
           - Test equipment
           - Other
         certificateRef: *id001
-        lastCalibrationDate: *id004
+        lastCalibrationDate: *id005
         nextDueDate:
           type: string
           format: date
@@ -2742,7 +2880,7 @@ components:
         role: *id001
         course: *id001
         standardOrSop: *id001
-        dueDate: *id004
+        dueDate: *id005
         findingRowId:
           type: string
           description: 'PO checks only: the finding row this came from'
@@ -2765,7 +2903,7 @@ components:
           - PO
           readOnly: true
         standardOrSop: *id001
-        dueDate: *id004
+        dueDate: *id005
         completedDate:
           type: string
           format: date
@@ -2810,8 +2948,8 @@ components:
           description: 'Link or description (BR-07, references only). Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
           maxLength: 32768
           x-free-text: true
-        effectiveDate: *id004
-        nextReviewDate: *id004
+        effectiveDate: *id005
+        nextReviewDate: *id005
         status:
           type: string
           enum:
@@ -2947,9 +3085,23 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
     Unprocessable:
-      description: 'gate:controlled_marker (BR-44). Nothing persisted, no audit event. Message names the marker id; input is kept client-side only (DP-03). Also all envs: sample_flag_immutable (QA-40),
-        isSample changed on PATCH. Also prod only: sample_flag_forbidden_in_prod (BR-49), isSample=true on create; nothing persisted. Also, dev/stage only: non_sample_data_forbidden (BR-45, QA-34): a create
-        without isSample=true is rejected; nothing persisted, no audit event. Enabled by the env profile (ADR-0013); prod ignores it.'
+      description: 'Codes: gate:controlled_marker, sample_flag_immutable, sample_flag_forbidden_in_prod, non_sample_data_forbidden, scar_source_invalid (Issue SCAR from a SCAR or a Closed record, OQ-23),
+        training_source_invalid (Assign training from a SCAR, OQ-15). gate:controlled_marker (BR-44). Nothing persisted, no audit event. Message names the marker id; input is kept client-side only (DP-03).
+        Also all envs: sample_flag_immutable (QA-40), isSample changed on PATCH. Also prod only: sample_flag_forbidden_in_prod (BR-49), isSample=true on create; nothing persisted. Also, dev/stage only:
+        non_sample_data_forbidden (BR-45, QA-34): a create without isSample=true is rejected; nothing persisted, no audit event. Enabled by the env profile (ADR-0013); prod ignores it.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PayloadTooLarge:
+      description: 'item_too_large (QA-26, overview §4.3): Domain item or compressed audit item over 350 KB. The transaction writes nothing.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: 'config_unavailable (QA-31, overview §4.2): a required SSM value is missing or malformed. Only routes that use it fail; free-text writes fail closed if gate markers or CFR ranges are
+        unavailable.'
       content:
         application/problem+json:
           schema:

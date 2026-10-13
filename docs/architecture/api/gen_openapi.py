@@ -15,7 +15,7 @@ ro=lambda x:{**x,'readOnly':True}
 schemas={
  'Problem':s('object',description='RFC 9457 problem+json. `code` is stable and machine-readable.',required=['type','title','status','code'],properties={
    'type':s('string',format='uri'),'title':STR,'status':s('integer'),'detail':STR,'instance':STR,
-   'code':enum('validation_failed','gate:attestation_required','gate:controlled_marker','not_found','version_conflict','precondition_required','stage_conflict','sod_violation','idempotency_conflict','forbidden_origin','rate_limited','internal'),
+   'code':enum('validation_failed','gate:attestation_required','gate:controlled_marker','not_found','version_conflict','precondition_required','stage_conflict','sod_violation','idempotency_conflict','forbidden_origin','rate_limited','internal','non_sample_data_forbidden','sample_flag_forbidden_in_prod','sample_flag_immutable','item_too_large','config_unavailable','scar_source_invalid','training_source_invalid'),
    'fields':s('array',items=s('object',properties={'name':STR,'message':STR})),
    'markerId':dec('DP-03','Matched marker id (K<n>/R<n>) is returned and shown in the 422 message. Matched text is never returned or logged')}),
  'Meta':s('object',properties={
@@ -115,7 +115,9 @@ params={
 }
 def prob(st,desc): return {'description':desc,'content':{'application/problem+json':{'schema':R('Problem')}}}
 resp={'BadRequest':prob(400,'Validation error or gate:attestation_required (BR-44)'),
- 'Unprocessable':prob(422,'gate:controlled_marker (BR-44). Nothing persisted, no audit event. Message names the marker id; input is kept client-side only (DP-03). Also all envs: sample_flag_immutable (QA-40), isSample changed on PATCH. Also prod only: sample_flag_forbidden_in_prod (BR-49), isSample=true on create; nothing persisted. Also, dev/stage only: non_sample_data_forbidden (BR-45, QA-34): a create without isSample=true is rejected; nothing persisted, no audit event. Enabled by the env profile (ADR-0013); prod ignores it.'),
+ 'Unprocessable':prob(422,'Codes: gate:controlled_marker, sample_flag_immutable, sample_flag_forbidden_in_prod, non_sample_data_forbidden, scar_source_invalid (Issue SCAR from a SCAR or a Closed record, OQ-23), training_source_invalid (Assign training from a SCAR, OQ-15). gate:controlled_marker (BR-44). Nothing persisted, no audit event. Message names the marker id; input is kept client-side only (DP-03). Also all envs: sample_flag_immutable (QA-40), isSample changed on PATCH. Also prod only: sample_flag_forbidden_in_prod (BR-49), isSample=true on create; nothing persisted. Also, dev/stage only: non_sample_data_forbidden (BR-45, QA-34): a create without isSample=true is rejected; nothing persisted, no audit event. Enabled by the env profile (ADR-0013); prod ignores it.'),
+ 'PayloadTooLarge':prob(413,'item_too_large (QA-26, overview §4.3): Domain item or compressed audit item over 350 KB. The transaction writes nothing.'),
+ 'ServiceUnavailable':prob(503,'config_unavailable (QA-31, overview §4.2): a required SSM value is missing or malformed. Only routes that use it fail; free-text writes fail closed if gate markers or CFR ranges are unavailable.'),
  'NotFound':prob(404,'Not found (or soft-deleted)'),'Conflict':prob(409,'stage_conflict, sod_violation or idempotency_conflict'),
  'PreconditionFailed':prob(412,'version_conflict'),'PreconditionRequired':prob(428,'If-Match missing'),
  'Forbidden':prob(403,'forbidden_origin: request did not come through CloudFront (ADR-0015)'),'TooMany':prob(429,'rate_limited (API Gateway throttle)')}
@@ -123,29 +125,29 @@ def ok(schema,code='200',desc='OK',etag=False):
     r={'description':desc,'content':{'application/json':{'schema':schema}}}
     if etag: r['headers']={'ETag':{'schema':STR}}
     return {code:r}
-common_err={'403':RS('Forbidden'),'429':RS('TooMany')}
+common_err={'403':RS('Forbidden'),'429':RS('TooMany'),'503':RS('ServiceUnavailable')}
 def page(n): return {'allOf':[R('Page'),s('object',properties={'items':s('array',items=R(n))})]}
 paths={}
 def collection(path,name,tag,fn='records-api',extra=None):
     paths[path]={'x-sentinelqa-function':fn,
      'get':{'tags':[tag],'operationId':f'list{name}','parameters':[P('Cursor'),P('Limit'),P('IncludeDeleted')]+(extra or []),'responses':{**ok(page(name)),**common_err}},
      'post':{'tags':[tag],'operationId':f'create{name}','parameters':[P('IdempotencyKey')],'requestBody':{'required':True,'content':{'application/json':{'schema':R(name)}}},
-       'responses':{**ok(R(name),'201','Created',True),'400':RS('BadRequest'),'409':RS('Conflict'),'422':RS('Unprocessable'),**common_err}}}
+       'responses':{**ok(R(name),'201','Created',True),'400':RS('BadRequest'),'409':RS('Conflict'),'413':RS('PayloadTooLarge'),'422':RS('Unprocessable'),**common_err}}}
     paths[path+'/{id}']={'x-sentinelqa-function':fn,'parameters':[P('Id')],
      'get':{'tags':[tag],'operationId':f'get{name}','responses':{**ok(R(name),etag=True),'404':RS('NotFound'),**common_err}},
      'patch':{'tags':[tag],'operationId':f'update{name}','parameters':[P('IfMatch')],'requestBody':{'required':True,'content':{'application/merge-patch+json':{'schema':R(name)}}},
-       'responses':{**ok(R(name),etag=True),'400':RS('BadRequest'),'404':RS('NotFound'),'409':RS('Conflict'),'412':RS('PreconditionFailed'),'422':RS('Unprocessable'),'428':RS('PreconditionRequired'),**common_err}},
+       'responses':{**ok(R(name),etag=True),'400':RS('BadRequest'),'404':RS('NotFound'),'409':RS('Conflict'),'412':RS('PreconditionFailed'),'413':RS('PayloadTooLarge'),'422':RS('Unprocessable'),'428':RS('PreconditionRequired'),**common_err}},
      'delete':{'tags':[tag],'operationId':f'delete{name}','description':'Soft delete: sets deletedAt and appends a DELETED audit event (BRD §13.1). No DynamoDB DeleteItem (denied in every env).','parameters':[P('IfMatch'),{'name':'actorName','in':'query','required':True,'schema':STR}],
        'responses':{'204':{'description':'Soft-deleted'},'404':RS('NotFound'),'412':RS('PreconditionFailed'),'428':RS('PreconditionRequired'),**common_err}}}
 def action(path,opid,tag,schema,desc,fn='records-api'):
     paths[path]={'x-sentinelqa-function':fn,'parameters':[P('Id')],'post':{'tags':[tag],'operationId':opid,'description':desc,'parameters':[P('IdempotencyKey'),P('IfMatch')],
       'requestBody':{'required':True,'content':{'application/json':{'schema':schema}}},
-      'responses':{**ok(s('object'),'200','OK',True),'400':RS('BadRequest'),'404':RS('NotFound'),'409':RS('Conflict'),'412':RS('PreconditionFailed'),'422':RS('Unprocessable'),**common_err}}}
+      'responses':{**ok(s('object'),'200','OK',True),'400':RS('BadRequest'),'404':RS('NotFound'),'409':RS('Conflict'),'412':RS('PreconditionFailed'),'413':RS('PayloadTooLarge'),'422':RS('Unprocessable'),**common_err}}}
 q=lambda n,sc:{'name':n,'in':'query','schema':sc}
 collection('/api/quality-records','QualityRecord','Quality records',extra=[q('type',enum('CAPA','NCMR','SCAR')),q('severity',STR),q('stage',STR),q('standard',STR)])
 action('/api/quality-records/{id}/transitions','transitionQualityRecord','Quality records',R('Transition'),'Stage advance (BR-13). Rules per DP-02.')
-action('/api/quality-records/{id}/scar','issueScar','Quality records',R('IssueScar'),'Issue SCAR (OQ-23) from an NCMR or CAPA. 422 if the source is a SCAR or Closed. UI: action-bar button next to stage advance, hidden when Closed (approved).')
-action('/api/quality-records/{id}/training','assignTrainingFromQualityRecord','Training',R('AssignTraining'),'Assign training from a CAPA/NCMR (OQ-15). 422 for SCAR.')
+action('/api/quality-records/{id}/scar','issueScar','Quality records',R('IssueScar'),'Issue SCAR (OQ-23) from an NCMR or CAPA. 422 scar_source_invalid if the source is a SCAR or Closed. UI: action-bar button next to stage advance, hidden when Closed (approved).')
+action('/api/quality-records/{id}/training','assignTrainingFromQualityRecord','Training',R('AssignTraining'),'Assign training from a CAPA/NCMR (OQ-15). 422 training_source_invalid for a SCAR.')
 collection('/api/suppliers','Supplier','Suppliers',extra=[q('standard',STR)])
 collection('/api/supplier-qualifications','SupplierQualification','Supplier qualification',extra=[q('stage',STR)])
 action('/api/supplier-qualifications/{id}/transitions','transitionSupplierQualification','Supplier qualification',R('Transition'),'Step advance (BR-36). To Active on ASL requires approverName (BR-35).')
@@ -155,9 +157,9 @@ collection('/api/fai','Fai','FAI')
 action('/api/fai/{id}/signatures','signFai','FAI',R('FaiSignature'),'Sign as preparer/evaluator (BR-33).')
 paths['/api/fai/{id}/characteristics']={'x-sentinelqa-function':'records-api','parameters':[P('Id')],
   'get':{'tags':['FAI'],'operationId':'listFaiCharacteristics','parameters':[P('Cursor'),P('Limit')],'responses':{**ok(page('FaiCharacteristic')),**common_err}},
-  'post':{'tags':['FAI'],'operationId':'createFaiCharacteristic','description':'One row per request (row + audit event in one transaction).','parameters':[P('IdempotencyKey')],'requestBody':{'required':True,'content':{'application/json':{'schema':R('FaiCharacteristic')}}},'responses':{**ok(R('FaiCharacteristic'),'201','Created',True),'400':RS('BadRequest'),'422':RS('Unprocessable'),**common_err}}}
+  'post':{'tags':['FAI'],'operationId':'createFaiCharacteristic','description':'One row per request (row + audit event in one transaction).','parameters':[P('IdempotencyKey')],'requestBody':{'required':True,'content':{'application/json':{'schema':R('FaiCharacteristic')}}},'responses':{**ok(R('FaiCharacteristic'),'201','Created',True),'400':RS('BadRequest'),'413':RS('PayloadTooLarge'),'422':RS('Unprocessable'),**common_err}}}
 paths['/api/fai/{id}/characteristics/{charId}']={'x-sentinelqa-function':'records-api','parameters':[P('Id'),{'name':'charId','in':'path','required':True,'schema':STR}],
-  'patch':{'tags':['FAI'],'operationId':'updateFaiCharacteristic','parameters':[P('IfMatch')],'requestBody':{'required':True,'content':{'application/merge-patch+json':{'schema':R('FaiCharacteristic')}}},'responses':{**ok(R('FaiCharacteristic'),etag=True),'400':RS('BadRequest'),'412':RS('PreconditionFailed'),'422':RS('Unprocessable'),**common_err}},
+  'patch':{'tags':['FAI'],'operationId':'updateFaiCharacteristic','parameters':[P('IfMatch')],'requestBody':{'required':True,'content':{'application/merge-patch+json':{'schema':R('FaiCharacteristic')}}},'responses':{**ok(R('FaiCharacteristic'),etag=True),'400':RS('BadRequest'),'412':RS('PreconditionFailed'),'413':RS('PayloadTooLarge'),'422':RS('Unprocessable'),**common_err}},
   'delete':{'tags':['FAI'],'operationId':'deleteFaiCharacteristic','description':'Soft delete of a Form 3 row (US-36, §13.1).','parameters':[P('IfMatch'),{'name':'actorName','in':'query','required':True,'schema':STR}],'responses':{'204':{'description':'Soft-deleted'},'412':RS('PreconditionFailed'),**common_err}}}
 collection('/api/calibration','Calibration','Calibration',extra=[q('status',enum('Active','Due soon','Overdue'))])
 collection('/api/training','Training','Training')
