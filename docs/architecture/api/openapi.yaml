@@ -2,7 +2,8 @@ openapi: 3.1.0
 info:
   title: SentinelQA API
   version: 0.5.0
-  description: 'Source of truth for the records-api / reports-api routes (architecture v0.5, BRD v1.4). Skeleton contract: only BRD-backed fields; anything pending a decision is marked `x-tbd: DP-nn`.
+  description: 'Source of truth for the records-api / reports-api routes (architecture v0.5, BRD v1.4). Skeleton contract: only BRD-backed fields; decided fields carry `x-decision: DP-nn` (decisions 2026-10-13,
+    docs/requirements/dp-proposals.md); remaining open items are `x-tbd`.
 
 
     Conventions:
@@ -196,7 +197,7 @@ paths:
       tags:
       - Quality records
       operationId: transitionQualityRecord
-      description: Stage advance (BR-13). Rules TBD (DP-02).
+      description: Stage advance (BR-13). Rules per DP-02.
       parameters:
       - $ref: '#/components/parameters/IdempotencyKey'
       - $ref: '#/components/parameters/IfMatch'
@@ -1802,7 +1803,8 @@ paths:
       tags:
       - Reports
       operationId: getDashboard
-      description: Tiles and "items need attention" count (BR-42). Sources for "FAI sign-off pending"/"Effectiveness checks due" TBD (DP-17).
+      description: Tiles and "items need attention" count (BR-42). FAI sign-off pending = FAI with an unsigned role; Effectiveness checks due = 0, "Not tracked in this build" (DP-17). Overdue CAPA/NCMR
+        count in Needs attention (DP-20).
       parameters: []
       responses:
         '200':
@@ -1819,7 +1821,7 @@ paths:
       tags:
       - Reports
       operationId: getReviewQueue
-      description: Awaiting your review, severity then age (BR-14). Age direction/basis TBD (DP-13).
+      description: Awaiting your review, severity then age (BR-14). Critical > Major > Minor, then oldest openedAt first (DP-13); overdue flagged (DP-20).
       parameters:
       - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/Limit'
@@ -1845,7 +1847,7 @@ paths:
       tags:
       - Reports
       operationId: getThreatensDelivery
-      description: Open CAPA/NCMR with need-by ≤ 14 days (BR-15). Day counting TBD (DP-12).
+      description: Open CAPA/NCMR with need-by ≤ 14 days (BR-15). Calendar days in America/New_York, inclusive (DP-12).
       parameters:
       - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/Limit'
@@ -1905,7 +1907,7 @@ paths:
       tags:
       - Reports
       operationId: getTrends
-      description: Opened vs closed 12 weeks, severity mix, by standard, clause Pareto (US-12). Definitions TBD (DP-14).
+      description: Opened vs closed 12 weeks, severity mix, by standard, clause Pareto (US-12). ISO weeks in workspace TZ; Pareto marks first 80% (DP-14).
       parameters: []
       responses:
         '200':
@@ -1922,7 +1924,7 @@ paths:
       tags:
       - Reports
       operationId: getSupplierRisk
-      description: Suppliers ranked by ascending score (BR-16, US-18). Tie-break TBD (DP-13).
+      description: Suppliers ranked by ascending score (BR-16, US-18). Ties by name A–Z (DP-13).
       parameters:
       - name: standard
         in: query
@@ -2004,15 +2006,16 @@ components:
               message: *id001
         markerId:
           type: string
-          description: 'TBD (DP-03): whether the matched marker id is returned to the user is pending. Matched text is never returned or logged.'
-          x-tbd: DP-03
+          description: Matched marker id (K<n>/R<n>) is returned and shown in the 422 message. Matched text is never returned or logged (Decided DP-03, 2026-10-13; see dp-proposals.md)
+          x-decision: DP-03
     Meta:
       type: object
       properties:
         id:
           type: string
-          description: 'TBD (DP-01): record ID/number format per entity (prefix, year scope, suffix).'
-          x-tbd: DP-01
+          description: 'System ID <TYPE>-YYYY-NNNN (SQ/CAL: NNN), year in workspace TZ, per-type per-year sequence, immutable; soft-deleted records keep their ID reserved (Decided DP-01, 2026-10-13; see
+            dp-proposals.md)'
+          x-decision: DP-01
           readOnly: true
         version:
           type: integer
@@ -2052,10 +2055,12 @@ components:
       properties:
         actorName:
           type: string
-          description: Self-asserted actor/reviewer name (BR-11). No identity yet (ADR-0008). Limits TBD (DP-04).
+          description: Self-asserted actor/reviewer name (BR-11). No identity yet (ADR-0008). 1–100 chars, trimmed, letters/space/.,'- (DP-04).
+          minLength: 1
+          maxLength: 100
         controlledDataAttestation:
           type: boolean
-          description: Required true on every request that persists free text (BR-44). Missing/false → 400 gate:attestation_required. Whether writes without free text also need it is TBD (DP-03).
+          description: Required true on every request that persists free text (BR-44). Missing/false → 400 gate:attestation_required. Required only on endpoints that accept a free-text field (DP-03).
     Page:
       type: object
       required:
@@ -2125,9 +2130,11 @@ components:
         toStage: *id001
         comment:
           type: string
-          description: 'Optional note. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Optional note. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
-      description: Generic stage advance; writes STAGE_CHANGED (BR-36). Conditional on current stage = fromStage (409 stage_conflict). Allowed moves (backward, skip, who closes) TBD (DP-02).
+      description: Generic stage advance; writes STAGE_CHANGED (BR-36). Conditional on current stage = fromStage (409 stage_conflict). Forward one stage at a time, no skip; only backward move is QM Review
+        → Investigation with a required comment; Closed is terminal; QM Review → Closed only by a reviewer independent of the author (DP-02, DP-08).
     QualityRecord:
       type: object
       allOf:
@@ -2146,11 +2153,13 @@ components:
           - SCAR
         title:
           type: string
-          description: 'Short title. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Short title. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         description:
           type: string
-          description: 'Event description. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Event description. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         severity:
           type: string
@@ -2178,7 +2187,8 @@ components:
           description: Need-by date (BR-15, delivery details optional)
         deliveryDetails:
           type: string
-          description: 'Optional. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Optional. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         reviewerName:
           type: string
@@ -2193,20 +2203,20 @@ components:
           - Return to supplier
         independentApprover:
           type: string
-          description: Required for Use as is / Repair (BR-10). Meaning of "independent" and block vs warn TBD (DP-08).
+          description: Required for Use as is / Repair (BR-10). Independent = different from the author after trim/whitespace-collapse/case-fold; hard block 409 sod_violation (DP-08).
         sourceRecordId:
           type: string
           description: e.g. NCMR that raised a SCAR (OQ-23)
         stepFields:
           type: object
-          description: 'TBD (DP-02): CAPA/NCMR steps 2–6 field specs are not observed (BRD §13.2a).'
-          x-tbd: DP-02
+          description: CAPA/NCMR step 2–6 fields per the approved step specs (Decided DP-02, 2026-10-13; see dp-proposals.md)
+          x-decision: DP-02
     Supplier:
       type: object
       allOf:
       - $ref: '#/components/schemas/Meta'
       - $ref: '#/components/schemas/WriteCommon'
-      description: Create/edit story and entered-vs-derived fields TBD (DP-10).
+      description: Supplier master record with create/edit (DP-10).
       properties:
         name: *id001
         commodity: *id001
@@ -2217,12 +2227,15 @@ components:
           - Standard
         onTimePct:
           type: number
-          description: 'TBD (DP-10): entered or derived'
-          x-tbd: DP-10
+          minimum: 0
+          maximum: 100
+          description: Entered manually (Decided DP-10, 2026-10-13; see dp-proposals.md)
+          x-decision: DP-10
         openScarCount:
           type: integer
-          description: 'TBD (DP-10): entered or derived'
-          x-tbd: DP-10
+          description: Derived from SCAR records linked by supplierId (Decided DP-10, 2026-10-13; see dp-proposals.md)
+          x-decision: DP-10
+          readOnly: true
         certRenewalDate: *id004
         standards:
           type: array
@@ -2245,8 +2258,8 @@ components:
         flags:
           type: array
           items: *id001
-          description: 'TBD (DP-10): deterministic flags and next step'
-          x-tbd: DP-10
+          description: 'Derived: open SCAR/CAPA linked → flag; next step text by band (Decided DP-10, 2026-10-13; see dp-proposals.md)'
+          x-decision: DP-10
           readOnly: true
     SupplierQualification:
       type: object
@@ -2261,11 +2274,13 @@ components:
           description: Required to continue (BR-17)
         scopeRequested:
           type: string
-          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         approvedScope:
           type: string
-          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         stage:
           type: string
@@ -2279,7 +2294,8 @@ components:
           readOnly: true
         docsReviewNotes:
           type: string
-          description: 'Step 2 documentation & certification review. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Step 2 documentation & certification review. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         approverName:
           type: string
@@ -2288,12 +2304,12 @@ components:
         reevalDate:
           type: string
           format: date
-          description: Validation vs approval date TBD (DP-19)
+          description: Must be after approvalDate, else 422 (DP-19)
         reviewerName: *id001
         stepFields:
           type: object
-          description: 'TBD (DP-02): SQ steps 3 (Risk), 4 (Evaluation), 6 (Active on ASL) not observed.'
-          x-tbd: DP-02
+          description: SQ step 3/4/6 fields per the approved step specs; forward-only (Decided DP-02, 2026-10-13; see dp-proposals.md)
+          x-decision: DP-02
     PoFinding:
       type: object
       properties:
@@ -2302,7 +2318,8 @@ components:
           readOnly: true
         requirement:
           type: string
-          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         clause:
           type: string
@@ -2318,18 +2335,20 @@ components:
           - Not captured
         suggestedWording:
           type: string
-          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         whyCitation:
           type: string
-          description: '"Why this citation" note. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: '"Why this citation" note. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
     PoCheck:
       type: object
       allOf:
       - $ref: '#/components/schemas/Meta'
       - $ref: '#/components/schemas/WriteCommon'
-      description: Manual entry, observed fields only (BRD §13.2). Types/lengths/required flags TBD (DP-04).
+      description: Manual entry, observed fields only (BRD §13.2). Field classes per DP-04.
       properties:
         poNumber: *id001
         supplier: *id001
@@ -2337,7 +2356,8 @@ components:
         quantity: *id001
         revision:
           type: string
-          description: 'Observed as free text. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Observed as free text. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         findings:
           type: array
@@ -2369,8 +2389,8 @@ components:
           description: N/A if blank
         faiReportNumber:
           type: string
-          description: 'TBD (DP-01): auto, observed FAIR-2026-xxxxxxxx'
-          x-tbd: DP-01
+          description: Auto FAIR-YYYY-NNNN (Decided DP-01, 2026-10-13; see dp-proposals.md)
+          x-decision: DP-01
           readOnly: true
         partType:
           type: string
@@ -2388,7 +2408,8 @@ components:
           - Delta
         reason:
           type: string
-          description: 'Reason for FAI. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Reason for FAI. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         routingNumber: *id001
         status:
@@ -2424,7 +2445,8 @@ components:
           enum:
           - preparer
           - evaluator
-      description: 'BR-33: evaluator ≠ preparer, preparer signs first (409 sod_violation). Name comparison and edits/un-sign after sign-off TBD (DP-08, DP-09).'
+      description: 'BR-33: evaluator ≠ preparer, preparer signs first (409 sod_violation). Names compared after trim/whitespace-collapse/case-fold (DP-08). Preparer may un-sign (audited) only before the
+        evaluator signs; after both sign, no edits (DP-09).'
     FaiCharacteristic:
       type: object
       allOf:
@@ -2439,11 +2461,13 @@ components:
           default: None
         requirement:
           type: string
-          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         result:
           type: string
-          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         equipment: *id001
         passFail:
@@ -2454,7 +2478,8 @@ components:
           default: PASS
         ncrDisposition:
           type: string
-          description: 'Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         checks:
           type: array
@@ -2492,11 +2517,12 @@ components:
         nextDueDate:
           type: string
           format: date
-          description: +6/+12/+24 months helper; end-of-month rule TBD (DP-12)
+          description: +6/+12/+24 months helper; clamps to last day of month (DP-12)
         calibratedBy: *id001
         nistStatement:
           type: string
-          description: 'NIST traceability statement. Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'NIST traceability statement. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         status:
           type: string
@@ -2531,8 +2557,8 @@ components:
           readOnly: true
         recurrence:
           type: object
-          description: 'TBD (DP-07): recurrence interval and Not started/start-by rule'
-          x-tbd: DP-07
+          description: Per-course recurrence in months (none = one-off); next due = completion + interval; Not started until start-by passes, then Overdue (Decided DP-07, 2026-10-13; see dp-proposals.md)
+          x-decision: DP-07
     Document:
       type: object
       allOf:
@@ -2558,7 +2584,8 @@ components:
           - Other
         location:
           type: string
-          description: 'Link or description (BR-07, references only). Free text: screened by the controlled-data gate (BR-44). Length limits TBD (DP-04).'
+          description: 'Link or description (BR-07, references only). Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+          maxLength: 32768
           x-free-text: true
         effectiveDate: *id004
         nextReviewDate: *id004
@@ -2569,7 +2596,7 @@ components:
           - Under review
           - Released
           - Superseded
-          description: Superseded is set by the server only (BR-37). Edit/re-release semantics TBD (DP-11).
+          description: Superseded is set by the server only (BR-37). Number and revision immutable; new revision = new record; releasing a revision ≤ current → 409; mixed numeric/alpha revision → 422 (DP-11).
         approvedBy:
           type: string
           description: Required when Released (BR-37, BR-38)
@@ -2613,12 +2640,18 @@ components:
             maximum: 5
         overallScore:
           type: number
-          description: Mean of 8 ratings (BR-41); rounding and < 8 answers TBD (DP-06)
+          description: Mean of 8 ratings (BR-41); rounded half-up to 1 decimal; no score until 8/8 answered (DP-06)
           readOnly: true
         band:
           type: string
-          description: 'TBD (DP-06): bands other than Defined'
-          x-tbd: DP-06
+          enum:
+          - Initial
+          - Developing
+          - Defined
+          - Managed
+          - Optimising
+          description: Initial / Developing / Defined / Managed / Optimising by floor of score (Decided DP-06, 2026-10-13; see dp-proposals.md)
+          x-decision: DP-06
           readOnly: true
         topGaps:
           type: array
@@ -2640,8 +2673,9 @@ components:
           readOnly: true
         timezone:
           type: string
-          description: 'TBD (DP-12): workspace timezone'
-          x-tbd: DP-12
+          const: America/New_York
+          description: Workspace timezone, America/New_York (Decided DP-12, 2026-10-13; see dp-proposals.md)
+          x-decision: DP-12
           readOnly: true
   parameters:
     Id:
@@ -2690,7 +2724,7 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
     Unprocessable:
-      description: gate:controlled_marker (BR-44). Nothing persisted, no audit event. User message and input retention TBD (DP-03).
+      description: gate:controlled_marker (BR-44). Nothing persisted, no audit event. Message names the marker id; input is kept client-side only (DP-03).
       content:
         application/problem+json:
           schema:
