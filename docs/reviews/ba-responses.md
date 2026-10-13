@@ -48,5 +48,6 @@ Note: developer-review states "BA 11"; the BA-owned items are DEV-04, 05 (Archit
 | F-09 (architect) | Resolved (v1.2.3) | BR-08 aligned with BR-46/C-1 in v1.2.3 |
 | BA-10 | Resolved (v1.4) | US-41 in scope: client-side search over loaded lists |
 | BA-15 | Partly resolved (v1.4) | Seed/sample policy: labeled sample data allowed in all envs (BR-31/45); ID format → DP-01 |
+| DEV-29 (BA part) | Open (v1.4.2) | CAPA/NCMR overdue rule not observed in screenshots 08/09/10/11/25/26/34/35; raised as OQ-25 / DP-20. Index side fixed by Architect (GSI2 `dueAt` = `dueDate`) |
 
 Rejected: none.
