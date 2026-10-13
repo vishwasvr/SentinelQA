@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `npm run build:lambdas` (deterministic esbuild + zip of records-api/reports-api to `dist/*.zip`) and `npm run smoke:deployed` (post-deploy smoke), used by deploy.yml; stub Lambda handlers returning 404 problem+json ([runbook](docs/runbooks/build-and-smoke.md)).
 
 ### Changed
+- `build:lambdas` aligned with ADR-0014: node24 target, ESM `index.mjs` + `index.mjs.map` at the zip root (still deterministic).
 - Alarm email sourced from a GitHub environment variable; emails forbidden in params ([#6](https://github.com/vishwasvr/SentinelQA/pull/6)).
 
 ### Pending (open PRs, not merged)

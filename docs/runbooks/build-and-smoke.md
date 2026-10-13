@@ -3,9 +3,13 @@
 Used by `.github/workflows/deploy.yml` (ADR-0014, delivery-strategy §3/§4).
 
 ## `npm run build:lambdas`
-`scripts/build-lambdas.mjs` bundles `src/functions/<name>/index.ts` for `records-api` and `reports-api` with esbuild
-(`--platform=node --target=node20 --format=cjs --minify`, AWS SDK bundled) and writes `dist/records-api.zip` and
-`dist/reports-api.zip`, each with `index.js` at the zip root (`Handler: index.handler` in `30-api.yaml`).
+`scripts/build-lambdas.mjs` bundles `src/functions/<name>/index.ts` for `records-api` and `reports-api` per ADR-0014
+(`--bundle --platform=node --target=node24 --format=esm --minify --sourcemap`, AWS SDK bundled, with a `createRequire`
+banner so bundled CommonJS deps can still `require`) and writes `dist/records-api.zip` and `dist/reports-api.zip`.
+Each zip holds `index.mjs` and its linked `index.mjs.map` at the root; `Handler: index.handler` in `30-api.yaml`
+resolves to `index.mjs` (the Lambda Node.js runtime loads `.mjs` as ESM). The map has root-relative source paths and
+no embedded sources. ADR-0014 does not require `NODE_OPTIONS=--enable-source-maps`, so the templates don't set it;
+add it to the function `Environment` if mapped stack traces are wanted (it adds some cold-start cost).
 Zips are deterministic (sorted entries, fixed mtime 1980-01-01 12:00, fixed compression), so the same commit gives the
 same `sha256` in `dist/manifest.json`. No system `zip` needed (uses `fflate`). `dist/` is gitignored; deploy.yml writes
 `manifest.json` itself.

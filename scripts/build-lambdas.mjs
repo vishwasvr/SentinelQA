@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Build the Lambda zips consumed by .github/workflows/deploy.yml (ADR-0014):
-//   src/functions/<name>/index.ts -> esbuild bundle -> dist/<name>.zip with index.js at the zip root
-//   (30-api.yaml: Handler: index.handler). Deterministic: fixed entry order and mtimes, no build timestamps.
+//   src/functions/<name>/index.ts -> esbuild (node24, ESM, minified, linked sourcemap) -> dist/<name>.zip containing
+//   index.mjs + index.mjs.map at the zip root (ADR-0014; 30-api.yaml Handler: index.handler resolves to index.mjs). Deterministic: fixed entry order and mtimes, no build timestamps.
 import { build } from 'esbuild';
 import { zipSync } from 'fflate';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -20,22 +20,27 @@ export function deterministicZip(files) {
   return zipSync(entries, { mtime: FIXED_MTIME });
 }
 
-/** Bundle one function in memory; returns { 'index.js': bytes }. */
+/** Bundle one function in memory; returns { 'index.mjs': bytes, 'index.mjs.map': bytes }. */
 export async function bundle(root, name) {
   const res = await build({
     entryPoints: [join(root, 'src/functions', name, 'index.ts')],
     bundle: true,
     platform: 'node',
-    target: 'node20',
-    format: 'cjs',
+    target: 'node24',
+    format: 'esm',
     minify: true,
+    sourcemap: 'linked',
+    sourcesContent: false,
+    // Bundled CJS deps (AWS SDK) may call require(); give the ESM bundle one.
+    banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
     legalComments: 'none',
     write: false,
-    outfile: 'index.js',
+    outfile: 'index.mjs',
+    absWorkingDir: root,
     logLevel: 'warning',
   });
-  const out = res.outputFiles.find((f) => f.path.endsWith('index.js'));
-  return { 'index.js': out.contents };
+  const pick = (suffix) => res.outputFiles.find((f) => f.path.endsWith(suffix)).contents;
+  return { 'index.mjs': pick('index.mjs'), 'index.mjs.map': pick('index.mjs.map') };
 }
 
 export async function buildAll(root, outDir = join(root, 'dist'), names = FUNCTIONS) {
