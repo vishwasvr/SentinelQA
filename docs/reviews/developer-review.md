@@ -259,3 +259,4 @@ Basis: committed HEAD `ff3b1ef`, verified from a `git archive HEAD` export, so u
 - #28 Resolved in ba4fa73.
 - #29 Resolved for the index (GSI2 dueAt = CAPA/NCMR dueDate; sparse GSI3 needByAt for BR-15). No CAPA/NCMR overdue logic until DP-20 / OQ-25.
 - cfn-lint not installed on this box at re-check; relying on Architect's clean lint report.
+- #24 Resolved (`6c61696`, overview §4.1): never-log list plus one-line JSON field schema. Implementation note: Powertools Logger adds its own default keys (service, cold_start, function_arn, xray_trace_id, sampling_rate); the logger must be configured to drop or rename them, or §4.1 should allow them, so "these fields only" holds.
