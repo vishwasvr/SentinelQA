@@ -68,7 +68,15 @@ schemas={
    'partType':enum('Detail','Sub-Assembly','Assembly','COTS','Software'),'faiType':enum('Full','Partial','Delta'),
    'reason':FT('Reason for FAI.'),'routingNumber':STR,'status':ro(STR),
    'preparerSignature':ro(s('object',properties={'name':STR,'at':TS})),'evaluatorSignature':ro(s('object',properties={'name':STR,'at':TS})),
-   'form2':tbd('OQ-08','Form 2 not observed.',s('object'))}),
+   'form2':dec('OQ-08','DECIDED 2026-10-13: built on the Form 1/3 pattern. Form 2 was NOT observed; every field is a GUESS taken from the public AS9102 Form 2 headings and must be checked before go-live.',s('object',properties={'rows':s('array',items=s('object',properties={
+     'rowId':ro(STR),
+     'materialOrProcessName':FT('GUESS (OQ-08): AS9102 Form 2 field 6.'),
+     'specificationNumber':FT('GUESS (OQ-08): field 7.'),
+     'code':FT('GUESS (OQ-08): field 8.'),
+     'specialProcessSupplierCode':FT('GUESS (OQ-08): field 9.'),
+     'customerApprovalVerification':s('string',enum=['Yes','No','N/A'],description='GUESS (OQ-08): field 10.'),
+     'certificateOfConformanceNumber':FT('GUESS (OQ-08): field 11.')},
+     **{'x-guess':True}))}))}),
  'FaiSignature':s('object',allOf=[R('WriteCommon')],required=['role'],properties={'role':enum('preparer','evaluator')},description='BR-33: evaluator ≠ preparer, preparer signs first (409 sod_violation). Names compared after trim/whitespace-collapse/case-fold (DP-08). Preparer may un-sign (audited) only before the evaluator signs; after both sign, no edits (DP-09).'),
  'FaiCharacteristic':s('object',allOf=[R('Meta'),R('WriteCommon')],properties={'charNo':s('integer'),'refLocation':STR,'designator':s('string',default='None'),'requirement':FT(),'result':FT(),'equipment':STR,'passFail':s('string',enum=['PASS','FAIL'],default='PASS'),'ncrDisposition':FT(),'checks':ro(s('array',items=STR,description='Advisory completeness checks (BR-34)'))}),
  'Calibration':s('object',allOf=[R('Meta'),R('WriteCommon')],required=['equipmentName'],properties={

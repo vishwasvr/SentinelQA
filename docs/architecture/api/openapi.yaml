@@ -2434,8 +2434,51 @@ components:
           readOnly: true
         form2:
           type: object
-          description: 'TBD (OQ-08): Form 2 not observed.'
-          x-tbd: OQ-08
+          properties:
+            rows:
+              type: array
+              items:
+                type: object
+                properties:
+                  rowId:
+                    type: string
+                    readOnly: true
+                  materialOrProcessName:
+                    type: string
+                    description: 'GUESS (OQ-08): AS9102 Form 2 field 6. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+                    maxLength: 32768
+                    x-free-text: true
+                  specificationNumber:
+                    type: string
+                    description: 'GUESS (OQ-08): field 7. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+                    maxLength: 32768
+                    x-free-text: true
+                  code:
+                    type: string
+                    description: 'GUESS (OQ-08): field 8. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+                    maxLength: 32768
+                    x-free-text: true
+                  specialProcessSupplierCode:
+                    type: string
+                    description: 'GUESS (OQ-08): field 9. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+                    maxLength: 32768
+                    x-free-text: true
+                  customerApprovalVerification:
+                    type: string
+                    enum:
+                    - 'Yes'
+                    - 'No'
+                    - N/A
+                    description: 'GUESS (OQ-08): field 10.'
+                  certificateOfConformanceNumber:
+                    type: string
+                    description: 'GUESS (OQ-08): field 11. Free text: screened by the controlled-data gate (BR-44). Max 32 KB (DP-04).'
+                    maxLength: 32768
+                    x-free-text: true
+                x-guess: true
+          description: 'DECIDED 2026-10-13: built on the Form 1/3 pattern. Form 2 was NOT observed; every field is a GUESS taken from the public AS9102 Form 2 headings and must be checked before go-live.
+            (Decided OQ-08, 2026-10-13; see dp-proposals.md)'
+          x-decision: OQ-08
     FaiSignature:
       type: object
       allOf:
