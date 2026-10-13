@@ -53,7 +53,7 @@ aws cloudformation deploy --profile sentinelqa-admin --stack-name SentinelQA-sta
   --parameter-overrides EnvName=stage GitHubRepo=vishwasvr/SentinelQA \
     OidcProviderArn=arn:aws:iam::723940054516:oidc-provider/token.actions.githubusercontent.com \
   --capabilities CAPABILITY_NAMED_IAM --tags app=SentinelQA env=stage --no-execute-changeset
-# expect 6 x Add
+# expect 5 x Add (AppRoleBoundary, ArtifactBucket, ArtifactBucketPolicy, CfnExecRole, DeployRole)
 # after execute + wait (decided: termination protection ON for stage Bootstrap):
 aws cloudformation update-termination-protection --enable-termination-protection --stack-name SentinelQA-stage-Bootstrap --profile sentinelqa-admin
 ```
