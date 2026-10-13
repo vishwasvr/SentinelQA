@@ -9,6 +9,8 @@ Status: Draft. **Do not execute** unless Vishwas explicitly approves each create
 | Params | `docs/architecture/iac/params/<env>.json` |
 | Alarm email | `vishwas.learn@yahoo.com` |
 
+> **First bootstrap (account OIDC stack + `00-bootstrap`) is an admin run by Vishwas:** follow [bootstrap-admin-run.md](bootstrap-admin-run.md). This page covers the overall order and the later pipeline stacks.
+
 ## 1. Prerequisites
 - Vishwas does a fresh `aws login` / SSO session himself. Agents never hold or create access keys.
 - **Explicit approval per create/update.** For each stack, present the change set (`--no-execute-changeset` or `describe-change-set`) and execute it only after Vishwas approves that specific change set.
@@ -16,15 +18,10 @@ Status: Draft. **Do not execute** unless Vishwas explicitly approves each create
 - Lambda zips exist (B-4, Developer) and are uploaded by the pipeline as `<commit-sha>/<function>.zip`.
 
 ## 2. GitHub OIDC provider (one per account; check, then create)
-The ARN `arn:aws:iam::723940054516:oidc-provider/token.actions.githubusercontent.com` is **unverified**.
-```bash
-aws iam list-open-id-connect-providers --query "OpenIDConnectProviderList[?ends_with(Arn,'token.actions.githubusercontent.com')]"
-```
-- If it exists, reuse it and do not create a second one.
-- If it is missing, create it **once per account, outside the per-env stacks**, after approval:
-  `aws iam create-open-id-connect-provider --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com`
+The provider belongs to the account-level stack `SentinelQA-Account-OIDC` (`templates/00-account-oidc.yaml`, `params/account.json`). That stack is separate from every per-env stack, and the provider is `Retain`. Set `CreateOidcProvider=true` only if `aws iam list-open-id-connect-providers` shows no GitHub provider. The ARN `arn:aws:iam::723940054516:oidc-provider/token.actions.githubusercontent.com` is unverified until that check runs. Exact steps: [bootstrap-admin-run.md](bootstrap-admin-run.md) §1–2.
 
 ## 3. Stack order (per env)
+0. `SentinelQA-Account-OIDC` (once per account; admin, see bootstrap-admin-run.md).
 1. `SentinelQA-<env>-Bootstrap` (00): deployed by Vishwas's admin session, **not** by the pipeline, because the deploy role is denied on this stack. Outputs: deploy role, `SentinelQA-<env>-cfn-exec`, the app boundary, and the artifact bucket.
 2. The pipeline (deploy role, `--role-arn` = cfn-exec) deploys, in order:
    - 10 `SentinelQA-<env>-Security`

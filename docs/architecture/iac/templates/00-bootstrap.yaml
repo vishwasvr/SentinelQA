@@ -14,8 +14,11 @@ Parameters:
     AllowedPattern: '^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$'
   OidcProviderArn:
     Type: String
-    Description: Existing token.actions.githubusercontent.com provider ARN (one per account, created outside this stack)
-    AllowedPattern: '^arn:aws[a-z-]*:iam::[0-9]{12}:oidc-provider/token\.actions\.githubusercontent\.com$'
+    Default: ''
+    Description: >-
+      Optional. Empty = use the account provider arn:<partition>:iam::<AccountId>:oidc-provider/token.actions.githubusercontent.com
+      (created/checked by SentinelQA-Account-OIDC). Set only to override.
+    AllowedPattern: '^$|^arn:aws[a-z-]*:iam::[0-9]{12}:oidc-provider/token\.actions\.githubusercontent\.com$'
   ArtifactNoncurrentDays:
     Type: Number
     Default: 30
@@ -23,6 +26,7 @@ Parameters:
     Description: Days after which noncurrent artifact object versions expire
 Conditions:
   IsProd: !Equals [!Ref EnvName, prod]
+  UseDefaultOidcArn: !Equals [!Ref OidcProviderArn, '']
 Resources:
   # ---------------------------------------------------------------- B-2 artifact bucket
   # Key convention (agreed with Developer): <commit-sha>/<function>.zip
@@ -245,7 +249,8 @@ Resources:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
-            Principal: { Federated: !Ref OidcProviderArn }
+            Principal:
+              Federated: !If [UseDefaultOidcArn, !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com', !Ref OidcProviderArn]
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:

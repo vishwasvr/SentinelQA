@@ -1,0 +1,32 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  SentinelQA account-level GitHub OIDC provider (ADR-0012). Stack name SentinelQA-Account-OIDC, deployed ONCE
+  per account by an admin. Not tied to any env stack lifecycle. Provider is retained on stack delete.
+Parameters:
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: 'true only if `aws iam list-open-id-connect-providers` shows no token.actions.githubusercontent.com provider'
+Conditions:
+  DoCreate: !Equals [!Ref CreateOidcProvider, 'true']
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: DoCreate
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      # ThumbprintList omitted: optional; IAM validates GitHub's OIDC endpoint via its trusted root CAs.
+      Tags:
+        - { Key: app, Value: SentinelQA }
+Outputs:
+  GitHubOidcProviderArn:
+    Description: GitHub Actions OIDC provider ARN (created here, or the pre-existing one)
+    Value: !If
+      - DoCreate
+      - !Ref GitHubOidcProvider
+      - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+    Export: { Name: SentinelQA-Account-GitHubOidcProviderArn }

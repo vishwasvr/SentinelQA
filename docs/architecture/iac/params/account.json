@@ -1,0 +1,6 @@
+{
+  "_comment": "Account-level stack SentinelQA-Account-OIDC (00-account-oidc.yaml). Account 723940054516, us-east-1. Set CreateOidcProvider from the pre-check in docs/runbooks/bootstrap-admin-run.md.",
+  "00-account-oidc": {
+    "CreateOidcProvider": "false"
+  }
+}
