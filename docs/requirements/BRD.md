@@ -4,7 +4,7 @@
 |---|---|
 | Product | Sentinel QA — "AI Quality Manager" for AS9100D aerospace suppliers |
 | Source | https://sentinel-qa.lovable.app/ (public, unauthenticated exploration) |
-| Version / date | 1.2.3 — 2026-10-13 (v1.1 + scope decisions from architecture, see §12 and §13; observed findings unchanged) |
+| Version / date | 1.3 — 2026-10-13 (v1.1 + scope decisions from architecture, §12; review responses and build clarifications, §13; observed findings unchanged; changelog §14) |
 | Basis | Observed behavior only (as-built BRD). No features are invented; roadmap items are marked **[ROADMAP – not live]**. |
 | Evidence | [screenshots/](screenshots/README.md) |
 | Architecture | [architecture-overview.md](../architecture/architecture-overview.md) v0.4, [ADRs](../architecture/adr/) |
@@ -22,7 +22,7 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 
 > **v1.2 build scope:** this document still records observed behavior. For the build, AI generate/draft flows are out of scope and items tagged **[Deferred v1.2 …]** are not built; items tagged **[Changed v1.2]** carry a build rule that differs from the observed demo. See §12.
 
-**Out of scope:** authentication (/auth: Continue with Google, Sign in, Create an account), user accounts and multi-tenancy, billing, and server-side persistence for signed-in users. Also out of scope is any AI output content: at the user's request, AI generate flows (Try the agent prompts, Check clauses, Try a sample, Start my CAPA, Build my FAI record, "Ask about …", "Continue drafting in the agent", "Ask the agent to draft a full gap-closure plan") were deliberately not run in either pass (see §10). AI-labelled content quoted in this BRD is pre-seeded sample/demo content or locally computed summaries that appeared without triggering generation.
+**Out of scope:** authentication (/auth: Continue with Google, Sign in, Create an account), user accounts and multi-tenancy, billing, and the observed demo's signed-in persistence (migration/export of the hosted product's accounts). *v1.3 clarification:* server-side persistence itself **is in build scope** (BR-45, §12 #2); only the login-gated behavior of the observed product is out of scope. Also out of scope is any AI output content: at the user's request, AI generate flows (Try the agent prompts, Check clauses, Try a sample, Start my CAPA, Build my FAI record, "Ask about …", "Continue drafting in the agent", "Ask the agent to draft a full gap-closure plan") were deliberately not run in either pass (see §10). AI-labelled content quoted in this BRD is pre-seeded sample/demo content or locally computed summaries that appeared without triggering generation.
 
 ## 2. Personas
 | ID | Persona | Goals | Observed touchpoints |
@@ -283,7 +283,7 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **BR-09** The human quality leader is the reviewer of record. AI outputs are drafts only.
 - **BR-10** Segregation of duties: the "Use as is" and "Repair" NCMR dispositions need an independent named approver.
 - **BR-11** CAPA/NCMR need a reviewer name ("Your name" + Save). The name is recorded on each step.
-- **BR-12** CAPA/NCMR IDs are generated automatically (CAPA-DEMO-xxxx / NCMR-DEMO-xxxx in demo mode).
+- **BR-12** CAPA/NCMR IDs are generated automatically (CAPA-DEMO-xxxx / NCMR-DEMO-xxxx in demo mode). *Build criterion (v1.3):* the ID is system-generated, unique within the workspace, starts with the record-type prefix (`CAPA-`, `NCMR-`, `SCAR-`) and is immutable after create. The production format (year scope, sequential vs random suffix, whether `DEMO` appears) is **pending decision DP-01** (§13.3); ACs must not assert the `DEMO` literal.
 - **BR-13** The CAPA/NCMR workflow has 6 steps through the stages New → Containment → Investigation → Draft Ready → QM Review → Closed. The Disposition field appears only for NCMR.
 - **BR-14** The "Awaiting your review" list sorts by severity (Critical > Major > Minor), then by age.
 - **BR-15** "Threatens delivery" lists open CAPA/NCMR with a need-by date within the next 14 days.
@@ -292,7 +292,7 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **BR-18** The supplier re-evaluation date is tracked and bucketed as overdue / 0–30d / 31–60d / 61–90d on the dashboard. **[Changed v1.2]** *Build rule:* bucket windows are configurable, values TBD from Vishwas (BR-47).
 - **BR-19** Approval Roles are a convenience only, not an access-control mechanism.
 - **BR-20** Default approvers: Supplier Qualification, CAPA, NCMR and Document → Quality Manager; FAI → Engineering Lead; Purchase Order → Production Supervisor. The default is skipped if it would break segregation of duties.
-- **BR-21** The PO clause check evaluates the PO against AS9100D §8.4.3 (and AS9102 for FAI). Each requirement is classified Missing / Weak / Present (or not captured) and comes with suggested wording. **[Deferred v1.2: AI out of scope]** PO check records are entered manually in the build; findings are not AI-generated (overview §2).
+- **BR-21** The PO clause check evaluates the PO against AS9100D §8.4.3 (and AS9102 for FAI). Each requirement is classified Missing / Weak / Present (or not captured) and comes with suggested wording. **[Deferred v1.2: AI out of scope]** PO check records are entered manually in the build; findings are not AI-generated (overview §2). Manual-entry fields are limited to the observed structure, §13.2.
 - **BR-22** FAI Form 1 requires Part Number and Part Name. On Create FAI with them empty, each shows "<Field> is required.", plus "Fill in the highlighted fields to continue: Part Number, Part Name." and a toast "Please fill in: Part Number, Part Name." ([40](screenshots/40-fai-form1-validation-errors.png)). The FAI Report Number is generated automatically if left blank (FAIR-YYYY-xxxxxxxx). Reason for FAI defaults to initial FAI. A new FAI starts in status Draft.
 - **BR-23** Calibration "Save to the register" is disabled until an equipment name is entered ("Enter an equipment name."). Certificate reference and NIST traceability statement are required.
 - **BR-24** The +6/+12/+24-month next-due buttons stay disabled until a last calibration date is set. When used, they set next due = last date + N months.
@@ -311,14 +311,16 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
   | Low-confidence drift | 8.8% / 15% | 24h | Email | Enabled |
   | Reviewer rejection rate | 11.3% / 10% | 7d | Email | Disabled (so not firing despite the breach) |
 
+- **BR-31** Records sample data is labelled "ILLUSTRATIVE — SAMPLE RECORDS".
+- **BR-32** Disabled-in-demo actions: none observed beyond the validation gates. AI generate actions were not exercised (user request); Reset demo was not executed.
 - **BR-33** FAI sign-off follows AS9102 Rev C segregation: the evaluator must be a different person than the preparer; Sign as Evaluator is disabled until the preparer signs ("Preparer must sign first."). The demo simulates a second person with "Simulate second reviewer" ([41](screenshots/41-fai-record-created-form3.png)).
-- **BR-34** FAI Form 3 completeness checks are advisory only; entry and sign-off are not blocked. Empty Reference Location, Result and Equipment cells auto-fill "N/A". A row needs Char. no. and Requirement (and NCR if Fail).
+- **BR-34** FAI Form 3 completeness checks are advisory only; entry and sign-off are not blocked. Empty Reference Location, Result and Equipment cells auto-fill "N/A". A row needs Char. no. and Requirement (and NCR if Fail). *Clarification (v1.3):* the last sentence is the **add-row precondition** observed in the hint "Fill Char. no., Requirement (and NCR if Fail) to add a row" — a row missing these is not committed. The **completeness banner** is a separate advisory check over committed rows and never blocks entry or sign-off. Whether a committed FAIL row can later have its NCR cleared is pending DP-09.
 - **BR-35** A supplier cannot go active on the ASL without a named approver: "Approve & add to ASL" is disabled with "Name an approver to continue." ([39](screenshots/39-sq-wizard-step5-approval-gated.png)). Approval date and re-evaluation/expiry date are entered manually at step 5.
 - **BR-36** Every SQ step advance is written to the audit trail with timestamp, actor ("Reviewer" when no name is saved) and "Advanced <from> → <to>". Every risk rating is a hypothesis until confirmed. **[Partially deferred v1.2: AI out of scope]** The audit-trail rule stays; AI risk hypotheses are deferred, so ratings are human-entered.
 - **BR-37** Releasing a document requires a named approver ("Name an approver to release." / "Pick who approved this release before saving."); saving a Released revision automatically marks any earlier released revision of the same document as Superseded ([44](screenshots/44-document-new-released-approver-required.png)).
 - **BR-38** Approver pickers (SQ, Document) list saved Approval Roles or accept a custom free-text name.
 - **BR-39** Calibration ID is auto-generated (CAL-DEMO-xxxxxxxx) when Equipment ID is blank; new entries are active immediately. Register KPIs: "Active instruments" = all non-overdue instruments; due-within-30/60/90 buckets are cumulative; Due soon status covers at least 25d and 64d, Active at 147d+ ([43](screenshots/43-calibration-register-after-save.png)).
-- **BR-40** Mark complete sets the training row to Current with "Completed <date>", replaces the action with Undo and updates the KPIs. No evidence or verifier is captured ([51](screenshots/51-training-mark-complete-alvarez.png)).
+- **BR-40** Mark complete sets the training row to Current with "Completed <date>", replaces the action with Undo and updates the KPIs. No evidence or verifier is captured ([51](screenshots/51-training-mark-complete-alvarez.png)). *Build rule (v1.3):* Mark complete and Undo are each written as a new audit event (BR-08/BR-46); Undo clears the completion on the assignment (no hard delete, §13.1) and the status is re-derived from the due date as if never completed (in [52](screenshots/52-training-mark-complete-brandt.png) the undone Alvarez row returned to Due soon 12d). Recurrence interval and the "Not started" rule are pending DP-07.
 - **BR-41** QMS Champion overall score equals the mean of the 8 ratings in all three observed cases (3.0 → band Defined). Top 3 gaps are the lowest-rated dimensions, with ties resolved in dimension order; the 90-day priority targets the two lowest ([54](screenshots/54-qms-champion-summary-all-3.png), [56](screenshots/56-qms-champion-summary-mixed.png), [57](screenshots/57-qms-champion-summary-leadership-1.png)). Ratings persist for the session; Reset clears them.
 - **BR-42** The dashboard "items need attention" count is the number of Needs attention items: overdue/expired or due-soon training, calibration and supplier re-evaluations (8 = 3 + 3 + 2).
 - **BR-43** Low-confidence drift counts drafts below 0.75 confidence; a timeout is a task exceeding 30 s (TIMEOUT_30S). **[Deferred v1.2: AI out of scope]**
@@ -326,9 +328,6 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **BR-45** **[New v1.2]** Persistence is server-side. In prod, records and audit events are retained for at least 7 years. Dev/stage hold synthetic data only and carry no retention obligation; real customer records must never be loaded there. Source: D-03 as amended by O-08, [ADR-0003](../architecture/adr/0003-datastore.md), [ADR-0013](../architecture/adr/0013-environment-profiles.md), overview §8.
 - **BR-46** **[New v1.2, amended v1.2.2]** The audit log is append-only as application behavior: the app only ever adds events (conditional put) and corrections are new events. Single-event updates and deletes are denied in every environment (IAM explicit deny). Prod is strictly append-only. In dev/stage only, admins may perform full table resets (synthetic data only, BR-45). No WORM/Object Lock archive. Source: D-05, [ADR-0006](../architecture/adr/0006-immutable-audit-log.md); decision C-1 (Vishwas, 2026-10-13).
 - **BR-47** **[New v1.2]** Supplier risk weights and score bands (BR-16) and due-soon thresholds (BR-18, BR-25, training) are configurable (SSM parameters), not hard-coded. Values TBD from Vishwas (overview O-04). Source: D-07, overview §1/§3.
-- **BR-31** Records sample data is labelled "ILLUSTRATIVE — SAMPLE RECORDS".
-- **BR-32** Disabled-in-demo actions: none observed beyond the validation gates. AI generate actions were not exercised (user request); Reset demo was not executed.
-
 ## 8. User stories and acceptance criteria
 
 ### 8.1 Governance (cross-cutting)
@@ -338,13 +337,14 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 - **US-02** As a user, I must confirm that my pasted text has no controlled data before it is processed. **[Changed v1.2]** Build: applies to every free-text save; a controlled-data keyword hit blocks the save even when the box is ticked (BR-44).
   - *Given* any paste-and-generate box, *When* the checkbox is unticked, *Then* the action button is disabled and the ITAR/EAR/CUI warning is visible.
   - *When* I tick it (and enter text), *Then* the button is enabled (BR-04/05).
+  - *Build (BR-44):* *Given* any free-text save request without `controlledDataAttestation=true`, *Then* it is rejected with HTTP 400 and nothing is persisted. *Given* the attestation and text containing a configured marker, *Then* it is rejected with HTTP 422, no record or audit event is written, and neither the text nor the matched substring is logged. The user-facing 422 message and whether the form keeps the input are pending DP-03.
 - **US-03** As an auditor, I want an audit timeline on every record. **[Changed v1.2]** Build: events are append-only (BR-46); AI draft acceptance events are reserved, not emitted.
   - *Given* a record is created, *Then* the timeline shows "Created · <reviewer> · stage: new" with a timestamp.
   - *When* the stage changes or an AI draft is accepted, *Then* a new event is appended (BR-08).
 
 ### 8.2 Marketing and public tools
 - **US-04** As a prospect, I want to compare Sentinel QA with competitors.
-  - *Given* /compare, *Then* I see the 9 criteria × 7 products, with values Yes / Partial / No / Not verified.
+  - *Given* /compare, *Then* I see a comparison table with values Yes / Partial / No / Not verified. *Seed check:* the observed page shows 9 criteria × 7 products; the cell content is not in this BRD, so the table content is pending DP-05.
 - **US-05** As a prospect, I want to try my own document. **[Deferred v1.2: AI out of scope]** (/try-your-document hidden or static, overview A-10.)
   - *Given* /try-your-document, *When* I pick a doc type, paste text and tick the confirmation, *Then* Check clauses is enabled.
   - *When* the box is unticked or the text is empty, *Then* the button is disabled.
@@ -353,7 +353,7 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 
 ### 8.3 Dashboard
 - **US-08** As a QM, I want one place showing what needs attention.
-  - *Given* /app/aerospace, *Then* the headline count equals the number of items in the Needs attention list (8), and each item is tagged Overdue or Due soon.
+  - *Given* /app/aerospace, *Then* the headline count equals the number of items in the Needs attention list, and each item is tagged Overdue or Due soon. *Build criterion:* count = number of training, calibration and supplier re-evaluation items whose derived status is Overdue or Due soon (BR-42). *Seed check (demo fixture, §13.4):* with the BRD sample data the count is 8 (3 + 3 + 2).
 - **US-09** As a QM, I want to know which CAPA/NCMR threaten delivery. *Given* no open record has a need-by date within 14 days, *Then* the empty-state text is shown.
 
 ### 8.4 Records
@@ -363,13 +363,13 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
 
 ### 8.5 NCMR / CAPA
 - **US-13** As an inspector, I want to start an NCMR.
-  - *Given* the NCMR list, *When* I click Start a new NCMR, *Then* /app/aerospace/capa/new?type=NCMR opens at "Step 1 of 6", with an auto ID NCMR-DEMO-xxxx and a Disposition selector.
+  - *Given* the NCMR list, *When* I click Start a new NCMR, *Then* /app/aerospace/capa/new?type=NCMR opens at "Step 1 of 6", with an auto ID that starts with `NCMR-` (BR-12) and a Disposition selector.
 - **US-14** As a reviewer, I want my name recorded. *When* I enter "Your name" and Save, *Then* that name is attributed on each step and in the timeline.
 - **US-15** As a user, I cannot create a record without the controlled-data confirmation. *Given* the box is unticked, *Then* "Create record & continue →" is disabled and shows "Tick the controlled-data confirmation to continue." **[Changed v1.2]** Build: in addition, a controlled-data keyword hit blocks the save (BR-44).
 - **US-16** As a QM, I need independent approval for risky dispositions. *Given* the NCMR disposition is Use as is or Repair, *Then* an independent named approver is required (BR-10).
 - **US-17** As a quality engineer, I want to draft a CAPA from pasted text. **[Partially deferred v1.2: AI out of scope]** "Start my CAPA" paste-to-draft is deferred; Start a new CAPA form stays in scope.
   - *Given* Corrective Actions, *When* I paste text and confirm, *Then* Start my CAPA is enabled.
-  - *Else* I can Start a new CAPA (CAPA-DEMO-xxxx).
+  - *Else* I can Start a new CAPA (auto ID starting `CAPA-`, BR-12).
 
 ### 8.6 Supply Chain
 - **US-18** As supplier quality, I want suppliers ranked by risk. *Then* the list is ordered by ascending score and can be filtered by standard.
@@ -402,11 +402,11 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
   - *Given* the form, *When* the equipment name is empty, *Then* Save is disabled with "Enter an equipment name."
   - *When* the last date is set, *Then* the +6/+12/+24 buttons fill in the next due date.
   - Certificate reference and NIST statement are required.
-  - *When* I set last date 01/15/2026 and click +24 months, *Then* next due becomes 01/15/2028; *When* I save, *Then* the register shows a new Active row with an auto CAL-DEMO id and the KPIs update.
+  - *When* I set last date 01/15/2026 and click +24 months, *Then* next due becomes 01/15/2028; *When* I save, *Then* the register shows a new Active row with an auto-generated unique ID (format pending DP-01) and the KPIs update.
 
 ### 8.11 Training
 - **US-27** As a training coordinator, I want a role-to-training matrix. *Then* each row shows role·person, course, source record, standard, due and status, with a Mark complete action.
-- **US-28** *When* I click Mark complete, *Then* the row shows "Completed <date>", status Current, the action becomes Undo, and the KPIs update (observed for M. Alvarez and L. Brandt).
+- **US-28** *When* I click Mark complete, *Then* the row shows "Completed <date>", status Current, the action becomes Undo, and the KPIs update; *When* I click Undo, *Then* the row returns to the status derived from its due date and both actions appear in the audit trail (BR-40). *Seed check:* observed for M. Alvarez and L. Brandt.
 
 ### 8.12 Document Control
 - **US-29** As a document controller, I want to register a controlled document. *When* the name is empty, *Then* Save is disabled with "Enter a document name." Location is a link or description (no upload).
@@ -418,7 +418,7 @@ Positioning, from the home page and /compare: clause-level citations, flagging o
   - *Given* a default would make the author also the approver, *Then* the default is skipped.
 
 ### 8.14 QMS Champion
-- **US-31** As a QM, I want a maturity self-assessment. *When* I rate all 8 dimensions 1–5, *Then* I get an overall score with band, top 3 gaps with next steps, a heatmap and a 90-day priority, marked draft assistance (e.g. all 3s → 3.0 / 5 Defined). **[Partially deferred v1.2: AI out of scope]** Deterministic score, gaps and heatmap stay (BR-41); "Ask the agent to draft a full gap-closure plan" is deferred.
+- **US-31** As a QM, I want a maturity self-assessment. *When* I rate all 8 dimensions 1–5, *Then* I get an overall score with band, top 3 gaps with next steps, a heatmap and a 90-day priority, marked draft assistance. *Build criterion:* overall = mean of the 8 ratings; top 3 gaps = lowest ratings, ties in dimension order (BR-41). *Seed check:* all 3s → 3.0 / 5 Defined. Band thresholds other than Defined and the mean's rounding are pending DP-06. **[Partially deferred v1.2: AI out of scope]** Deterministic score, gaps and heatmap stay (BR-41); "Ask the agent to draft a full gap-closure plan" is deferred.
 
 ### 8.15 Agent reliability
 - **US-32** As an ops owner, I want agent KPIs and alerts. *Then* I see 24h KPIs, firing alerts with their channel, a rules table and a filterable task log; Export CSV downloads the log. **[Deferred v1.2: AI out of scope]**
@@ -485,7 +485,52 @@ Decided during architecture (2026-10-13). Sources: [architecture-overview.md](..
 
 Still open OQs: OQ-03, 06, 07, 08, 09, 10, 14, 15, 17, 18, 21, 22, 23 (consistent with overview O-07). Answered OQs (11, 12, 16, 19, 20, 24) are unchanged.
 
-## 13. Changelog
+## 13. v1.3 review responses and build clarifications
+Responses to the BA-owned findings in [developer-review.md](../reviews/developer-review.md) (be0a8d5), [ba-review.md](../reviews/ba-review.md), [qa-review.md](../reviews/qa-review.md), [infra-review.md](../reviews/infra-review.md) and [architect-review.md](../reviews/architect-review.md). Mapping per finding: [ba-responses.md](../reviews/ba-responses.md). Nothing here adds observed behavior; unresolved items are listed in §13.3.
+
+### 13.1 Removal, undo and resets (decided by architecture)
+- Domain-record deletes are denied in **every** environment (architecture, confirmed by Architect 2026-10-13; `30-api.yaml`). Every remove or undo in the app is therefore a **soft delete / reversal**: the item is marked removed or reverted and a new audit event is appended (BR-08, BR-46). This applies to Approval Roles "Remove role" and "remove person" (§4.14), Training Undo (BR-40) and removing a Form 3 row (US-36). Removed items are excluded from lists, counts and pickers.
+- Corrections to any record are new audit events; prior events are never changed (BR-46).
+- Full dev/stage table resets (BR-46, C-1) are an **operator action via the InfraDeploy reset script**, not an app feature and not available in prod.
+
+### 13.2 Manual PO-check entry (BR-21, US-22) — observed fields only
+Fields are limited to what the observed PO check shows (§4.9, §6). Types, lengths and required flags beyond this are **not** specified (DP-04).
+- **PO header:** PO number, supplier, part, quantity, revision (observed as free text, e.g. "Rev C (not stated on PO)").
+- **Findings grid, one row per requirement:** requirement; clause (AS9100D §8.4.3 or AS9102); status (Missing / Weak / Present / Not captured); suggested wording; "Why this citation" note.
+- **Summary counts** are derived from the rows (count per status), not entered.
+- Filters: status and clause (US-22).
+- Free-text fields (requirement, suggested wording, why-citation, revision) are subject to the controlled-data gate (BR-44).
+
+### 13.2a Not specified — blocked on Vishwas
+- **CAPA/NCMR steps 2–6** field specs (Containment, Investigation, Draft Ready, QM Review, Closed) and **SQ steps 3 (Risk), 4 (Evaluation) and 6 (Active on ASL)** were not observed (OQ-06, OQ-07). No fields are specified here. **Blocked on DP-02.** Until decided, the build covers step 1 (§4.6), SQ steps 1, 2 and 5 (§4.8) and a generic stage advance that writes the audit event (BR-36).
+
+### 13.3 Decisions pending (Vishwas)
+| # | Decision | Findings |
+|---|---|---|
+| DP-01 | Record ID/number format per entity: prefix, year scope, sequential vs random suffix, `DEMO` literal; uniqueness of user-entered IDs (Equipment ID, Document number) | DEV-10, QA-15, BA-15 |
+| DP-02 | Field specs for CAPA/NCMR steps 2–6 and SQ steps 3/4/6; stage transition rules (backward moves, skipping, who closes, disposition before Closed, SQ re-evaluation cycle) | DEV-04, QA-14, BA-08 |
+| DP-03 | Controlled-data gate rules: final marker list, matching rule (case, whole word, normalisation, evasion cases), screened fields vs exempt IDs/names, attestation on writes without free text, 422 user message and input retention, whether the marker id is shown | DEV-13, QA-03, QA-04, QA-20 |
+| DP-04 | Field-level limits (lengths, allowed characters) incl. reviewer name and PO-check fields | QA-16, DEV-04 |
+| DP-05 | /compare table content and the "Simulate second reviewer" control in the build (keep or remove); published seed fixtures | DEV-11 |
+| DP-06 | QMS maturity bands other than Defined, rounding of the mean, results with < 8 answers | QA-08, DEV-11 |
+| DP-07 | Training recurrence interval, "Not started" / start-by rule | DEV-22, QA-24 |
+| DP-08 | Segregation of duties: definition of "independent" approver and "author"; hard block vs warning; name comparison (case/whitespace/initials) | DEV-15, QA-07, QA-25 |
+| DP-09 | FAI edits after sign-off, un-sign, FAIL row NCR clearing | QA-25 |
+| DP-10 | Supplier master data: create/edit story; on-time % and open SCAR count entered or derived; SQ ↔ Supplier ↔ SCAR linking; deterministic flags and next step | DEV-12, BA-12 |
+| DP-11 | Edit semantics for keyed records: changing Document number/revision, re-release of same or older revision, "same document" for supersede | DEV-14, QA-13 |
+| DP-12 | Date/time: workspace timezone for "today" and day counts, inclusive/exclusive threshold boundaries, due-today status, +N months end-of-month rule | DEV-21, QA-23 |
+| DP-13 | Review-queue age direction and basis (openedAt vs due date); filter combination (AND?) and empty state; supplier score tie-break | QA-10, QA-11 |
+| DP-14 | Trend definitions: week boundaries, "opened", Pareto cut | QA-09 |
+| DP-15 | ⌘K search scope and matching | QA-12 |
+| DP-16 | BR-47 threshold, weight and band values plus schema | QA-01 |
+| DP-17 | Data source for dashboard tiles "FAI sign-off pending" and "Effectiveness checks due" (no effectiveness-check entity observed) | BA-16 |
+| DP-18 | /demo and /try-your-document: hidden or static (O-06) | QA-27 |
+| DP-19 | SQ date validation: re-evaluation before approval date, future approval date | QA-24 |
+
+### 13.4 Build criteria vs demo-seed checks
+ACs in §8 are build criteria unless marked *Seed check*. A seed check holds only against the BRD sample data (§4) loaded as a synthetic fixture in dev/stage (BR-45); it is not a build requirement. Seed checks in v1.3: US-04 (9 × 7), US-08 (8), US-28 (Alvarez/Brandt), US-31 (3.0 Defined), US-26 (01/15/2026 + 24 months = 01/15/2028 is a rule example and holds without seed). Fixture publication is pending DP-05.
+
+## 14. Changelog
 | Version | Date | Summary |
 |---|---|---|
 | 1.0 | 2026-10-12 | Initial as-built BRD from the first exploration pass (screenshots 01–30). |
@@ -494,3 +539,4 @@ Still open OQs: OQ-03, 06, 07, 08, 09, 10, 14, 15, 17, 18, 21, 22, 23 (consisten
 | 1.2.1 | 2026-10-13 | OQ-13 changed from Deferred to Closed: the build logs `controlledDataAttested` on audit events for all free-text saves (architecture-overview §4, ADR-0005, BR-44). |
 | 1.2.2 | 2026-10-13 | BR-46 amended per decision C-1: append-only covers app behavior; single-event updates/deletes denied everywhere; prod strictly append-only; dev/stage admins may do full table resets. OQ-13 citation corrected to architecture-overview §4 / ADR-0005. |
 | 1.2.3 | 2026-10-13 | BR-08 build rule aligned with BR-46/C-1 (dev/stage full table resets; prod strictly append-only). |
+| 1.3 | 2026-10-13 | Responses to BA-owned review findings (§13, ba-responses.md): soft delete for all removals/undo and reset via InfraDeploy script (§13.1); manual PO-check fields from observed structure (§13.2); CAPA/NCMR steps 2–6 and SQ steps 3/4/6 marked blocked; ID ACs no longer assert `DEMO`; build criteria separated from seed checks (US-04/08/28/31); BR-44 400/422 ACs on US-02; BR-34 add-row vs advisory clarified; BR-40 Undo audited; §1.1 persistence wording fixed; BR-31/32 renumbered in order; decisions pending DP-01..DP-19 (§13.3). |
