@@ -21,7 +21,10 @@ Resources:
       ClientIdList: [sts.amazonaws.com]
       # ThumbprintList omitted: optional; IAM validates GitHub's OIDC endpoint via its trusted root CAs.
       Tags:
-        - { Key: app, Value: SentinelQA }
+        - { Key: Project, Value: SentinelQA }
+        - { Key: Environment, Value: shared }
+        - { Key: ManagedBy, Value: CloudFormation }
+        - { Key: Repo, Value: vishwasvr/SentinelQA }
 Outputs:
   GitHubOidcProviderArn:
     Description: GitHub Actions OIDC provider ARN (created here, or the pre-existing one)
