@@ -2040,7 +2040,8 @@ components:
         isSample:
           type: boolean
           description: 'BR-31: true for the illustrative seed set (labelled "ILLUSTRATIVE — SAMPLE RECORDS"). Allowed in every env. Client-settable on create only (immutable after). dev/stage: required
-            true on create, else 422 non_sample_data_forbidden (BR-45, QA-34). prod: an isSample=true create from the client is ignored and stored as false; only the seed loader sets it.'
+            true on create, else 422 non_sample_data_forbidden (BR-45, QA-34). prod: PENDING Vishwas (BR-49). Architect recommends 422 sample_flag_forbidden_in_prod (nothing persisted); alternative is silently
+            storing false. Either way only the seed loader creates sample records in prod.'
         draft:
           type:
           - object

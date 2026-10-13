@@ -23,7 +23,7 @@ schemas={
    'version':ro(s('integer',description='Optimistic-concurrency counter, returned as ETag "W/\\"<version>\\""')),
    'createdAt':ro(TS),'updatedAt':ro(TS),
    'deletedAt':ro({**TS,'description':'Soft delete (BRD §13.1). Removed items are excluded from lists, counts and pickers.'}),
-   'isSample':s('boolean',description='BR-31: true for the illustrative seed set (labelled "ILLUSTRATIVE — SAMPLE RECORDS"). Allowed in every env. Client-settable on create only (immutable after). dev/stage: required true on create, else 422 non_sample_data_forbidden (BR-45, QA-34). prod: an isSample=true create from the client is ignored and stored as false; only the seed loader sets it.'),
+   'isSample':s('boolean',description='BR-31: true for the illustrative seed set (labelled "ILLUSTRATIVE — SAMPLE RECORDS"). Allowed in every env. Client-settable on create only (immutable after). dev/stage: required true on create, else 422 non_sample_data_forbidden (BR-45, QA-34). prod: PENDING Vishwas (BR-49). Architect recommends 422 sample_flag_forbidden_in_prod (nothing persisted); alternative is silently storing false. Either way only the seed loader creates sample records in prod.'),
    'draft':ro(s('object',description='Reserved AI seam (BRD §12 #1). Always null in this build.',nullable=True)),
    'aiAssisted':ro(s('boolean',const=False))}),
  'WriteCommon':s('object',required=['actorName'],properties={
