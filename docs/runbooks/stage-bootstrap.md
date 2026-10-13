@@ -1,6 +1,6 @@
 # Runbook: stage bootstrap (shared non-prod account)
 
-Status: Draft, **not run**. Extends delivery-strategy.md §1a (the plan) and reuses [bootstrap-admin-run.md](bootstrap-admin-run.md) / [first-deploy.md](first-deploy.md); it does not replace them.
+Status: **partially run 2026-10-13** (steps 0, 2, 3, 4, 5 done; 1 done by Chief of Staff (reported); 6-9 blocked on first build; 10 done). Extends delivery-strategy.md §1a (the plan) and reuses [bootstrap-admin-run.md](bootstrap-admin-run.md) / [first-deploy.md](first-deploy.md); it does not replace them.
 Agents never execute this. **Vishwas runs every command himself**, in his own admin session, and signs the `APPROVAL` line of each step before executing it.
 
 | | |
@@ -99,7 +99,7 @@ Rollback: `aws cloudformation delete-stack --profile sentinelqa-admin --stack-na
 APPROVAL: Vishwas ____
 
 ## 5. `SentinelQA-stage-Data` (20-data, lean)
-Creates DynamoDB `SentinelQA-stage-Domain`, `SentinelQA-stage-AuditLog`, SSM config parameters under `/sentinelqa/stage/…`, seed-runs log group, seed-runs write policy (lean: PITR off).
+Creates DynamoDB `SentinelQA-stage-Domain`, `SentinelQA-stage-AuditLog`, SSM config parameters under `/sentinelqa/stage/…` (lean: PITR off). The seed-runs log group and seed-runs write policy are prod-only (`IsProd` condition) and are **not** created in stage.
 ```bash
 aws cloudformation deploy --profile sentinelqa-admin --stack-name SentinelQA-stage-Data --template-file $T/20-data.yaml \
   --parameter-overrides EnvName=stage EnvProfile=lean \
@@ -175,4 +175,11 @@ See [delivery-strategy.md §1b](../architecture/delivery-strategy.md#1b-cost-of-
 ## Run log
 | Date (CT) | Run by | Steps | Result | Notes |
 |---|---|---|---|---|
-| | | | | |
+| 2026-10-13 3:21 PM | InfraDeploy (Vishwas's `aws login`) | 0 | Done | Admin login, profile `sentinelqa-admin` |
+| 2026-10-13 | Chief of Staff | 1 | Done (reported) | GitHub `stage` env main-only with `AWS_DEPLOY_ROLE_ARN`; not independently verified |
+| 2026-10-13 3:24 PM | InfraDeploy | 2 | Done | Change set executed; termination protection ON |
+| 2026-10-13 3:25 PM | InfraDeploy | 3 | Done | `/sentinelqa/stage/edge/origin-verify` v1 |
+| 2026-10-13 3:28 PM | InfraDeploy | 4 | Done | Subscription PendingConfirmation; AlarmEmail passed directly (pre-PR #6 path) |
+| 2026-10-13 ~3:37 PM | InfraDeploy | 5 | Done | Deployed directly under Vishwas's 3:34 PM "establish everything" approval; no separate change-set review. Tables ACTIVE |
+| 2026-10-13 | — | 6-9 | Blocked | Need first build artifacts (`records-api.zip`, `reports-api.zip`) |
+| 2026-10-13 ~3:40 PM | InfraDeploy | 10 | Done | Logged out, profile removed, caches cleared, `get-caller-identity` fails |
