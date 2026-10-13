@@ -24,7 +24,7 @@ Owner: InfraDeploy. Status: **design only**. No `.github/workflows` file exists 
 7. **Real-data guard check (QA-34 §3.2):** the seed-fixture lint.
 8. **Integration tests (DynamoDB Local, no AWS):** QA-28 single audit write path, including that an overwrite attempt fails, and that nothing is written after a 413.
 
-Coverage threshold: decided by Developer at build time and recorded here. Until then, there's no numeric gate.
+Coverage threshold (DECIDED by Vishwas, 2026-10-13): at least 90% line and branch coverage overall; 100% for the gate matcher, `buildAuditPut`, the `isSample` checks and the config loader; and a PR fails if coverage drops by more than 1 point. It counts app code only, not generated OpenAPI types, IaC, tests or fixtures. The required `unit-coverage` job must pass before any dev deploy ([delivery-strategy.md](../delivery-strategy.md) §3b).
 
 ### 1.3 `deploy.yml` stages (ADR-0012 plus tests)
 

@@ -347,3 +347,5 @@ Notes (non-blocking):
 - Identity Center permission sets reference customer-managed policies by name, and the policy must exist in the prod account. This is consistent with the attach-at-account-split plan (O-03).
 
 **QA-45: Resolved.** Final sign-off stands. Open items are unchanged (QA-32, QA-36, OI-4, OI-5, OI-7), plus QA-46 to check at build time.
+
+- **QA-46 verify (2026-10-13, 3:05 PM CT, HEAD 9f2fa46; fix 1c75ad3 is an ancestor):** **Resolved.** `iac/templates/20-data.yaml:135-137`: the SeedRunsWritePolicy Resource now lists both `…log-group:/sentinelqa/prod/seed-runs:*` (:136) and `…:log-stream:*` (:137), with actions still only CreateLogStream/PutLogEvents (:134), both scoped to this one group. cfn-lint was not run (not installed).
