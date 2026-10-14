@@ -1,6 +1,6 @@
 # Environments: current state
 
-As of **2026-10-13 ~15:40 CT**. Account `723940054516`, region `us-east-1` (dev and stage share the account). Point-in-time record; update when stacks change.
+As of **2026-10-13 ~15:40 CT**. Account `723940054516`, region `us-east-1` (dev and stage share the account). Point-in-time record; update when stacks change. Per-resource list: [aws-resource-inventory.md](aws-resource-inventory.md).
 
 ## Shared
 | Resource | State | Notes |
