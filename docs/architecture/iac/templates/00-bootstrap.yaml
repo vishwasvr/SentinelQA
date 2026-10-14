@@ -343,6 +343,10 @@ Resources:
                 Effect: Allow
                 Action: ssm:PutParameter
                 Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sentinelqa/${EnvName}/version
+              - Sid: InvokeRecordsApiProbe  # deploy.yml §5b non-prod probe ({"probe":"qa-5b"}); records-api only, never a wildcard
+                Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:SentinelQA-${EnvName}-records-api
 Outputs:
   DeployRoleArn:
     Value: !GetAtt DeployRole.Arn
