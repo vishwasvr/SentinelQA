@@ -31,3 +31,34 @@ The handlers are currently **stubs**: every request returns a 404 `application/p
 Note: deploy.yml currently runs `DEPLOY_ENV=dev npm run smoke:deployed` without `SMOKE_BASE_URL`, so the step fails
 until the workflow supplies it (for example from the 40-web `DistributionDomain` stack output).
 The remaining smoke items (403 without origin header, 429 throttle, QA-36) stay manual (first-deploy §5b).
+
+## §5b probe (records-api direct invoke, non-prod only)
+Automates first-deploy §5b (QA-36) with the deployed records-api role. It is reachable **only** by a direct Lambda
+invoke whose payload is exactly `{"probe":"qa-5b"}` (no `requestContext`, no other keys); any API Gateway request,
+or any other payload, takes the normal path (stub 404). `npm run smoke:deployed` never calls it.
+
+Only records-api wires it (reports-api returns 404 for the same payload). It fails closed on the function's
+`ENV_NAME` (set by `30-api.yaml`): it runs only for `dev` or `stage`; when `ENV_NAME` is unset, empty, `prod` in any
+casing, or anything else, it returns `pass: false` with `refused` and touches nothing. **Never run it against prod.**
+
+```bash
+aws lambda invoke --function-name SentinelQA-dev-records-api \
+  --cli-binary-format raw-in-base64-out --payload '{"probe":"qa-5b"}' out.json && cat out.json
+```
+
+Each run [WRITE]s one new append-only audit event (`TransactWriteItems` via `buildAuditPut`, constant
+`attribute_not_exists` condition, entity `qa-5b-probe`, snapshot `isSample: true`), then tries a bare `PutItem` on the
+audit table with the same `attribute_not_exists(PK) AND attribute_not_exists(SK)` condition. Expected output (keys vary per run; the event body is never logged or returned):
+
+```json
+{ "probe": "qa-5b", "env": "dev", "pass": true,
+  "eventKeys": { "PK": "WS#qa-5b-probe#ENT#qa-5b-probe", "SK": "<ISO time>#<ULID>" },
+  "auditTransact": { "ok": true, "outcome": "written" },
+  "barePutItem": { "ok": true, "outcome": "denied", "error": "AccessDeniedException" } }
+```
+
+`pass` is true only if the transaction writes **and** the bare `PutItem` is denied with `AccessDeniedException`
+(or `AccessDenied`). A `PutItem` that succeeds, or fails with any other error (including
+`ConditionalCheckFailedException`), is a FAIL. If `auditTransact` fails,
+follow first-deploy §5b (stop; Architect's fallback). Re-runs are safe: each adds one new event and overwrites nothing.
+The probe stays in place as a non-prod regression check after first deploy.

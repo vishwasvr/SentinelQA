@@ -54,3 +54,15 @@ describe('smoke-deployed', () => {
     expect(isProblem({ status: 1 })).toBe(false);
   });
 });
+
+describe('smoke never calls the §5b probe', () => {
+  it('scripts/smoke-deployed.mjs has no probe marker or Lambda invoke', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('scripts/smoke-deployed.mjs', 'utf8');
+    expect(src).not.toMatch(/qa-5b|probe|lambda|invoke/i);
+  });
+  it('reports-api source does not import the probe', async () => {
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync('src/functions/reports-api/index.ts', 'utf8')).not.toMatch(/probe/i);
+  });
+});
