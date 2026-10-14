@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `npm run build:lambdas` (deterministic esbuild + zip of records-api/reports-api to `dist/*.zip`) and `npm run smoke:deployed` (post-deploy smoke), used by deploy.yml; stub Lambda handlers returning 404 problem+json ([runbook](docs/runbooks/build-and-smoke.md)).
 
 - records-api §5b first-deploy probe (QA-36): direct invoke with exactly `{"probe":"qa-5b"}` writes one sample audit event through `buildAuditPut` and checks that a bare `PutItem` on the audit table is denied; dev/stage only, refused in prod ([runbook](docs/runbooks/build-and-smoke.md)).
+- Bootstrap: deploy role Sid `InvokeRecordsApiProbe` (`lambda:InvokeFunction` on `SentinelQA-<env>-records-api` only) for the deploy.yml §5b probe; pending Bootstrap redeploy.
 
 ### Changed
 - `build:lambdas` aligned with ADR-0014: node24 target, ESM `index.mjs` + `index.mjs.map` at the zip root (still deterministic).

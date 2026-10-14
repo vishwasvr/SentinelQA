@@ -46,6 +46,11 @@ aws lambda invoke --function-name SentinelQA-dev-records-api \
   --cli-binary-format raw-in-base64-out --payload '{"probe":"qa-5b"}' out.json && cat out.json
 ```
 
+**Deploy role permission:** for deploy.yml to run this step, `SentinelQA-<env>-deploy` needs `lambda:InvokeFunction`
+on `SentinelQA-<env>-records-api` only. Sid `InvokeRecordsApiProbe` in `00-bootstrap.yaml` (env-scoped-deploy policy)
+grants exactly that as of this change; it is **not live** until the env's Bootstrap stack is redeployed with admin
+credentials (Vishwas's approval). Until then the deploy role cannot invoke it; run the probe manually as above.
+
 Each run [WRITE]s one new append-only audit event (`TransactWriteItems` via `buildAuditPut`, constant
 `attribute_not_exists` condition, entity `qa-5b-probe`, snapshot `isSample: true`), then tries a bare `PutItem` on the
 audit table with the same `attribute_not_exists(PK) AND attribute_not_exists(SK)` condition. Expected output (keys vary per run; the event body is never logged or returned):
