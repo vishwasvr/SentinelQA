@@ -13,6 +13,7 @@
 | [architecture/iac/ci-and-data-guards.md](architecture/iac/ci-and-data-guards.md) | CI jobs and data guards (no AWS in PR CI, coverage threshold, seed guards) | 2026-10-13 |
 | [architecture/iac/README.md](architecture/iac/README.md) | CloudFormation templates outline/skeleton incl. prod-only backup stack (not deployed) | 2026-10-13 |
 | [infrastructure/environments.md](infrastructure/environments.md) | Current deployed state of dev and stage (stacks, SSM, GitHub environments, drift, what's left) as of 2026-10-13 15:40 CT | 2026-10-13 |
+| [infrastructure/aws-resource-inventory.md](infrastructure/aws-resource-inventory.md) | AWS resource inventory per category (IAM, OIDC, stacks, S3, DynamoDB, secrets, SSM, Lambda, alarms/SNS): owning stack, tags, deployed/planned, last verified; updated with every deploy via the runbook run log | 2026-10-14 |
 | [architecture/cost-estimate.md](architecture/cost-estimate.md) | Cost estimate v0.5: prod / non-prod (lean vs strict), AWS managed keys, export backup, 20/50/100 users, savings review, 7-year retention and backup options, sources | 2026-10-13 |
 | [architecture/api/openapi.yaml](architecture/api/openapi.yaml) | API contract (OpenAPI 3.1, BRD v1.4.1); source of the 30-api routes | 2026-10-13 |
 | [specs/gate.md](specs/gate.md), [specs/audit.md](specs/audit.md), [specs/sample.md](specs/sample.md), [specs/config.md](specs/config.md) | Module specs for the safety-critical shared modules in `src/shared/` (as implemented in PR #7) | 2026-10-13 |
