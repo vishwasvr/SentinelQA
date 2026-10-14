@@ -35,10 +35,16 @@ function errName(e: unknown): string {
 }
 
 /** Runs the probe. Never logs or returns the event body; returns keys and outcomes only. */
-export async function runProbe5b(client: ProbeSender, ctx: Partial<AuditCtx> = {}): Promise<ProbeResult> {
-  const env = process.env.DEPLOY_ENV ?? '(unset)';
-  if (!ALLOWED_ENVS.has(env)) {
-    return { probe: 'qa-5b', env, pass: false, refused: `probe refused: DEPLOY_ENV=${env} (allowed: dev, stage)` };
+export async function runProbe5b(event: unknown, client: ProbeSender, ctx: Partial<AuditCtx> = {}): Promise<ProbeResult> {
+  // Fail closed: unset, empty, prod (any casing) or anything not dev/stage is refused before any AWS call.
+  const raw = process.env.ENV_NAME;
+  const env = raw === undefined ? '(unset)' : raw === '' ? '(empty)' : raw;
+  const norm = (raw ?? '').trim().toLowerCase();
+  if (norm === 'prod' || !ALLOWED_ENVS.has(norm)) {
+    return { probe: 'qa-5b', env, pass: false, refused: `probe refused: ENV_NAME=${env} (allowed: dev, stage)` };
+  }
+  if (!isProbeEvent(event)) {
+    return { probe: 'qa-5b', env, pass: false, refused: 'probe refused: not the exact {"probe":"qa-5b"} marker' };
   }
   const put = buildAuditPut(
     {
@@ -58,13 +64,16 @@ export async function runProbe5b(client: ProbeSender, ctx: Partial<AuditCtx> = {
     auditTransact = { ok: false, outcome: 'failed', error: errName(e) };
   }
 
-  // Bare PutItem (no transaction): must be denied by the EnclosingOperation Deny. Distinct SK so it can never collide.
+  // Bare PutItem (no transaction), same attribute_not_exists condition: must be denied by the EnclosingOperation
+  // Deny. Distinct SK so it can never collide. Only AccessDenied passes (ConditionalCheckFailed etc. fail).
   const bareItem: Record<string, AttributeValue> = {
     PK: { S: eventKeys.PK }, SK: { S: `${eventKeys.SK}#bare-put` }, entityType: { S: PROBE_ENTITY }, isSample: { BOOL: true },
   };
   let barePutItem: StepResult;
   try {
-    await client.send(new PutItemCommand({ TableName: put.Put!.TableName, Item: bareItem }));
+    await client.send(new PutItemCommand({
+      TableName: put.Put!.TableName, Item: bareItem, ConditionExpression: put.Put!.ConditionExpression,
+    }));
     barePutItem = { ok: false, outcome: 'succeeded (FAIL: bare PutItem must be denied)' };
   } catch (e) {
     const name = errName(e);

@@ -37,8 +37,9 @@ Automates first-deploy §5b (QA-36) with the deployed records-api role. It is re
 invoke whose payload is exactly `{"probe":"qa-5b"}` (no `requestContext`, no other keys); any API Gateway request,
 or any other payload, takes the normal path (stub 404). `npm run smoke:deployed` never calls it.
 
-It runs only when the function's `DEPLOY_ENV` is `dev` or `stage`. In `prod`, or when `DEPLOY_ENV` is unset or
-unknown, it returns `pass: false` with `refused` and touches nothing. **Never run it against prod.**
+Only records-api wires it (reports-api returns 404 for the same payload). It fails closed on the function's
+`ENV_NAME` (set by `30-api.yaml`): it runs only for `dev` or `stage`; when `ENV_NAME` is unset, empty, `prod` in any
+casing, or anything else, it returns `pass: false` with `refused` and touches nothing. **Never run it against prod.**
 
 ```bash
 aws lambda invoke --function-name SentinelQA-dev-records-api \
@@ -47,7 +48,7 @@ aws lambda invoke --function-name SentinelQA-dev-records-api \
 
 Each run [WRITE]s one new append-only audit event (`TransactWriteItems` via `buildAuditPut`, constant
 `attribute_not_exists` condition, entity `qa-5b-probe`, snapshot `isSample: true`), then tries a bare `PutItem` on the
-audit table. Expected output (keys vary per run; the event body is never logged or returned):
+audit table with the same `attribute_not_exists(PK) AND attribute_not_exists(SK)` condition. Expected output (keys vary per run; the event body is never logged or returned):
 
 ```json
 { "probe": "qa-5b", "env": "dev", "pass": true,
@@ -57,9 +58,7 @@ audit table. Expected output (keys vary per run; the event body is never logged 
 ```
 
 `pass` is true only if the transaction writes **and** the bare `PutItem` is denied with `AccessDeniedException`
-(or `AccessDenied`). A `PutItem` that succeeds, or fails with any other error, is a FAIL. If `auditTransact` fails,
+(or `AccessDenied`). A `PutItem` that succeeds, or fails with any other error (including
+`ConditionalCheckFailedException`), is a FAIL. If `auditTransact` fails,
 follow first-deploy §5b (stop; Architect's fallback). Re-runs are safe: each adds one new event and overwrites nothing.
 The probe stays in place as a non-prod regression check after first deploy.
-
-Prerequisite: the records-api function must have `DEPLOY_ENV` set to `dev`/`stage` in its environment (30-api.yaml
-currently sets `ENV_NAME`, not `DEPLOY_ENV`; until that is added, the probe refuses).

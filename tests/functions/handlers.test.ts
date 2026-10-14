@@ -29,11 +29,11 @@ describe('http helpers', () => {
 describe('records-api §5b probe routing', async () => {
   const { setClient } = await import('../../src/functions/records-api/index.js');
   const { vi, afterEach } = await import('vitest');
-  const saved = process.env.DEPLOY_ENV;
-  afterEach(() => { setClient(undefined); if (saved === undefined) delete process.env.DEPLOY_ENV; else process.env.DEPLOY_ENV = saved; });
+  const saved = process.env.ENV_NAME;
+  afterEach(() => { setClient(undefined); if (saved === undefined) delete process.env.ENV_NAME; else process.env.ENV_NAME = saved; });
 
   it('runs the probe for a direct invoke with exactly the marker', async () => {
-    process.env.DEPLOY_ENV = 'dev';
+    process.env.ENV_NAME = 'dev';
     const send = vi.fn(async (cmd: { constructor: { name: string } }) => {
       if (cmd.constructor.name === 'PutItemCommand') throw Object.assign(new Error('d'), { name: 'AccessDeniedException' });
       return {};
@@ -51,12 +51,28 @@ describe('records-api §5b probe routing', async () => {
   });
 
   it('refuses in prod without touching DynamoDB (default client path)', async () => {
-    process.env.DEPLOY_ENV = 'prod';
+    process.env.ENV_NAME = 'prod';
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const r = await records({ probe: 'qa-5b' } as never) as { pass: boolean; refused: string };
     log.mockRestore();
     expect(r.pass).toBe(false);
-    expect(r.refused).toMatch(/DEPLOY_ENV=prod/);
+    expect(r.refused).toMatch(/ENV_NAME=prod/);
+  });
+
+  it('reports-api never reaches the probe: {"probe":"qa-5b"} is a 404', async () => {
+    process.env.ENV_NAME = 'dev';
+    const send = vi.fn();
+    setClient({ send });
+    const r = await reports({ probe: 'qa-5b' } as never) as HttpResult;
+    expect(r.statusCode).toBe(404);
+    expect(JSON.parse(r.body).code).toBe('not_found');
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('isDirectProbeInvoke rejects non-objects and arrays', async () => {
+    const { isDirectProbeInvoke } = await import('../../src/functions/records-api/index.js');
+    for (const e of [null, undefined, 'x', ['qa-5b'], {}, { probe: 'qa-5a' }]) expect(isDirectProbeInvoke(e)).toBe(false);
+    expect(isDirectProbeInvoke({ probe: 'qa-5b' })).toBe(true);
   });
 
   it.each([
@@ -64,7 +80,7 @@ describe('records-api §5b probe routing', async () => {
     { probe: 'qa-5b', extra: true },
     { rawPath: '/api/x', requestContext: { http: { method: 'POST' } }, body: '{"probe":"qa-5b"}' },
   ])('anything else follows the normal 404 path: %j', async (e) => {
-    process.env.DEPLOY_ENV = 'dev';
+    process.env.ENV_NAME = 'dev';
     const send = vi.fn();
     setClient({ send });
     const r = await records(e as never) as { statusCode: number };
