@@ -38,8 +38,8 @@ As of **2026-10-13 ~15:40 CT**. Account `723940054516`, region `us-east-1` (dev 
 
 ## Known drift
 - **Tags:** deployed stacks are tagged `app=SentinelQA`, `env=<env>` (OIDC provider: `app=SentinelQA`). The repo now follows ADR-0017 for 00-bootstrap and 00-account-oidc (explicit `Project`, `Environment`, `ManagedBy`, `Repo` tags; `Environment=shared` for the account OIDC stack) and the runbook deploy commands pass the matching `--tags`. Deployed stacks **keep the old tags until a Vishwas-approved redeploy**. Redeploying is a tag-only stack update (no resource replacement); stage Bootstrap's termination protection doesn't block updates. Templates 10-50 are being retagged separately (Developer).
-- **Deploy role policy (branch `ci/deploy-workflow`):** `00-bootstrap.yaml` now lets `SentinelQA-<env>-deploy` read Bootstrap outputs (`DescribeStacks` only), tag `SentinelQA-<env>-*` stacks (`cloudformation:TagResource`, for `--tags`), `s3:ListBucket` on the env artifact bucket (head-object 404), and `ssm:PutParameter` on `/sentinelqa/<env>/version`. The live dev (and stage) Bootstrap stacks do not have this yet: a Bootstrap redeploy with admin credentials is needed, with Vishwas's approval, before the first `deploy.yml` run. The deploy role cannot apply it itself.
-- **`deploy.yml` is manual-only (temporary, Vishwas's decision 2026-10-13):** the `push` trigger is removed, so merges to main don't deploy; only `workflow_dispatch` runs it. Re-enable by restoring the commented `push:` block at the top of `.github/workflows/deploy.yml` in a PR, after (1) the dev/stage Bootstrap and OIDC redeploy is done with Vishwas's approval and (2) `npm run build:lambdas` and `npm run smoke:deployed` are on main.
+- **Deploy role policy (on main via #15):** `00-bootstrap.yaml` now lets `SentinelQA-<env>-deploy` read Bootstrap outputs (`DescribeStacks` only), tag `SentinelQA-<env>-*` stacks (`cloudformation:TagResource`, for `--tags`), `s3:ListBucket` on the env artifact bucket (head-object 404), and `ssm:PutParameter` on `/sentinelqa/<env>/version`. The live dev (and stage) Bootstrap stacks do not have this yet: a Bootstrap redeploy with admin credentials is needed, with Vishwas's approval, before the first `deploy.yml` run. The deploy role cannot apply it itself.
+- **`deploy.yml` is manual-only (temporary, Vishwas's decision 2026-10-13):** the `push` trigger is removed, so merges to main don't deploy; only `workflow_dispatch` runs it. Re-enable by restoring the commented `push:` block at the top of `.github/workflows/deploy.yml` in a PR, after (1) the dev/stage Bootstrap and OIDC redeploy is done with Vishwas's approval and (2) `npm run build:lambdas` and `npm run smoke:deployed` are on main (both landed in #18; only (1) remains).
 - **AlarmEmail:** the deployed Security stacks got `AlarmEmail` passed directly at deploy time. Future redeploys must take it from the `ALARM_EMAIL` GitHub environment variable (PR #6). The address is never written in the repo.
 
 ## Admin session (2026-10-13)
@@ -49,10 +49,12 @@ Run by InfraDeploy on Vishwas's temporary `aws login` session (profile `sentinel
 1. Verify GitHub environment settings (dev/stage `AWS_DEPLOY_ROLE_ARN`, branch limits) independently.
 2. Set and verify `ALARM_EMAIL` on `dev` and `stage` (PR #6).
 3. Confirm the SNS email subscriptions for `SentinelQA-dev-alarms` and `SentinelQA-stage-alarms`.
-4. Developer adds `npm run build:lambdas` (writes `dist/records-api.zip`, `dist/reports-api.zip`) and `npm run smoke:deployed`; `deploy.yml` (on main, manual dispatch only for now) then runs the first build and pipeline first deploy of Api, Web, Observability (dev, then stage; stage-bootstrap steps 6–9).
-5. Smoke test and sample data in stage (stage-bootstrap step 9).
-6. Decide whether to turn termination protection on for `SentinelQA-dev-Bootstrap`.
-7. Apply ADR-0017 tags once accepted.
+4. Redeploy `SentinelQA-Account-OIDC`, `SentinelQA-dev-Bootstrap` and `SentinelQA-stage-Bootstrap` (ADR-0017 tags + deploy-role policy from #14/#15) as reviewed change sets with admin credentials and Vishwas's approval; required before the first `deploy.yml` run.
+5. First manual `deploy.yml` dispatch for dev (build scripts `build:lambdas` / `smoke:deployed` are on main via #18; smoke URL wiring via #17): deploys Api, Web, Observability, then the §5b audit-write probe (Vishwas's OK). Then stage (stage-bootstrap steps 6–9).
+6. Re-enable the `push` trigger in `deploy.yml` after items 4–5.
+7. Smoke test and sample data in stage (stage-bootstrap step 9).
+8. Decide whether to turn termination protection on for `SentinelQA-dev-Bootstrap`.
+9. Retag templates 10–50 per ADR-0017 (Developer); 00-bootstrap/00-account-oidc done in repo, live via item 4.
 
 ## Runbooks
 - [stage-bootstrap.md](../runbooks/stage-bootstrap.md)
