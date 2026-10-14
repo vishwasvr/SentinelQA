@@ -17,6 +17,6 @@
 | [architecture/cost-estimate.md](architecture/cost-estimate.md) | Cost estimate v0.5: prod / non-prod (lean vs strict), AWS managed keys, export backup, 20/50/100 users, savings review, 7-year retention and backup options, sources | 2026-10-13 |
 | [architecture/api/openapi.yaml](architecture/api/openapi.yaml) | API contract (OpenAPI 3.1, BRD v1.4.1); source of the 30-api routes | 2026-10-13 |
 | [specs/gate.md](specs/gate.md), [specs/audit.md](specs/audit.md), [specs/sample.md](specs/sample.md), [specs/config.md](specs/config.md) | Module specs for the safety-critical shared modules in `src/shared/` (as implemented in PR #7) | 2026-10-13 |
-| [runbooks/build-and-smoke.md](runbooks/build-and-smoke.md) | `build:lambdas` and `smoke:deployed` npm scripts used by deploy.yml: outputs, env vars, stub handlers, §5b probe (non-prod) | 2026-10-14 |
+| [runbooks/build-and-smoke.md](runbooks/build-and-smoke.md) | `build:lambdas` and `smoke:deployed` npm scripts used by deploy.yml: outputs, env vars, stub handlers, §5b probe (non-prod, auto-run by deploy.yml) | 2026-10-14 |
 | [reviews/architect-review.md](reviews/architect-review.md) | Architect self-review + resolution of peer findings (v0.5) | 2026-10-13 |
 - [BA responses to review findings (BRD v1.3, statuses v1.4 / v1.4.1 / v1.4.2)](reviews/ba-responses.md)

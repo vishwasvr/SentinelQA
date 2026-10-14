@@ -62,3 +62,8 @@ audit table with the same `attribute_not_exists(PK) AND attribute_not_exists(SK)
 `ConditionalCheckFailedException`), is a FAIL. If `auditTransact` fails,
 follow first-deploy §5b (stop; Architect's fallback). Re-runs are safe: each adds one new event and overwrites nothing.
 The probe stays in place as a non-prod regression check after first deploy.
+
+**CI:** `deploy.yml` runs this automatically for non-prod (`deploy-dev` right after the smoke step; `deploy-stage` after
+the deploy step), as its own step guarded by `env.DEPLOY_ENV == 'dev' || env.DEPLOY_ENV == 'stage'`, with the job's
+OIDC deploy role. The step fails unless the invoke returns `StatusCode` 200, no `FunctionError`, and `out-5b.json` is
+valid JSON with `pass: true` (it also fails if the function is missing). It prints the result JSON. Never in prod.
