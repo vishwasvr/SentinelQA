@@ -23,7 +23,7 @@ export async function handler(event: HttpEvent): Promise<HttpResult | ProbeResul
   if (isDirectProbeInvoke(event)) {
     client ??= new DynamoDBClient({});
     const r = await runProbe5b(event, client);
-    console.log(JSON.stringify({ probe: r.probe, env: r.env, pass: r.pass, refused: r.refused }));
+    console.log(JSON.stringify({ probe: r.probe, env: r.env, pass: r.pass, refused: r.refused, readBack: r.readBack }));
     return r;
   }
   return router(event);

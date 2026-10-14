@@ -150,6 +150,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      DEPLOY_ENV: dev
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: { persist-credentials: false }
@@ -182,6 +184,31 @@ jobs:
           else
             echo "::warning::No 'smoke:deployed' script yet. Run the smoke test + QA-36 (first-deploy §5b) manually before committing releases/<sha>/dev-signoff.md."
           fi
+      - name: §5b audit-write probe (records-api direct invoke, non-prod only)
+        # Separate from smoke so it still runs when smoke is warning-only. Same OIDC role as the deploy step.
+        if: env.DEPLOY_ENV == 'dev' || env.DEPLOY_ENV == 'stage'
+        run: |
+          set -uo pipefail
+          FN="SentinelQA-${DEPLOY_ENV}-records-api"
+          echo "Invoking ${FN} with the §5b probe payload"
+          if ! aws lambda invoke --region us-east-1 --function-name "$FN" \
+              --cli-binary-format raw-in-base64-out --payload '{"probe":"qa-5b"}' \
+              out-5b.json > invoke-5b.json; then
+            echo "::error::aws lambda invoke failed for ${FN} (function missing or not invokable)"; exit 1
+          fi
+          cat invoke-5b.json
+          STATUS=$(jq -r '.StatusCode // empty' invoke-5b.json)
+          FNERR=$(jq -r '.FunctionError // empty' invoke-5b.json)
+          if [ "$STATUS" != "200" ]; then echo "::error::§5b invoke StatusCode=${STATUS:-missing} (expected 200)"; exit 1; fi
+          if [ -n "$FNERR" ]; then echo "::error::§5b invoke FunctionError=${FNERR}"; cat out-5b.json || true; exit 1; fi
+          if [ ! -s out-5b.json ] || ! jq -e . out-5b.json > /dev/null; then
+            echo "::error::§5b out-5b.json missing or not valid JSON"; exit 1
+          fi
+          jq . out-5b.json
+          if ! jq -e '.pass == true' out-5b.json > /dev/null; then
+            echo "::error::§5b probe FAILED (pass !== true); follow first-deploy §5b"; exit 1
+          fi
+          echo "§5b probe PASS"
 
   # Stage: no required reviewer (option (c)); the gate is the Developer's dev sign-off file on main.
   deploy-stage:
@@ -195,6 +222,8 @@ jobs:
       contents: read
       actions: read
       id-token: write
+    env:
+      DEPLOY_ENV: stage
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: { persist-credentials: false, ref: main }
