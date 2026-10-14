@@ -12,7 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `npm run build:lambdas` (deterministic esbuild + zip of records-api/reports-api to `dist/*.zip`) and `npm run smoke:deployed` (post-deploy smoke), used by deploy.yml; stub Lambda handlers returning 404 problem+json ([runbook](docs/runbooks/build-and-smoke.md)).
 
 - records-api §5b first-deploy probe (QA-36): direct invoke with exactly `{"probe":"qa-5b"}` writes one sample audit event through `buildAuditPut` and checks that a bare `PutItem` on the audit table is denied; dev/stage only, refused in prod ([runbook](docs/runbooks/build-and-smoke.md)).
-- deploy.yml runs the §5b probe automatically in `deploy-dev` (after smoke) and `deploy-stage` as a separate, non-prod-guarded step that fails unless `pass: true`; `DEPLOY_ENV` is now also set at job level ([runbook](docs/runbooks/build-and-smoke.md)).
+- deploy.yml runs the §5b probe automatically in `deploy-dev` only (after smoke) as a separate, non-prod-guarded step that fails unless `pass: true`; `DEPLOY_ENV` is now also set at job level; needs `lambda:InvokeFunction` on the deploy role (pending Bootstrap change) ([runbook](docs/runbooks/build-and-smoke.md)).
+- §5b probe read-back: consistent keys-only `GetItem` confirms the audit event exists and the `#bare-put` key is absent; both folded into `pass` (`readBack` in the result).
 
 ### Changed
 - `build:lambdas` aligned with ADR-0014: node24 target, ESM `index.mjs` + `index.mjs.map` at the zip root (still deterministic).

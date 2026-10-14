@@ -1,15 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PutItemCommand, TransactWriteItemsCommand } from '@aws-sdk/client-dynamodb';
+import { GetItemCommand, PutItemCommand, TransactWriteItemsCommand } from '@aws-sdk/client-dynamodb';
 import { isProbeEvent, runProbe5b, type ProbeSender } from '../../src/shared/audit/probe5b.js';
 
 const fixed = { now: () => new Date('2026-10-14T14:00:00.000Z'), ulid: () => '01TESTULID0000000000000000', tableName: 'AuditLogT' };
 const M = { probe: 'qa-5b' };
 const err = (name: string) => Object.assign(new Error('x'), { name });
 
-function mockClient(put: () => Promise<unknown>, tx: () => Promise<unknown> = async () => ({})) {
+type Get = (sk: string) => Promise<unknown>;
+/** Default read-back: audit event present, #bare-put key absent. */
+const okGet: Get = async (sk) => (sk.endsWith('#bare-put') ? {} : { Item: { PK: { S: 'p' }, SK: { S: sk } } });
+
+function mockClient(put: () => Promise<unknown>, tx: () => Promise<unknown> = async () => ({}), get: Get = okGet) {
   const calls: unknown[] = [];
   const c: ProbeSender = {
-    send: vi.fn(async (cmd) => { calls.push(cmd); return cmd instanceof TransactWriteItemsCommand ? tx() : put(); }),
+    send: vi.fn(async (cmd) => {
+      calls.push(cmd);
+      if (cmd instanceof GetItemCommand) return get(cmd.input.Key!.SK.S!);
+      return cmd instanceof TransactWriteItemsCommand ? tx() : put();
+    }),
   };
   return { c, calls };
 }
@@ -73,7 +81,9 @@ describe('runProbe5b', () => {
         eventKeys: { PK: 'WS#qa-5b-probe#ENT#qa-5b-probe', SK: '2026-10-14T14:00:00.000Z#01TESTULID0000000000000000' },
         auditTransact: { ok: true, outcome: 'written' },
         barePutItem: { ok: true, outcome: 'denied', error: 'AccessDeniedException' },
+        readBack: { auditEventFound: true, barePutAbsent: true },
       });
+      expect(r.readBack).toEqual({ auditEventFound: true, barePutAbsent: true });
       const tx = calls[0] as TransactWriteItemsCommand;
       expect(tx.input.TransactItems).toHaveLength(1);
       const p = tx.input.TransactItems![0].Put!;
@@ -123,7 +133,58 @@ describe('runProbe5b', () => {
       const a = await runProbe5b(M, c, { tableName: 'T' });
       const b = await runProbe5b(M, c, { tableName: 'T' });
       expect(a.eventKeys!.SK).not.toBe(b.eventKeys!.SK);
-      expect(calls).toHaveLength(4);
+      expect(calls).toHaveLength(8);
+    });
+
+    describe('read-back', () => {
+      const denied = async () => { throw err('AccessDeniedException'); };
+
+      it('found + absent passes; GetItems are consistent, keys-only, on the audit table', async () => {
+        const { c, calls } = mockClient(denied);
+        const r = await runProbe5b(M, c, fixed);
+        expect(r.pass).toBe(true);
+        const gets = calls.filter((x): x is GetItemCommand => x instanceof GetItemCommand);
+        expect(gets).toHaveLength(2);
+        for (const g of gets) {
+          expect(g.input).toMatchObject({ TableName: 'AuditLogT', ConsistentRead: true, ProjectionExpression: 'PK, SK' });
+        }
+        expect(gets[0].input.Key).toEqual({ PK: { S: r.eventKeys!.PK }, SK: { S: r.eventKeys!.SK } });
+        expect(gets[1].input.Key).toEqual({ PK: { S: r.eventKeys!.PK }, SK: { S: `${r.eventKeys!.SK}#bare-put` } });
+      });
+
+      it('fails when the audit event is missing', async () => {
+        const { c } = mockClient(denied, undefined, async () => ({}));
+        const r = await runProbe5b(M, c, fixed);
+        expect(r.pass).toBe(false);
+        expect(r.readBack).toEqual({ auditEventFound: false, barePutAbsent: true });
+      });
+
+      it('fails when the #bare-put key is present', async () => {
+        const { c } = mockClient(denied, undefined, async (sk) => ({ Item: { SK: { S: sk } } }));
+        const r = await runProbe5b(M, c, fixed);
+        expect(r.pass).toBe(false);
+        expect(r.readBack).toEqual({ auditEventFound: true, barePutAbsent: false });
+      });
+
+      it('fails on a GetItem error and reports the error name only', async () => {
+        const { c } = mockClient(denied, undefined, async () => { throw Object.assign(new Error('secret body text'), { name: 'AccessDeniedException' }); });
+        const r = await runProbe5b(M, c, fixed);
+        expect(r.pass).toBe(false);
+        expect(r.readBack).toEqual({
+          auditEventFound: false, barePutAbsent: false, auditEventError: 'AccessDeniedException', barePutError: 'AccessDeniedException',
+        });
+        expect(JSON.stringify(r)).not.toContain('secret body text');
+      });
+
+      it('fails on a GetItem error for one key only (undefined response treated as absent)', async () => {
+        const { c } = mockClient(denied, undefined, async (sk) => {
+          if (sk.endsWith('#bare-put')) return undefined;
+          throw null;
+        });
+        const r = await runProbe5b(M, c, fixed);
+        expect(r.pass).toBe(false);
+        expect(r.readBack).toEqual({ auditEventFound: false, barePutAbsent: true, auditEventError: 'UnknownError' });
+      });
     });
   });
 });

@@ -54,16 +54,26 @@ audit table with the same `attribute_not_exists(PK) AND attribute_not_exists(SK)
 { "probe": "qa-5b", "env": "dev", "pass": true,
   "eventKeys": { "PK": "WS#qa-5b-probe#ENT#qa-5b-probe", "SK": "<ISO time>#<ULID>" },
   "auditTransact": { "ok": true, "outcome": "written" },
-  "barePutItem": { "ok": true, "outcome": "denied", "error": "AccessDeniedException" } }
+  "barePutItem": { "ok": true, "outcome": "denied", "error": "AccessDeniedException" },
+  "readBack": { "auditEventFound": true, "barePutAbsent": true } }
 ```
 
 `pass` is true only if the transaction writes **and** the bare `PutItem` is denied with `AccessDeniedException`
-(or `AccessDenied`). A `PutItem` that succeeds, or fails with any other error (including
+(or `AccessDenied`) **and** the read-back confirms it: a consistent, keys-only `GetItem` finds the audit event, and a
+`GetItem` of the `<SK>#bare-put` key finds nothing. A `GetItem` error fails that check and is reported by error name
+only (`readBack.auditEventError` / `readBack.barePutError`). A `PutItem` that succeeds, or fails with any other error (including
 `ConditionalCheckFailedException`), is a FAIL. If `auditTransact` fails,
 follow first-deploy §5b (stop; Architect's fallback). Re-runs are safe: each adds one new event and overwrites nothing.
 The probe stays in place as a non-prod regression check after first deploy.
 
-**CI:** `deploy.yml` runs this automatically for non-prod (`deploy-dev` right after the smoke step; `deploy-stage` after
-the deploy step), as its own step guarded by `env.DEPLOY_ENV == 'dev' || env.DEPLOY_ENV == 'stage'`, with the job's
-OIDC deploy role. The step fails unless the invoke returns `StatusCode` 200, no `FunctionError`, and `out-5b.json` is
-valid JSON with `pass: true` (it also fails if the function is missing). It prints the result JSON. Never in prod.
+**CI:** `deploy.yml` runs this automatically in `deploy-dev` only, right after the smoke step, as its own step guarded
+by `env.DEPLOY_ENV == 'dev' || env.DEPLOY_ENV == 'stage'`, with the job's OIDC deploy role. It is **not** run in
+`deploy-stage` (run it manually there) and never in prod. The step fails unless the invoke returns `StatusCode` 200, no
+`FunctionError`, and `out-5b.json` is valid JSON with `pass: true` (it also fails if the function is missing). It
+prints the result JSON.
+
+- **Permanent audit data (expected):** every dev deploy run writes one permanent sample audit event (entity
+  `qa-5b-probe`, `isSample: true`) to the append-only dev AuditLog table. It cannot be removed and that is by design.
+- **Known blocker:** the deploy role does not currently have `lambda:InvokeFunction` (it appears only in
+  `AppRoleBoundary`, which is a ceiling, not a grant). Until a Bootstrap (`00-bootstrap.yaml`) change is approved, the
+  CI step will fail with `AccessDeniedException` on the invoke. Run the probe manually as above in the meantime.

@@ -27,7 +27,15 @@ function stepBlock(body: string, name: string): string | undefined {
 describe('deploy.yml §5b probe step', () => {
   const j = jobs();
 
-  it.each([['deploy-dev', 'dev'], ['deploy-stage', 'stage']])('%s has the step with the non-prod guard', (job, env) => {
+  it('is ONLY in deploy-dev', () => {
+    const withStep = Object.entries(j).filter(([, b]) => b.includes('qa-5b')).map(([n]) => n);
+    expect(withStep).toEqual(['deploy-dev']);
+    expect(j['deploy-stage']).toBeDefined();
+    expect(j['deploy-stage']).not.toContain(STEP);
+    expect(j['deploy-stage']).toMatch(/\n {4}env:\n {6}DEPLOY_ENV: stage\n/);
+  });
+
+  it.each([['deploy-dev', 'dev']])('%s has the step with the non-prod guard', (job, env) => {
     const body = j[job];
     expect(body).toBeDefined();
     expect(body).toMatch(new RegExp(`\\n {4}env:\\n {6}DEPLOY_ENV: ${env}\\n`));

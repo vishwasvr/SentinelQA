@@ -36,6 +36,10 @@ describe('records-api §5b probe routing', async () => {
     process.env.ENV_NAME = 'dev';
     const send = vi.fn(async (cmd: { constructor: { name: string } }) => {
       if (cmd.constructor.name === 'PutItemCommand') throw Object.assign(new Error('d'), { name: 'AccessDeniedException' });
+      if (cmd.constructor.name === 'GetItemCommand') {
+        const sk = (cmd as unknown as { input: { Key: { SK: { S: string } } } }).input.Key.SK.S;
+        return sk.endsWith('#bare-put') ? {} : { Item: { PK: { S: 'x' } } };
+      }
       return {};
     });
     setClient({ send });
@@ -45,7 +49,7 @@ describe('records-api §5b probe routing', async () => {
     const r = await records({ probe: 'qa-5b' } as never) as { pass: boolean };
     process.env['AUDIT_' + 'TABLE'] = prevTable;
     expect(r.pass).toBe(true);
-    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledTimes(4);
     expect(log.mock.calls.flat().join(' ')).not.toMatch(/snapshot|isSample/);
     log.mockRestore();
   });
