@@ -1,7 +1,7 @@
 // First-deploy §5b probe (first-deploy.md §5b, QA-36). Non-prod only; reached by direct Lambda invoke only.
 // Lives under src/shared/audit/ because it names the audit table (audit-lint rule) and must issue the bare PutItem.
 import type { AttributeValue } from '@aws-sdk/client-dynamodb';
-import { PutItemCommand, TransactWriteItemsCommand } from '@aws-sdk/client-dynamodb';
+import { GetItemCommand, PutItemCommand, TransactWriteItemsCommand } from '@aws-sdk/client-dynamodb';
 import { buildAuditPut, type AuditCtx } from './appendAudit.js';
 
 export const PROBE_ENTITY = 'qa-5b-probe';
@@ -15,7 +15,7 @@ export function isProbeEvent(event: unknown): boolean {
 }
 
 export interface ProbeSender {
-  send(cmd: TransactWriteItemsCommand | PutItemCommand): Promise<unknown>;
+  send(cmd: TransactWriteItemsCommand | PutItemCommand | GetItemCommand): Promise<unknown>;
 }
 
 export interface StepResult { ok: boolean; outcome: string; error?: string }
@@ -27,6 +27,8 @@ export interface ProbeResult {
   eventKeys?: { PK: string; SK: string };
   auditTransact?: StepResult;
   barePutItem?: StepResult;
+  /** Consistent GetItem read-back: the audit event must exist, the #bare-put key must not. */
+  readBack?: { auditEventFound: boolean; barePutAbsent: boolean; auditEventError?: string; barePutError?: string };
 }
 
 function errName(e: unknown): string {
@@ -81,5 +83,28 @@ export async function runProbe5b(event: unknown, client: ProbeSender, ctx: Parti
     barePutItem = { ok: denied, outcome: denied ? 'denied' : 'failed with unexpected error', error: name };
   }
 
-  return { probe: 'qa-5b', env, pass: auditTransact.ok && barePutItem.ok, eventKeys, auditTransact, barePutItem };
+  // Read-back (ConsistentRead, keys only via ProjectionExpression so the event body is never fetched).
+  // A GetItem error is a FAIL for that check; only the error name is reported.
+  const tableName = put.Put!.TableName;
+  const exists = async (PK: string, SK: string): Promise<{ found?: boolean; error?: string }> => {
+    try {
+      const out = (await client.send(new GetItemCommand({
+        TableName: tableName, Key: { PK: { S: PK }, SK: { S: SK } }, ConsistentRead: true, ProjectionExpression: 'PK, SK',
+      }))) as { Item?: unknown } | undefined;
+      return { found: out?.Item !== undefined };
+    } catch (e) {
+      return { error: errName(e) };
+    }
+  };
+  const ev = await exists(eventKeys.PK, eventKeys.SK);
+  const bare = await exists(bareItem.PK.S!, bareItem.SK.S!);
+  const readBack: NonNullable<ProbeResult['readBack']> = {
+    auditEventFound: ev.found === true,
+    barePutAbsent: bare.found === false,
+    ...(ev.error ? { auditEventError: ev.error } : {}),
+    ...(bare.error ? { barePutError: bare.error } : {}),
+  };
+
+  const pass = auditTransact.ok && barePutItem.ok && readBack.auditEventFound && readBack.barePutAbsent;
+  return { probe: 'qa-5b', env, pass, eventKeys, auditTransact, barePutItem, readBack };
 }
